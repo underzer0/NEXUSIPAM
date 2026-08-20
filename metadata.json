@@ -1,0 +1,6 @@
+{
+  "name": "IP Address Manager (IPAM)",
+  "description": "Enterprise Web IP Address Management application tracking Datacenters, VLANs, Subnets, and IP assignments with real-time updates and REST APIs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
