@@ -68,15 +68,15 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-3.5 sm:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-6">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-white dark:text-white flex items-center gap-2.5">
+          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white dark:text-white flex items-center gap-2.5">
             <Building2 className="w-5 h-5 text-indigo-400" />
             Datacenter Infrastructure Sites
           </h1>
-          <p className="text-xs text-slate-400 mt-1 font-mono">
+          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 font-mono">
             Physical geographic regions acting as independent routing and VLAN isolation scopes.
           </p>
         </div>
@@ -84,14 +84,14 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
         <button
           id="btn-add-datacenter"
           onClick={onOpenNewDatacenterModal}
-          className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2 self-start sm:self-auto active:scale-95"
+          className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2 active:scale-95"
         >
           <Plus className="w-4 h-4" /> Add Datacenter Site
         </button>
       </div>
 
       {deleteError && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-start gap-2 font-mono">
+        <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-start gap-2 font-mono">
           <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
           <div>
             <span className="font-bold">Cannot Delete Datacenter: </span>

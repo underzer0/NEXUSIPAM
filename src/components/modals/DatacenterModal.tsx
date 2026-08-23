@@ -69,11 +69,11 @@ export const DatacenterModal: React.FC<DatacenterModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-      <div className={`relative w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden ${
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+      <div className={`relative w-full max-w-md max-h-[90vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden ${
         isDark ? 'bg-slate-900 border-slate-700/60 text-slate-100' : 'bg-white border-slate-200 text-slate-800'
       }`}>
-        <div className="p-5 border-b border-slate-700/50 flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-slate-700/50 flex items-center justify-between shrink-0">
           <h2 className="text-base font-bold flex items-center gap-2 text-white">
             <Building2 className="w-5 h-5 text-indigo-400" />
             {datacenterToEdit ? 'Edit Datacenter Site' : 'Add New Datacenter Site'}
@@ -83,7 +83,7 @@ export const DatacenterModal: React.FC<DatacenterModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-3.5 text-xs font-mono">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-3.5 text-xs font-mono overflow-y-auto">
           {error && (
             <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400">
               {error}

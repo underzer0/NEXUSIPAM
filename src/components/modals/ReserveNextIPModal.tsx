@@ -36,13 +36,15 @@ export const ReserveNextIPModal: React.FC<ReserveNextIPModalProps> = ({
   useEffect(() => {
     if (!subnetId || !isOpen) return;
     let isMounted = true;
-    getNextAvailableIP(subnetId).then(res => {
-      if (isMounted) setPreviewIP(res.nextAvailableIP);
-    }).catch(() => {
-      if (isMounted) setPreviewIP(null);
-    });
+    if (getNextAvailableIP) {
+      getNextAvailableIP(subnetId).then(res => {
+        if (isMounted) setPreviewIP(res?.availableIP || (res as any)?.nextAvailableIP || null);
+      }).catch(() => {
+        if (isMounted) setPreviewIP(null);
+      });
+    }
     return () => { isMounted = false; };
-  }, [subnetId, isOpen]);
+  }, [subnetId, isOpen, getNextAvailableIP]);
 
   if (!isOpen) return null;
 

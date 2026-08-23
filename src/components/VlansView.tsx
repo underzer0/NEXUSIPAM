@@ -67,15 +67,15 @@ export const VlansView: React.FC<VlansViewProps> = ({
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-3.5 sm:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-white dark:text-white flex items-center gap-2.5">
+          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white dark:text-white flex items-center gap-2.5">
             <Layers className="w-5 h-5 text-purple-400" />
             Virtual LAN (VLAN) Management
           </h1>
-          <p className="text-xs text-slate-400 mt-1 font-mono">
+          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 font-mono">
             Layer-2 broadcast domains scoped locally to individual Datacenters (VLAN IDs 1–4094).
           </p>
         </div>
@@ -83,14 +83,14 @@ export const VlansView: React.FC<VlansViewProps> = ({
         <button
           id="btn-add-vlan"
           onClick={onOpenNewVlanModal}
-          className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2 self-start sm:self-auto active:scale-95"
+          className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2 active:scale-95"
         >
           <Plus className="w-4 h-4" /> Create VLAN
         </button>
       </div>
 
       {/* Domain Rule Explainer Card */}
-      <div className={`p-4 rounded-2xl border flex items-start gap-3 text-xs ${
+      <div className={`p-3.5 sm:p-4 rounded-2xl border flex items-start gap-3 text-xs ${
         isDark ? 'bg-purple-950/20 border-purple-500/30 text-purple-200' : 'bg-purple-50 border-purple-200 text-purple-900'
       }`}>
         <Info className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
@@ -98,13 +98,13 @@ export const VlansView: React.FC<VlansViewProps> = ({
           <span className="font-bold text-xs block text-purple-300">VLAN Uniqueness Architecture Rule</span>
           <p className="text-inherit opacity-90 leading-relaxed font-mono text-[11px]">
             In enterprise networks, VLAN IDs (1–4094) are scoped to their respective physical Datacenter. 
-            For example, <span className="font-semibold text-purple-300 underline">VLAN 100</span> can exist in <strong>DC-East</strong> (e.g. for Backend Apps) and independently in <strong>DC-West</strong> (e.g. for DMZ Edge Gateways) without collision.
+            For example, <span className="font-semibold text-purple-300 underline">VLAN 100</span> can exist in <strong>DC-East</strong> and independently in <strong>DC-West</strong> without collision.
           </p>
         </div>
       </div>
 
       {deleteError && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-start gap-2 font-mono">
+        <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-start gap-2 font-mono">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <div>
             <span className="font-bold">Cannot Delete VLAN: </span>
@@ -114,19 +114,19 @@ export const VlansView: React.FC<VlansViewProps> = ({
       )}
 
       {/* Filter Toolbar */}
-      <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3 ${
+      <div className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3 ${
         isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-white border-slate-200'
       }`}>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 font-mono">
             <Building2 className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Datacenter Scope:</span>
+            <span className="text-[11px]">Datacenter Scope:</span>
           </div>
           <select
             id="vlan-dc-filter"
             value={dcFilter}
             onChange={(e) => setDcFilter(e.target.value)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium border focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+            className={`flex-1 sm:flex-initial px-2.5 py-1.5 rounded-lg text-xs font-medium border focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
               isDark ? 'bg-slate-900/80 border-slate-700/60 text-slate-200' : 'bg-slate-100 border-slate-200 text-slate-800'
             }`}
           >
@@ -152,11 +152,79 @@ export const VlansView: React.FC<VlansViewProps> = ({
         </div>
       </div>
 
-      {/* VLANs Table */}
+      {/* VLANs: Mobile Cards (< md) + Desktop Table (md+) */}
       <div className={`rounded-2xl border overflow-hidden ${
         isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-white border-slate-200'
       }`}>
-        <div className="overflow-x-auto">
+        {/* Mobile Cards View */}
+        <div className="block md:hidden divide-y divide-slate-700/40">
+          {filteredVlans.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 font-mono text-xs px-4">
+              No VLANs found matching current filters.
+            </div>
+          ) : (
+            filteredVlans.map((vlan) => {
+              const dc = datacenters.find(d => d.id === vlan.datacenterId);
+              const linkedSubnets = subnets.filter(s => s.vlanId === vlan.id);
+              const isReusedAcrossDCs = (vlanIdCounts[vlan.vlanId] || 0) > 1;
+
+              return (
+                <div key={vlan.id} className="p-3.5 space-y-2.5 transition-colors hover:bg-slate-800/30">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono">
+                        VID {vlan.vlanId}
+                      </span>
+                      <span className="font-bold text-sm text-white">{vlan.name}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => onOpenEditVlanModal(vlan)}
+                        className="p-1.5 rounded bg-slate-800 text-slate-300 hover:text-indigo-400 text-xs border border-slate-700/50"
+                        title="Edit VLAN"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(vlan)}
+                        className="p-1.5 rounded bg-slate-800 text-slate-400 hover:text-rose-400 text-xs border border-slate-700/50"
+                        title="Delete VLAN"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400">Datacenter:</span>
+                    <span className="text-slate-200 font-medium">{dc?.name || 'Unknown'}</span>
+                  </div>
+
+                  {linkedSubnets.length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap pt-1">
+                      <span className="text-[11px] text-slate-400 font-mono">Subnets:</span>
+                      {linkedSubnets.map(s => (
+                        <span key={s.id} className="px-1.5 py-0.5 rounded font-mono text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          {s.cidr}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {vlan.description && (
+                    <p className="text-[11px] text-slate-400 italic bg-slate-900/40 p-1.5 rounded">
+                      {vlan.description}
+                    </p>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className={`border-b font-mono uppercase tracking-wider text-slate-400 ${

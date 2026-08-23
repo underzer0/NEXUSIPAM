@@ -1,6 +1,8 @@
 {
-  "name": "IP Address Manager (IPAM)",
-  "description": "Enterprise Web IP Address Management application tracking Datacenters, VLANs, Subnets, and IP assignments with real-time updates and REST APIs.",
+  "name": "BeyondIP",
+  "description": "BeyondIP Enterprise Edition - Modern IP Address Management (IPAM) for Datacenters, VLANs, Subnets, and Dual-Stack IP directories.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

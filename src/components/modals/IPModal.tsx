@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useIPAM } from '../../context/IPAMContext';
-import { X, Hash, Network, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { IPAddress, IPStatus, Subnet } from '../../types/ipam';
-import { isIPInSubnet, isValidIPv4 } from '../../utils/ipCalculator';
+import { X, Hash, Network, AlertCircle, CheckCircle2, Sparkles } from 'lucide-react';
+import { IPAddress, IPStatus, Subnet, IPVersion } from '../../types/ipam';
+import { isIPInSubnet, isValidIP, getIPVersion, compressIPv6 } from '../../utils/ipCalculator';
 
 interface IPModalProps {
   isOpen: boolean;
@@ -47,19 +47,22 @@ export const IPModal: React.FC<IPModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Validation
-  let validationMsg = null;
-  if (ipAddress.trim() && selectedSubnet) {
-    if (!isValidIPv4(ipAddress.trim())) {
-      validationMsg = 'Invalid IPv4 address format';
-    } else if (!isIPInSubnet(ipAddress.trim(), selectedSubnet.cidr)) {
-      validationMsg = `IP does not fall inside subnet CIDR ${selectedSubnet.cidr}`;
+  const rawIp = ipAddress.trim();
+  const detectedVer: IPVersion | 'Unknown' = isValidIP(rawIp) ? getIPVersion(rawIp) : 'Unknown';
+
+  // Real-time validation against parent subnet
+  let validationMsg: string | null = null;
+  if (rawIp && selectedSubnet) {
+    if (!isValidIP(rawIp)) {
+      validationMsg = 'Invalid IP address format (expected IPv4 e.g. 10.10.10.25 or IPv6 e.g. 2001:db8::1, fd00:10::1)';
+    } else if (!isIPInSubnet(rawIp, selectedSubnet.cidr)) {
+      validationMsg = `IP "${rawIp}" does not mathematically fall inside subnet CIDR ${selectedSubnet.cidr}`;
     }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ipAddress.trim() || !subnetId) {
+    if (!rawIp || !subnetId) {
       setError('Subnet and IP Address are required.');
       return;
     }
@@ -74,13 +77,14 @@ export const IPModal: React.FC<IPModalProps> = ({
     try {
       if (ipToEdit) {
         await updateIP(ipToEdit.id, {
+          ipAddress: rawIp,
           status,
           assignedDevice: assignedDevice.trim(),
           description: description.trim(),
         });
       } else {
         await createIP({
-          ipAddress: ipAddress.trim(),
+          ipAddress: rawIp,
           subnetId,
           status,
           assignedDevice: assignedDevice.trim(),
@@ -96,11 +100,11 @@ export const IPModal: React.FC<IPModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-      <div className={`relative w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden ${
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+      <div className={`relative w-full max-w-md max-h-[90vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden ${
         isDark ? 'bg-slate-900 border-slate-700/60 text-slate-100' : 'bg-white border-slate-200 text-slate-800'
       }`}>
-        <div className="p-5 border-b border-slate-700/50 flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-slate-700/50 flex items-center justify-between shrink-0">
           <h2 className="text-base font-bold flex items-center gap-2 text-white">
             <Hash className="w-5 h-5 text-indigo-400" />
             {ipToEdit ? 'Edit IP Assignment' : 'Assign IP Address'}
@@ -110,7 +114,7 @@ export const IPModal: React.FC<IPModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-3.5 text-xs font-mono">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-3.5 text-xs font-mono overflow-y-auto">
           {error && (
             <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -128,25 +132,39 @@ export const IPModal: React.FC<IPModalProps> = ({
               onChange={(e) => setSubnetId(e.target.value)}
               className="w-full px-3 py-1.5 rounded-lg border dark:bg-slate-950/80 dark:border-slate-700/60 font-mono font-medium text-slate-200 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             >
-              {subnets.map(s => (
-                <option key={s.id} value={s.id}>{s.cidr} ({s.segmentType})</option>
-              ))}
+              {subnets.map(s => {
+                const ver = s.ipVersion || getIPVersion(s.cidr);
+                return (
+                  <option key={s.id} value={s.id}>
+                    [{ver}] {s.cidr} ({s.segmentType})
+                  </option>
+                );
+              })}
             </select>
           </div>
 
           {/* IP Address */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-[10px] uppercase font-semibold text-slate-400">IPv4 Host Address *</label>
-              {selectedSubnet && (
-                <span className="text-[10px] text-slate-400 font-mono">Inside {selectedSubnet.cidr}</span>
-              )}
+              <label className="text-[10px] uppercase font-semibold text-slate-400">Host IP Address *</label>
+              <div className="flex items-center gap-1.5">
+                {detectedVer !== 'Unknown' && (
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                    detectedVer === 'IPv6' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                  }`}>
+                    {detectedVer}
+                  </span>
+                )}
+                {selectedSubnet && (
+                  <span className="text-[10px] text-slate-400 font-mono">Inside {selectedSubnet.cidr}</span>
+                )}
+              </div>
             </div>
             <input
               type="text"
               required
               disabled={!!ipToEdit}
-              placeholder="e.g. 10.10.10.25"
+              placeholder={selectedSubnet?.cidr.includes(':') ? 'e.g. fd00:10:10::15 or 2001:db8::1' : 'e.g. 10.10.10.25'}
               value={ipAddress}
               onChange={(e) => setIpAddress(e.target.value)}
               className="w-full px-3 py-1.5 rounded-lg border dark:bg-slate-950/80 dark:border-slate-700/60 font-mono font-bold text-xs text-indigo-400 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-indigo-500"

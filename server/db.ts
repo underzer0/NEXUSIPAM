@@ -1,5 +1,5 @@
-import { Datacenter, VLAN, Subnet, IPAddress, ActivityLog, IPAMStats, SegmentType, IPStatus } from '../src/types/ipam';
-import { isIPInCIDR, isValidCIDR, isValidIPv4, parseCIDR, isPrivateRFC1918, ipToInt, intToIp } from '../src/utils/ipCalculator';
+import { Datacenter, VLAN, Subnet, IPAddress, ActivityLog, IPAMStats, SegmentType, IPStatus, UserProfile, IPVersion } from '../src/types/ipam';
+import { isIPInCIDR, isValidCIDR, isValidIP, isValidIPv4, isValidIPv6, parseCIDR, isPrivateRFC1918, ipToInt, intToIp, getIPVersion, compressIPv6, generateIPRange } from '../src/utils/ipCalculator';
 
 class IPAMDatabase {
   private datacenters: Datacenter[] = [];
@@ -7,6 +7,9 @@ class IPAMDatabase {
   private subnets: Subnet[] = [];
   private ips: IPAddress[] = [];
   private activityLogs: ActivityLog[] = [];
+  private users: UserProfile[] = [];
+  private passwords: Map<string, string> = new Map();
+  private currentUserId: string = 'user-hbouslama';
 
   constructor() {
     this.seedInitialData();
@@ -197,11 +200,64 @@ class IPAMDatabase {
       {
         id: 'sub-apac-core',
         cidr: '10.30.100.0/25',
+        ipVersion: 'IPv4',
         segmentType: 'Private',
         datacenterId: 'dc-apac',
         vlanId: 'vlan-dc-apac-888',
         description: 'Tokyo Financial Matching Engine Cluster',
         createdAt: new Date(Date.now() - 20 * 86400000).toISOString(),
+      },
+
+      // Enterprise IPv6 Subnets
+      {
+        id: 'sub-east-v6-app',
+        cidr: 'fd00:10:10::/64',
+        ipVersion: 'IPv6',
+        segmentType: 'Private',
+        datacenterId: 'dc-east',
+        vlanId: 'vlan-dc-east-100',
+        description: 'US-East Production App Tier (IPv6 ULA fd00:10:10::/64)',
+        createdAt: new Date(Date.now() - 65 * 86400000).toISOString(),
+      },
+      {
+        id: 'sub-east-v6-pub',
+        cidr: '2001:db8:1000::/64',
+        ipVersion: 'IPv6',
+        segmentType: 'Public',
+        datacenterId: 'dc-east',
+        vlanId: null,
+        description: 'US-East Anycast BGP IPv6 Edge Public Block',
+        createdAt: new Date(Date.now() - 60 * 86400000).toISOString(),
+      },
+      {
+        id: 'sub-west-v6-dmz',
+        cidr: '2001:db8:2000::/64',
+        ipVersion: 'IPv6',
+        segmentType: 'Public',
+        datacenterId: 'dc-west',
+        vlanId: 'vlan-dc-west-100',
+        description: 'US-West Public Edge Gateway (IPv6)',
+        createdAt: new Date(Date.now() - 40 * 86400000).toISOString(),
+      },
+      {
+        id: 'sub-eu-v6-web',
+        cidr: 'fd00:20:50::/64',
+        ipVersion: 'IPv6',
+        segmentType: 'Private',
+        datacenterId: 'dc-eu',
+        vlanId: 'vlan-dc-eu-100',
+        description: 'EU Container Mesh (IPv6 ULA fd00:20:50::/64)',
+        createdAt: new Date(Date.now() - 28 * 86400000).toISOString(),
+      },
+      {
+        id: 'sub-apac-v6-core',
+        cidr: 'fd00:30:100::/64',
+        ipVersion: 'IPv6',
+        segmentType: 'Private',
+        datacenterId: 'dc-apac',
+        vlanId: 'vlan-dc-apac-888',
+        description: 'Tokyo Financial Matching Core (IPv6 ULA)',
+        createdAt: new Date(Date.now() - 15 * 86400000).toISOString(),
       },
     ];
 
@@ -448,10 +504,129 @@ class IPAMDatabase {
       {
         id: 'ip-10-30-100-9',
         ipAddress: '10.30.100.9',
+        ipVersion: 'IPv4',
         subnetId: 'sub-apac-core',
         status: 'Active',
         assignedDevice: 'tyo-matching-engine-02',
         description: 'Low-latency Matching Engine Worker 2',
+        lastUpdated: now,
+      },
+
+      // IPv6 Seed Addresses (US-East Private ULA fd00:10:10::/64)
+      {
+        id: 'ip-fd00-10-10--1',
+        ipAddress: 'fd00:10:10::1',
+        ipVersion: 'IPv6',
+        subnetId: 'sub-east-v6-app',
+        status: 'Active',
+        assignedDevice: 'dc1-gw-v6.internal',
+        description: 'Default IPv6 Gateway VIP (HSRPv6)',
+        lastUpdated: now,
+      },
+      {
+        id: 'ip-fd00-10-10--10',
+        ipAddress: 'fd00:10:10::10',
+        ipVersion: 'IPv6',
+        subnetId: 'sub-east-v6-app',
+        status: 'Active',
+        assignedDevice: 'k8s-v6-master-01.east',
+        description: 'Kubernetes Control Plane IPv6 Node 1',
+        lastUpdated: now,
+      },
+      {
+        id: 'ip-fd00-10-10--11',
+        ipAddress: 'fd00:10:10::11',
+        ipVersion: 'IPv6',
+        subnetId: 'sub-east-v6-app',
+        status: 'Active',
+        assignedDevice: 'k8s-v6-master-02.east',
+        description: 'Kubernetes Control Plane IPv6 Node 2',
+        lastUpdated: now,
+      },
+      {
+        id: 'ip-fd00-10-10--20',
+        ipAddress: 'fd00:10:10::20',
+        ipVersion: 'IPv6',
+        subnetId: 'sub-east-v6-app',
+        status: 'Reserved',
+        assignedDevice: 'ingress-v6-vip.east',
+        description: 'Reserved for Envoy Dual-Stack Ingress Controller',
+        lastUpdated: now,
+      },
+      {
+        id: 'ip-fd00-10-10--21',
+        ipAddress: 'fd00:10:10::21',
+        ipVersion: 'IPv6',
+        subnetId: 'sub-east-v6-app',
+        status: 'Available',
+        assignedDevice: '',
+        description: 'Unallocated IPv6 pool host slot',
+        lastUpdated: now,
+      },
+
+      // IPv6 Seed Addresses (US-East Public 2001:db8:1000::/64)
+      {
+        id: 'ip-2001-db8-1000--1',
+        ipAddress: '2001:db8:1000::1',
+        ipVersion: 'IPv6',
+        subnetId: 'sub-east-v6-pub',
+        status: 'Active',
+        assignedDevice: 'bgp-core-v6-01.east',
+        description: 'Public BGP IPv6 Anycast Ingress Edge Router',
+        lastUpdated: now,
+      },
+      {
+        id: 'ip-2001-db8-1000--5',
+        ipAddress: '2001:db8:1000::5',
+        ipVersion: 'IPv6',
+        subnetId: 'sub-east-v6-pub',
+        status: 'Active',
+        assignedDevice: 'api-edge-v6.global',
+        description: 'Cloudflare Edge IPv6 VIP endpoint',
+        lastUpdated: now,
+      },
+      {
+        id: 'ip-2001-db8-1000--6',
+        ipAddress: '2001:db8:1000::6',
+        ipVersion: 'IPv6',
+        subnetId: 'sub-east-v6-pub',
+        status: 'Reserved',
+        assignedDevice: 'stg-edge-v6.global',
+        description: 'Reserved for Stage Edge IPv6 Ingress',
+        lastUpdated: now,
+      },
+
+      // IPv6 Seed Addresses (EU Container Mesh fd00:20:50::/64)
+      {
+        id: 'ip-fd00-20-50--1',
+        ipAddress: 'fd00:20:50::1',
+        ipVersion: 'IPv6',
+        subnetId: 'sub-eu-v6-web',
+        status: 'Active',
+        assignedDevice: 'eu-gw-v6.internal',
+        description: 'EU Mesh Gateway IPv6 Default Route',
+        lastUpdated: now,
+      },
+      {
+        id: 'ip-fd00-20-50--10',
+        ipAddress: 'fd00:20:50::10',
+        ipVersion: 'IPv6',
+        subnetId: 'sub-eu-v6-web',
+        status: 'Active',
+        assignedDevice: 'eu-k8s-worker-01.de',
+        description: 'EU Worker Node 1 Dual-Stack IPv6',
+        lastUpdated: now,
+      },
+
+      // IPv6 Seed Addresses (APAC Matching Core fd00:30:100::/64)
+      {
+        id: 'ip-fd00-30-100--1',
+        ipAddress: 'fd00:30:100::1',
+        ipVersion: 'IPv6',
+        subnetId: 'sub-apac-v6-core',
+        status: 'Active',
+        assignedDevice: 'apac-match-gw-v6.jp',
+        description: 'Tokyo Low-Latency IPv6 Gateway Interface',
         lastUpdated: now,
       },
     ];
@@ -504,6 +679,72 @@ class IPAMDatabase {
         timestamp: new Date(Date.now() - 3600000 * 1).toISOString(),
       },
     ];
+
+    // 5. Seed Users
+    this.users = [
+      {
+        id: 'user-hbouslama',
+        name: 'Habib Bouslama',
+        email: 'hbouslama98@gmail.com',
+        role: 'Principal Network Architect',
+        department: 'Core Infrastructure & Cloud Engineering',
+        organization: 'BeyondIP Global Networks',
+        location: 'Ashburn, VA / Remote',
+        phone: '+1 (555) 234-8900',
+        bio: 'Lead Infrastructure Architect overseeing multi-region datacenters, BGP routing fabrics, RFC 1918 allocations, and Kubernetes overlay networks.',
+        primaryDatacenterId: 'dc-east',
+        twoFactorEnabled: true,
+        emailNotifications: true,
+        collisionAlerts: true,
+        exhaustionAlerts: true,
+        themePreference: 'dark',
+        apiKey: 'nx_live_9f82b7c4e201a68d',
+        createdAt: new Date(Date.now() - 120 * 86400000).toISOString(),
+      },
+      {
+        id: 'user-secops',
+        name: 'Elena Rostova',
+        email: 'e.rostova@nexus.io',
+        role: 'SecOps Administrator',
+        department: 'Cybersecurity & Compliance',
+        organization: 'Nexus Global Networks',
+        location: 'Frankfurt, Germany',
+        phone: '+49 69 1234 5678',
+        bio: 'Security architect enforcing IP isolation policies, firewall perimeter rules, and GDPR compliance.',
+        primaryDatacenterId: 'dc-eu',
+        twoFactorEnabled: true,
+        emailNotifications: true,
+        collisionAlerts: true,
+        exhaustionAlerts: false,
+        themePreference: 'dark',
+        apiKey: 'nx_live_3c19d45e8812f0ab',
+        createdAt: new Date(Date.now() - 60 * 86400000).toISOString(),
+      },
+      {
+        id: 'user-devops',
+        name: 'Kenji Sato',
+        email: 'k.sato@nexus.io',
+        role: 'Cloud Infrastructure Lead',
+        department: 'APAC Operations',
+        organization: 'Nexus Global Networks',
+        location: 'Tokyo, Japan',
+        phone: '+81 3 5555 0192',
+        bio: 'Specialist in low-latency financial exchange networks, high-performance L3 routing, and automated IPAM pipelines.',
+        primaryDatacenterId: 'dc-apac',
+        twoFactorEnabled: false,
+        emailNotifications: true,
+        collisionAlerts: true,
+        exhaustionAlerts: true,
+        themePreference: 'light',
+        apiKey: 'nx_live_7a44e991cb3209dd',
+        createdAt: new Date(Date.now() - 40 * 86400000).toISOString(),
+      }
+    ];
+
+    // Seed passwords for demo accounts
+    this.passwords.set('user-hbouslama', 'password123');
+    this.passwords.set('user-secops', 'password123');
+    this.passwords.set('user-devops', 'password123');
   }
 
   public logActivity(action: ActivityLog['action'], entityType: ActivityLog['entityType'], entityId: string, title: string, detail: string): ActivityLog {
@@ -703,7 +944,7 @@ class IPAMDatabase {
   public createSubnet(data: { cidr: string; segmentType?: SegmentType; datacenterId: string; vlanId?: string | null; description?: string }): Subnet {
     if (!data.cidr?.trim()) throw new Error('CIDR notation is required');
     if (!isValidCIDR(data.cidr.trim())) {
-      throw new Error(`Invalid CIDR format: "${data.cidr}". Expected format: a.b.c.d/prefix (e.g. 10.10.10.0/24)`);
+      throw new Error(`Invalid CIDR format: "${data.cidr}". Expected IPv4 (e.g. 10.10.10.0/24) or IPv6 (e.g. 2001:db8::/64, fd00:10::/64)`);
     }
 
     const calc = parseCIDR(data.cidr.trim());
@@ -731,18 +972,19 @@ class IPAMDatabase {
     const inferredType: SegmentType = calc.isPrivate ? 'Private' : 'Public';
     const segmentType: SegmentType = data.segmentType || inferredType;
 
-    const id = `sub-${normalizedCidr.replace(/[\.\/]/g, '-')}-${Date.now().toString(36)}`;
+    const id = `sub-${normalizedCidr.replace(/[\.\:\/]/g, '-')}-${Date.now().toString(36)}`;
     const newSubnet: Subnet = {
       id,
       cidr: normalizedCidr,
+      ipVersion: calc.ipVersion,
       segmentType,
       datacenterId: data.datacenterId,
       vlanId: data.vlanId || null,
-      description: data.description?.trim() || `${segmentType} Subnet ${normalizedCidr}`,
+      description: data.description?.trim() || `${calc.ipVersion} ${segmentType} Subnet ${normalizedCidr}`,
       createdAt: new Date().toISOString(),
     };
     this.subnets.push(newSubnet);
-    this.logActivity('CREATE', 'Subnet', newSubnet.id, `Subnet ${newSubnet.cidr} Created`, `Configured as ${segmentType} in ${dc.name}`);
+    this.logActivity('CREATE', 'Subnet', newSubnet.id, `Subnet ${newSubnet.cidr} (${calc.ipVersion}) Created`, `Configured as ${segmentType} in ${dc.name}`);
     return newSubnet;
   }
 
@@ -755,7 +997,7 @@ class IPAMDatabase {
     const targetCidr = data.cidr ? data.cidr.trim() : current.cidr;
 
     if (!isValidCIDR(targetCidr)) {
-      throw new Error(`Invalid CIDR format: "${targetCidr}". Expected format: a.b.c.d/prefix (e.g. 10.10.10.0/24)`);
+      throw new Error(`Invalid CIDR format: "${targetCidr}". Expected IPv4 or IPv6 CIDR (e.g. 10.10.10.0/24 or 2001:db8::/64)`);
     }
 
     const calc = parseCIDR(targetCidr);
@@ -790,6 +1032,7 @@ class IPAMDatabase {
     }
 
     current.cidr = normalizedCidr;
+    current.ipVersion = calc.ipVersion;
     current.datacenterId = targetDcId;
     if (data.segmentType) current.segmentType = data.segmentType;
     if (data.description !== undefined) current.description = data.description.trim();
@@ -842,9 +1085,14 @@ class IPAMDatabase {
   }
 
   public createIP(data: { ipAddress: string; subnetId: string; status: IPStatus; assignedDevice?: string; description?: string }): IPAddress {
-    const ip = data.ipAddress?.trim();
-    if (!isValidIPv4(ip)) {
-      throw new Error(`Invalid IPv4 address: "${ip}"`);
+    let ip = data.ipAddress?.trim();
+    if (!isValidIP(ip)) {
+      throw new Error(`Invalid IP address: "${ip}". Please enter a valid IPv4 (e.g. 192.168.1.10) or IPv6 (e.g. 2001:db8::1, fd00:10::1)`);
+    }
+
+    const version = getIPVersion(ip);
+    if (version === 'IPv6') {
+      ip = compressIPv6(ip);
     }
 
     const subnet = this.subnets.find(s => s.id === data.subnetId);
@@ -858,15 +1106,22 @@ class IPAMDatabase {
     }
 
     // Check duplicate in same Subnet
-    const existing = this.ips.find(i => i.subnetId === data.subnetId && i.ipAddress === ip);
+    const existing = this.ips.find(i => {
+      if (i.subnetId !== data.subnetId) return false;
+      if (version === 'IPv6' && getIPVersion(i.ipAddress) === 'IPv6') {
+        return compressIPv6(i.ipAddress) === ip;
+      }
+      return i.ipAddress === ip;
+    });
     if (existing) {
       throw new Error(`IP Address "${ip}" is already tracked in Subnet "${subnet.cidr}". Update the existing record instead.`);
     }
 
-    const id = `ip-${ip.replace(/\./g, '-')}-${Date.now().toString(36)}`;
+    const id = `ip-${ip.replace(/[\.\:]/g, '-')}-${Date.now().toString(36)}`;
     const newIp: IPAddress = {
       id,
       ipAddress: ip,
+      ipVersion: version === 'IPv6' ? 'IPv6' : 'IPv4',
       subnetId: data.subnetId,
       status: data.status || 'Active',
       assignedDevice: data.assignedDevice?.trim() || '',
@@ -874,7 +1129,7 @@ class IPAMDatabase {
       lastUpdated: new Date().toISOString(),
     };
     this.ips.push(newIp);
-    this.logActivity('CREATE', 'IP', newIp.id, `IP ${newIp.ipAddress} Assigned`, `Status: ${newIp.status} (Host: ${newIp.assignedDevice || 'None'})`);
+    this.logActivity('CREATE', 'IP', newIp.id, `IP ${newIp.ipAddress} (${newIp.ipVersion}) Assigned`, `Status: ${newIp.status} (Host: ${newIp.assignedDevice || 'None'})`);
     return newIp;
   }
 
@@ -887,9 +1142,14 @@ class IPAMDatabase {
     const subnet = this.subnets.find(s => s.id === targetSubnetId);
     if (!subnet) throw new Error(`Target Subnet ${targetSubnetId} not found`);
 
-    const targetIp = data.ipAddress ? data.ipAddress.trim() : current.ipAddress;
-    if (!isValidIPv4(targetIp)) {
-      throw new Error(`Invalid IPv4 address: "${targetIp}"`);
+    let targetIp = data.ipAddress ? data.ipAddress.trim() : current.ipAddress;
+    if (!isValidIP(targetIp)) {
+      throw new Error(`Invalid IP address: "${targetIp}"`);
+    }
+
+    const version = getIPVersion(targetIp);
+    if (version === 'IPv6') {
+      targetIp = compressIPv6(targetIp);
     }
 
     // Math validation
@@ -898,12 +1158,19 @@ class IPAMDatabase {
     }
 
     // Check duplicate
-    const duplicate = this.ips.find(i => i.id !== id && i.subnetId === targetSubnetId && i.ipAddress === targetIp);
+    const duplicate = this.ips.find(i => {
+      if (i.id === id || i.subnetId !== targetSubnetId) return false;
+      if (version === 'IPv6' && getIPVersion(i.ipAddress) === 'IPv6') {
+        return compressIPv6(i.ipAddress) === targetIp;
+      }
+      return i.ipAddress === targetIp;
+    });
     if (duplicate) {
       throw new Error(`IP Address "${targetIp}" already exists in Subnet "${subnet.cidr}".`);
     }
 
     current.ipAddress = targetIp;
+    current.ipVersion = version === 'IPv6' ? 'IPv6' : 'IPv4';
     current.subnetId = targetSubnetId;
     if (data.status) current.status = data.status;
     if (data.assignedDevice !== undefined) current.assignedDevice = data.assignedDevice.trim();
@@ -930,45 +1197,73 @@ class IPAMDatabase {
     if (!subnet) throw new Error(`Subnet ${subnetId} not found`);
 
     const calc = parseCIDR(subnet.cidr);
-    const existingIps = new Set(this.ips.filter(i => i.subnetId === subnetId).map(i => i.ipAddress));
-
-    const firstInt = ipToInt(calc.firstUsableHost);
-    const lastInt = ipToInt(calc.lastUsableHost);
-    const totalUsable = lastInt - firstInt + 1;
+    const existingIps = new Set(
+      this.ips
+        .filter(i => i.subnetId === subnetId)
+        .map(i => calc.ipVersion === 'IPv6' ? compressIPv6(i.ipAddress) : i.ipAddress)
+    );
 
     const offset = options?.startingOffset || 0;
-    const requestedCount = options?.count || Math.min(totalUsable, 64);
+    const requestedCount = options?.count || (calc.ipVersion === 'IPv4' ? Math.min(calc.usableHosts, 64) : 32);
     const status = options?.status || 'Available';
-
     const created: IPAddress[] = [];
     const now = new Date().toISOString();
 
-    for (let i = offset; i < totalUsable && created.length < requestedCount; i++) {
-      const currentInt = firstInt + i;
-      if (currentInt > lastInt) break;
+    if (calc.ipVersion === 'IPv4') {
+      const firstInt = ipToInt(calc.firstUsableHost);
+      const lastInt = ipToInt(calc.lastUsableHost);
+      const totalUsable = lastInt - firstInt + 1;
 
-      const ipStr = intToIp(currentInt);
-      if (!existingIps.has(ipStr)) {
-        const newIp: IPAddress = {
-          id: `ip-${ipStr.replace(/\./g, '-')}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 5)}`,
-          ipAddress: ipStr,
-          subnetId,
-          status,
-          assignedDevice: '',
-          description: `Bulk generated ${status} pool host`,
-          lastUpdated: now,
-        };
-        this.ips.push(newIp);
-        created.push(newIp);
-        existingIps.add(ipStr);
+      for (let i = offset; i < totalUsable && created.length < requestedCount; i++) {
+        const currentInt = firstInt + i;
+        if (currentInt > lastInt) break;
+
+        const ipStr = intToIp(currentInt);
+        if (!existingIps.has(ipStr)) {
+          const newIp: IPAddress = {
+            id: `ip-${ipStr.replace(/[\.\:]/g, '-')}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 5)}`,
+            ipAddress: ipStr,
+            ipVersion: 'IPv4',
+            subnetId,
+            status,
+            assignedDevice: '',
+            description: `Bulk generated ${status} pool host`,
+            lastUpdated: now,
+          };
+          this.ips.push(newIp);
+          created.push(newIp);
+          existingIps.add(ipStr);
+        }
+      }
+    } else {
+      // IPv6 bulk generation
+      const range = generateIPRange(subnet.cidr, 500);
+      let count = 0;
+      for (let i = offset; i < range.length && created.length < requestedCount; i++) {
+        const ipStr = range[i];
+        if (!existingIps.has(ipStr)) {
+          const newIp: IPAddress = {
+            id: `ip-${ipStr.replace(/[\.\:]/g, '-')}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 5)}`,
+            ipAddress: ipStr,
+            ipVersion: 'IPv6',
+            subnetId,
+            status,
+            assignedDevice: '',
+            description: `Bulk generated IPv6 ${status} pool host`,
+            lastUpdated: now,
+          };
+          this.ips.push(newIp);
+          created.push(newIp);
+          existingIps.add(ipStr);
+        }
       }
     }
 
-    this.logActivity('CREATE', 'IP', subnetId, `Bulk Generated ${created.length} IPs`, `Populated IP slots for subnet ${subnet.cidr}`);
+    this.logActivity('CREATE', 'IP', subnetId, `Bulk Generated ${created.length} ${calc.ipVersion} IPs`, `Populated IP slots for subnet ${subnet.cidr}`);
     return { created, totalGenerated: created.length };
   }
 
-  public getNextAvailableIP(subnetId: string): { availableIP: string | null; subnetCidr: string; totalUsable: number; allocatedCount: number } {
+  public getNextAvailableIP(subnetId: string): { availableIP: string | null; subnetCidr: string; totalUsable: number; allocatedCount: number; totalUsableFormatted?: string } {
     const subnet = this.subnets.find(s => s.id === subnetId);
     if (!subnet) throw new Error(`Subnet ${subnetId} not found`);
 
@@ -976,22 +1271,33 @@ class IPAMDatabase {
     const trackedIps = this.ips.filter(i => i.subnetId === subnetId);
 
     // Any IP that is Active or Reserved is considered taken. If an IP is marked 'Available' in DB, it is a candidate!
-    // Also any IP in the CIDR range that is not in DB at all is available.
     const activeOrReservedSet = new Set(
       trackedIps
         .filter(i => i.status === 'Active' || i.status === 'Reserved')
-        .map(i => i.ipAddress)
+        .map(i => calc.ipVersion === 'IPv6' ? compressIPv6(i.ipAddress) : i.ipAddress)
     );
 
-    const firstInt = ipToInt(calc.firstUsableHost);
-    const lastInt = ipToInt(calc.lastUsableHost);
     let nextAvailable: string | null = null;
 
-    for (let cur = firstInt; cur <= lastInt; cur++) {
-      const candidate = intToIp(cur);
-      if (!activeOrReservedSet.has(candidate)) {
-        nextAvailable = candidate;
-        break;
+    if (calc.ipVersion === 'IPv4') {
+      const firstInt = ipToInt(calc.firstUsableHost);
+      const lastInt = ipToInt(calc.lastUsableHost);
+
+      for (let cur = firstInt; cur <= lastInt; cur++) {
+        const candidate = intToIp(cur);
+        if (!activeOrReservedSet.has(candidate)) {
+          nextAvailable = candidate;
+          break;
+        }
+      }
+    } else {
+      // IPv6 next available search
+      const range = generateIPRange(subnet.cidr, 1000);
+      for (const candidate of range) {
+        if (!activeOrReservedSet.has(candidate)) {
+          nextAvailable = candidate;
+          break;
+        }
       }
     }
 
@@ -999,6 +1305,7 @@ class IPAMDatabase {
       availableIP: nextAvailable,
       subnetCidr: subnet.cidr,
       totalUsable: calc.usableHosts,
+      totalUsableFormatted: calc.usableHostsFormatted,
       allocatedCount: activeOrReservedSet.size,
     };
   }
@@ -1012,8 +1319,17 @@ class IPAMDatabase {
       throw new Error(`Subnet ${subnet.cidr} has no available IP addresses remaining.`);
     }
 
+    const version = getIPVersion(availableIP);
+
     // Check if there is an existing 'Available' record in DB for this IP
-    const existing = this.ips.find(i => i.subnetId === subnetId && i.ipAddress === availableIP);
+    const existing = this.ips.find(i => {
+      if (i.subnetId !== subnetId) return false;
+      if (version === 'IPv6' && getIPVersion(i.ipAddress) === 'IPv6') {
+        return compressIPv6(i.ipAddress) === availableIP;
+      }
+      return i.ipAddress === availableIP;
+    });
+
     if (existing) {
       existing.status = 'Reserved';
       existing.assignedDevice = data.assignedDevice?.trim() || '';
@@ -1025,8 +1341,9 @@ class IPAMDatabase {
 
     // Create new reserved record
     const newIp: IPAddress = {
-      id: `ip-${availableIP.replace(/\./g, '-')}-${Date.now().toString(36)}`,
+      id: `ip-${availableIP.replace(/[\.\:]/g, '-')}-${Date.now().toString(36)}`,
       ipAddress: availableIP,
+      ipVersion: version === 'IPv6' ? 'IPv6' : 'IPv4',
       subnetId,
       status: 'Reserved',
       assignedDevice: data.assignedDevice?.trim() || '',
@@ -1048,18 +1365,31 @@ class IPAMDatabase {
     let availableCount = 0;
     let reservedCount = 0;
     let activeCount = 0;
+    let ipv4Count = 0;
+    let ipv6Count = 0;
 
     for (const ip of this.ips) {
       if (ip.status === 'Active') activeCount++;
       else if (ip.status === 'Reserved') reservedCount++;
       else availableCount++;
+
+      const v = ip.ipVersion || getIPVersion(ip.ipAddress);
+      if (v === 'IPv6') ipv6Count++;
+      else ipv4Count++;
     }
 
     let privateSubnetCount = 0;
     let publicSubnetCount = 0;
+    let ipv4SubnetCount = 0;
+    let ipv6SubnetCount = 0;
+
     for (const s of this.subnets) {
       if (s.segmentType === 'Private') privateSubnetCount++;
       else publicSubnetCount++;
+
+      const v = s.ipVersion || getIPVersion(s.cidr);
+      if (v === 'IPv6') ipv6SubnetCount++;
+      else ipv4SubnetCount++;
     }
 
     // Datacenter utilization
@@ -1077,7 +1407,7 @@ class IPAMDatabase {
       for (const sub of dcSubnets) {
         try {
           const c = parseCIDR(sub.cidr);
-          totalUsableCapacity += c.usableHosts;
+          totalUsableCapacity += (c.ipVersion === 'IPv6' ? 1000 : c.usableHosts);
         } catch {}
       }
 
@@ -1109,24 +1439,34 @@ class IPAMDatabase {
 
       let usableCapacity = 0;
       let totalHosts = 0;
+      let totalHostsFormatted = '0';
+      let usableCapacityFormatted = '0';
+      let ipVer: IPVersion = 'IPv4';
+
       try {
         const c = parseCIDR(sub.cidr);
         usableCapacity = c.usableHosts;
         totalHosts = c.totalHosts;
+        totalHostsFormatted = c.totalHostsFormatted || totalHosts.toLocaleString();
+        usableCapacityFormatted = c.usableHostsFormatted || usableCapacity.toLocaleString();
+        ipVer = c.ipVersion;
       } catch {}
 
       const allocated = active + reserved;
-      const utilPercent = usableCapacity > 0 ? Math.min(100, Math.round((allocated / usableCapacity) * 100)) : 0;
+      const utilPercent = usableCapacity > 0 ? Math.min(100, Math.round((allocated / (ipVer === 'IPv6' ? Math.max(allocated, 100) : usableCapacity)) * 100)) : 0;
 
       return {
         subnetId: sub.id,
         cidr: sub.cidr,
+        ipVersion: ipVer,
         datacenterName: dc?.name || 'Unknown',
         vlanName: vlan?.name || null,
         vlanId: vlan?.vlanId || null,
         segmentType: sub.segmentType,
         totalHosts,
         usableCapacity,
+        totalHostsFormatted,
+        usableCapacityFormatted,
         trackedIPs: subIPs.length,
         activeIPs: active,
         reservedIPs: reserved,
@@ -1148,6 +1488,14 @@ class IPAMDatabase {
       segmentCounts: {
         private: privateSubnetCount,
         public: publicSubnetCount,
+      },
+      ipVersionCounts: {
+        ipv4: ipv4Count,
+        ipv6: ipv6Count,
+      },
+      ipVersionSubnetCounts: {
+        ipv4: ipv4SubnetCount,
+        ipv6: ipv6SubnetCount,
       },
       datacenterUtilization,
       subnetUtilization,
@@ -1197,6 +1545,156 @@ class IPAMDatabase {
       subnets: matchedSubnets,
       ips: matchedIPs,
     };
+  }
+
+  // --- USER PROFILE & AUTHENTICATION CRUD ---
+  public getUsers(): UserProfile[] {
+    return [...this.users];
+  }
+
+  public getCurrentUser(): UserProfile {
+    const user = this.users.find(u => u.id === this.currentUserId);
+    if (user) return user;
+    if (this.users.length > 0) return this.users[0];
+    throw new Error('No active user profile exists');
+  }
+
+  public getUserById(id: string): UserProfile | undefined {
+    return this.users.find(u => u.id === id);
+  }
+
+  public switchUser(id: string): UserProfile {
+    const user = this.users.find(u => u.id === id);
+    if (!user) throw new Error(`User account ${id} not found`);
+    this.currentUserId = user.id;
+    this.logActivity('UPDATE', 'Datacenter', user.id, `User Switched: ${user.name}`, `Active engineer session updated to ${user.email}`);
+    return user;
+  }
+
+  public updateUserProfile(id: string, data: Partial<UserProfile>): UserProfile {
+    const index = this.users.findIndex(u => u.id === id);
+    if (index === -1) throw new Error(`User account with ID ${id} not found`);
+
+    const current = this.users[index];
+
+    if (data.email && data.email.trim()) {
+      const email = data.email.trim().toLowerCase();
+      // Check duplicate email
+      const duplicate = this.users.find(u => u.id !== id && u.email.toLowerCase() === email);
+      if (duplicate) {
+        throw new Error(`Email address "${data.email}" is already in use by another engineer account.`);
+      }
+      current.email = email;
+    }
+
+    if (data.name !== undefined && data.name.trim()) current.name = data.name.trim();
+    if (data.role !== undefined && data.role.trim()) current.role = data.role.trim();
+    if (data.department !== undefined) current.department = data.department.trim();
+    if (data.organization !== undefined) current.organization = data.organization.trim();
+    if (data.location !== undefined) current.location = data.location.trim();
+    if (data.phone !== undefined) current.phone = data.phone.trim();
+    if (data.bio !== undefined) current.bio = data.bio.trim();
+    if (data.primaryDatacenterId !== undefined) current.primaryDatacenterId = data.primaryDatacenterId;
+    if (data.twoFactorEnabled !== undefined) current.twoFactorEnabled = Boolean(data.twoFactorEnabled);
+    if (data.emailNotifications !== undefined) current.emailNotifications = Boolean(data.emailNotifications);
+    if (data.collisionAlerts !== undefined) current.collisionAlerts = Boolean(data.collisionAlerts);
+    if (data.exhaustionAlerts !== undefined) current.exhaustionAlerts = Boolean(data.exhaustionAlerts);
+    if (data.themePreference !== undefined) current.themePreference = data.themePreference;
+
+    this.logActivity('UPDATE', 'Datacenter', current.id, `Profile Updated: ${current.name}`, `Updated contact & preferences for ${current.email}`);
+    return current;
+  }
+
+  public createUser(data: {
+    name: string;
+    email: string;
+    role?: string;
+    department?: string;
+    organization?: string;
+    location?: string;
+    phone?: string;
+    bio?: string;
+    primaryDatacenterId?: string;
+    password?: string;
+  }): UserProfile {
+    if (!data.name?.trim()) throw new Error('Full Name is required');
+    if (!data.email?.trim()) throw new Error('Email address is required');
+
+    const email = data.email.trim().toLowerCase();
+    const existing = this.users.find(u => u.email.toLowerCase() === email);
+    if (existing) {
+      throw new Error(`An account with email "${email}" already exists. Please sign in or use another email.`);
+    }
+
+    const id = `user-${email.split('@')[0].replace(/[^a-z0-9]/g, '')}-${Date.now().toString(36)}`;
+    const randomHex = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
+    
+    const newUser: UserProfile = {
+      id,
+      name: data.name.trim(),
+      email,
+      role: data.role?.trim() || 'Network Engineer',
+      department: data.department?.trim() || 'Core Infrastructure Engineering',
+      organization: data.organization?.trim() || 'Nexus Enterprise Grid',
+      location: data.location?.trim() || 'Global Remote',
+      phone: data.phone?.trim() || '',
+      bio: data.bio?.trim() || `Infrastructure engineer managing network segments and enterprise IP allocations.`,
+      primaryDatacenterId: data.primaryDatacenterId || 'dc-east',
+      twoFactorEnabled: false,
+      emailNotifications: true,
+      collisionAlerts: true,
+      exhaustionAlerts: true,
+      themePreference: 'dark',
+      apiKey: `nx_live_${randomHex}`,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.users.push(newUser);
+    if (data.password) {
+      this.passwords.set(newUser.id, data.password);
+    } else {
+      this.passwords.set(newUser.id, 'password123');
+    }
+    this.currentUserId = newUser.id;
+    this.logActivity('CREATE', 'Datacenter', newUser.id, `New Account Created: ${newUser.name}`, `Registered ${newUser.email} with ${newUser.role} role`);
+    return newUser;
+  }
+
+  public signIn(email: string, password: string): UserProfile {
+    if (!email?.trim()) throw new Error('Email address is required.');
+    if (!password?.trim()) throw new Error('Password is required.');
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = this.users.find(u => u.email.toLowerCase() === cleanEmail);
+    if (!user) {
+      throw new Error(`No account found with email "${email}". Please verify your email or sign up.`);
+    }
+
+    const storedPass = this.passwords.get(user.id) || 'password123';
+    if (storedPass !== password) {
+      throw new Error('Invalid credentials. Please verify your password.');
+    }
+
+    this.currentUserId = user.id;
+    this.logActivity('UPDATE', 'Datacenter', user.id, `Engineer Authenticated: ${user.name}`, `Logged into IPAM session as ${user.email}`);
+    return user;
+  }
+
+  public signOut(): boolean {
+    const user = this.users.find(u => u.id === this.currentUserId);
+    if (user) {
+      this.logActivity('UPDATE', 'Datacenter', user.id, `Engineer Signed Out: ${user.name}`, `Session ended for ${user.email}`);
+    }
+    return true;
+  }
+
+  public generateApiKey(userId: string): string {
+    const user = this.users.find(u => u.id === userId);
+    if (!user) throw new Error('User not found');
+    const randomHex = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
+    user.apiKey = `nx_live_${randomHex}`;
+    this.logActivity('UPDATE', 'Datacenter', user.id, `API Key Regenerated`, `New token issued for ${user.email}`);
+    return user.apiKey;
   }
 }
 

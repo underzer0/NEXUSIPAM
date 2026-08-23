@@ -55,6 +55,8 @@ async function startServer() {
         ips: db.getIPs(),
         stats: db.getStats(),
         activityLogs: db.getActivityLogs(),
+        currentUser: db.getCurrentUser(),
+        users: db.getUsers(),
       },
       timestamp: new Date().toISOString(),
     };

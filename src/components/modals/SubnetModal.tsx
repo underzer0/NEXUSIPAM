@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useIPAM } from '../../context/IPAMContext';
-import { X, Network, Building2, Layers, Globe, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
-import { Subnet, SegmentType } from '../../types/ipam';
-import { parseCIDR, isPrivateRFC1918 } from '../../utils/ipCalculator';
+import { X, Network, Building2, Layers, Globe, Lock, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
+import { Subnet, SegmentType, IPVersion } from '../../types/ipam';
+import { parseCIDR, isPrivateRFC1918, isValidCIDR, getIPVersion } from '../../utils/ipCalculator';
 
 interface SubnetModalProps {
   isOpen: boolean;
@@ -46,7 +46,7 @@ export const SubnetModal: React.FC<SubnetModalProps> = ({
     setError(null);
   }, [subnetToEdit, isOpen, defaultDatacenterId, datacenters]);
 
-  // Auto-detect RFC 1918 when CIDR changes
+  // Auto-detect Private/Public when CIDR changes
   useEffect(() => {
     if (cidr.includes('/')) {
       const baseIp = cidr.split('/')[0];
@@ -61,9 +61,11 @@ export const SubnetModal: React.FC<SubnetModalProps> = ({
 
   // Real-time calculation preview
   let calcPreview = null;
+  let detectedVersion: IPVersion | 'Unknown' = 'Unknown';
   try {
-    if (cidr.trim()) {
+    if (cidr.trim() && isValidCIDR(cidr.trim())) {
       calcPreview = parseCIDR(cidr.trim());
+      detectedVersion = calcPreview.ipVersion;
     }
   } catch {
     calcPreview = null;
@@ -72,7 +74,11 @@ export const SubnetModal: React.FC<SubnetModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cidr.trim()) {
-      setError('CIDR Prefix is required (e.g. 10.10.10.0/24).');
+      setError('CIDR Prefix is required (e.g. 10.10.10.0/24 or 2001:db8:10::/64).');
+      return;
+    }
+    if (!isValidCIDR(cidr.trim())) {
+      setError('Invalid CIDR format. Please provide a valid IPv4 (e.g. 10.10.10.0/24) or IPv6 (e.g. fd00:10::/64, 2001:db8::/64).');
       return;
     }
     if (!datacenterId) {
@@ -110,11 +116,11 @@ export const SubnetModal: React.FC<SubnetModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-      <div className={`relative w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden ${
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+      <div className={`relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden ${
         isDark ? 'bg-slate-900 border-slate-700/60 text-slate-100' : 'bg-white border-slate-200 text-slate-800'
       }`}>
-        <div className="p-5 border-b border-slate-700/50 flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-slate-700/50 flex items-center justify-between shrink-0">
           <h2 className="text-base font-bold flex items-center gap-2 text-white">
             <Network className="w-5 h-5 text-indigo-400" />
             {subnetToEdit ? 'Edit Subnet Allocation' : 'Allocate New Subnet Prefix'}
@@ -124,7 +130,7 @@ export const SubnetModal: React.FC<SubnetModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-3.5 text-xs font-mono">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-3.5 text-xs font-mono overflow-y-auto">
           {error && (
             <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -154,26 +160,69 @@ export const SubnetModal: React.FC<SubnetModalProps> = ({
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-[10px] uppercase font-semibold text-slate-400">Subnet CIDR Prefix *</label>
-              <span className="text-[10px] text-indigo-400 font-mono">IPv4 (e.g. 10.10.10.0/24)</span>
+              <div className="flex items-center gap-1">
+                {detectedVersion !== 'Unknown' && (
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                    detectedVersion === 'IPv6' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                  }`}>
+                    {detectedVersion}
+                  </span>
+                )}
+              </div>
             </div>
             <input
               type="text"
               required
-              placeholder="e.g. 10.10.100.0/24 or 192.168.50.0/26"
+              placeholder="e.g. 10.10.100.0/24 or fd00:10:10::/64 or 2001:db8::/64"
               value={cidr}
               onChange={(e) => setCidr(e.target.value)}
               className="w-full px-3 py-1.5 rounded-lg border dark:bg-slate-950/80 dark:border-slate-700/60 font-mono font-bold text-xs text-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
+
+            {/* Quick Helper Presets */}
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              <span className="text-[10px] text-slate-400">Presets:</span>
+              <button
+                type="button"
+                onClick={() => setCidr('10.10.100.0/24')}
+                className="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300"
+              >
+                IPv4 /24
+              </button>
+              <button
+                type="button"
+                onClick={() => setCidr('172.16.50.0/26')}
+                className="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300"
+              >
+                IPv4 /26
+              </button>
+              <button
+                type="button"
+                onClick={() => setCidr('fd00:10:10::/64')}
+                className="px-1.5 py-0.5 rounded text-[10px] bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-300 border border-cyan-800/40"
+              >
+                IPv6 ULA /64
+              </button>
+              <button
+                type="button"
+                onClick={() => setCidr('2001:db8:1000::/64')}
+                className="px-1.5 py-0.5 rounded text-[10px] bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-300 border border-cyan-800/40"
+              >
+                IPv6 Public /64
+              </button>
+            </div>
           </div>
 
           {/* Calculation Live Preview */}
           {calcPreview && (
             <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[11px] font-mono space-y-1 text-indigo-300">
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span>Netmask: {calcPreview.netmask}</span>
-                <span>Usable: {calcPreview.usableHosts} IPs</span>
+                <span className="text-emerald-400 font-bold">
+                  Usable: {calcPreview.usableHostsFormatted || calcPreview.usableHosts.toLocaleString()}
+                </span>
               </div>
-              <div className="text-slate-400">
+              <div className="text-slate-400 truncate">
                 Range: {calcPreview.firstUsableHost} – {calcPreview.lastUsableHost}
               </div>
             </div>
@@ -208,7 +257,7 @@ export const SubnetModal: React.FC<SubnetModalProps> = ({
                 }`}
               >
                 <Lock className="w-3.5 h-3.5" />
-                <span className="text-xs">Private (RFC 1918)</span>
+                <span className="text-xs">Private (RFC1918 / ULA)</span>
               </button>
 
               <button
@@ -221,7 +270,7 @@ export const SubnetModal: React.FC<SubnetModalProps> = ({
                 }`}
               >
                 <Globe className="w-3.5 h-3.5" />
-                <span className="text-xs">Publicly Routed</span>
+                <span className="text-xs">Publicly Routed (Global)</span>
               </button>
             </div>
           </div>
@@ -230,7 +279,7 @@ export const SubnetModal: React.FC<SubnetModalProps> = ({
             <label className="block text-[10px] uppercase font-semibold text-slate-400 mb-1">Description / Subnet Purpose</label>
             <textarea
               rows={2}
-              placeholder="e.g. Kubernetes worker node pool subnet with DHCP disabled"
+              placeholder="e.g. Kubernetes worker node pool subnet with dual-stack SLAAC"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full px-3 py-1.5 rounded-lg border dark:bg-slate-950/80 dark:border-slate-700/60 text-slate-200 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500"

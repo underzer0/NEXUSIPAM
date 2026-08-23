@@ -19,6 +19,8 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
       const ips = db.getIPs();
       const stats = db.getStats();
       const activityLogs = db.getActivityLogs();
+      const currentUser = db.getCurrentUser();
+      const users = db.getUsers();
 
       res.json({
         success: true,
@@ -29,6 +31,8 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
           ips,
           stats,
           activityLogs,
+          currentUser,
+          users,
         },
       });
     } catch (err: any) {
@@ -312,6 +316,102 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
       const result = db.deleteIP(req.params.id);
       broadcast('IP_DELETED', { id: req.params.id, ipAddress: result.ipAddress });
       res.json({ success: true, data: result });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // --- USER PROFILE & AUTHENTICATION ROUTES ---
+  router.get('/user/current', (req: Request, res: Response) => {
+    try {
+      const user = db.getCurrentUser();
+      res.json({ success: true, data: user });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  router.put('/user/profile', (req: Request, res: Response) => {
+    try {
+      const currentUser = db.getCurrentUser();
+      const updated = db.updateUserProfile(currentUser.id, req.body);
+      broadcast('USER_UPDATED', updated);
+      res.json({ success: true, data: updated });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  router.get('/users', (req: Request, res: Response) => {
+    try {
+      const users = db.getUsers();
+      res.json({ success: true, data: users });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  router.post('/auth/signin', (req: Request, res: Response) => {
+    try {
+      const { email, password } = req.body;
+      const user = db.signIn(email, password);
+      broadcast('USER_UPDATED', user);
+      res.json({ success: true, data: user });
+    } catch (err: any) {
+      res.status(401).json({ success: false, error: err.message });
+    }
+  });
+
+  router.post('/auth/signout', (req: Request, res: Response) => {
+    try {
+      db.signOut();
+      res.json({ success: true, message: 'Signed out successfully' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  router.post('/auth/signup', (req: Request, res: Response) => {
+    try {
+      const { name, email, password, role, department, organization, location, phone, bio, primaryDatacenterId } = req.body;
+      const newUser = db.createUser({
+        name,
+        email,
+        password,
+        role,
+        department,
+        organization,
+        location,
+        phone,
+        bio,
+        primaryDatacenterId,
+      });
+      broadcast('USER_CREATED', newUser);
+      res.status(201).json({ success: true, data: newUser });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  router.post('/auth/switch-user', (req: Request, res: Response) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) return res.status(400).json({ success: false, error: 'User ID is required' });
+      const user = db.switchUser(userId);
+      broadcast('USER_UPDATED', user);
+      res.json({ success: true, data: user });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  router.post('/user/generate-api-key', (req: Request, res: Response) => {
+    try {
+      const currentUser = db.getCurrentUser();
+      const apiKey = db.generateApiKey(currentUser.id);
+      const updated = db.getCurrentUser();
+      broadcast('USER_UPDATED', updated);
+      res.json({ success: true, data: { apiKey, user: updated } });
     } catch (err: any) {
       res.status(400).json({ success: false, error: err.message });
     }

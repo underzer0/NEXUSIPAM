@@ -1,5 +1,27 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { Datacenter, VLAN, Subnet, IPAddress, ActivityLog, IPAMStats, FilterState, WSMessage, SegmentType, IPStatus } from '../types/ipam';
+import { Datacenter, VLAN, Subnet, IPAddress, ActivityLog, IPAMStats, FilterState, WSMessage, SegmentType, IPStatus, UserProfile } from '../types/ipam';
+
+export type ActiveTab = 'dashboard' | 'datacenters' | 'vlans' | 'subnets' | 'ips' | 'calculator' | 'api-docs' | 'profile' | 'signup' | 'signin';
+
+const defaultUser: UserProfile = {
+  id: 'user-hbouslama',
+  name: 'Habib Bouslama',
+  email: 'hbouslama98@gmail.com',
+  role: 'Principal Network Architect',
+  department: 'Core Infrastructure & Cloud Engineering',
+  organization: 'BeyondIP Global Networks',
+  location: 'Ashburn, VA / Remote',
+  phone: '+1 (555) 234-8900',
+  bio: 'Lead Infrastructure Architect overseeing multi-region datacenters, BGP routing fabrics, RFC 1918 allocations, and Kubernetes overlay networks.',
+  primaryDatacenterId: 'dc-east',
+  twoFactorEnabled: true,
+  emailNotifications: true,
+  collisionAlerts: true,
+  exhaustionAlerts: true,
+  themePreference: 'dark',
+  apiKey: 'nx_live_9f82b7c4e201a68d',
+  createdAt: new Date().toISOString(),
+};
 
 interface IPAMContextType {
   datacenters: Datacenter[];
@@ -8,11 +30,14 @@ interface IPAMContextType {
   ips: IPAddress[];
   stats: IPAMStats | null;
   activityLogs: ActivityLog[];
+  currentUser: UserProfile;
+  users: UserProfile[];
+  isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
   wsConnected: boolean;
-  activeTab: 'dashboard' | 'datacenters' | 'vlans' | 'subnets' | 'ips' | 'calculator' | 'api-docs';
-  setActiveTab: (tab: 'dashboard' | 'datacenters' | 'vlans' | 'subnets' | 'ips' | 'calculator' | 'api-docs') => void;
+  activeTab: ActiveTab;
+  setActiveTab: (tab: ActiveTab) => void;
   selectedDatacenterId: string | null;
   setSelectedDatacenterId: (id: string | null) => void;
   selectedSubnetForVisualizer: Subnet | null;
@@ -29,6 +54,24 @@ interface IPAMContextType {
 
   // Actions
   fetchBootstrapData: () => Promise<void>;
+  updateCurrentUser: (data: Partial<UserProfile>) => Promise<UserProfile>;
+  signIn: (email: string, password: string) => Promise<UserProfile>;
+  signOut: () => Promise<void>;
+  signUpUser: (data: {
+    name: string;
+    email: string;
+    role?: string;
+    department?: string;
+    organization?: string;
+    location?: string;
+    phone?: string;
+    bio?: string;
+    primaryDatacenterId?: string;
+    password?: string;
+  }) => Promise<UserProfile>;
+  switchUser: (userId: string) => Promise<UserProfile>;
+  generateNewApiKey: () => Promise<string>;
+
   createDatacenter: (data: { name: string; location: string; description: string }) => Promise<Datacenter>;
   updateDatacenter: (id: string, data: { name?: string; location?: string; description?: string }) => Promise<Datacenter>;
   deleteDatacenter: (id: string) => Promise<void>;
@@ -48,6 +91,7 @@ interface IPAMContextType {
   reserveNextIP: (subnetId: string, data: { assignedDevice?: string; description?: string }) => Promise<IPAddress>;
   bulkGenerateIPs: (subnetId: string, options: { count: number; startingOffset?: number; status?: IPStatus }) => Promise<IPAddress[]>;
   fetchNextAvailableIP: (subnetId: string) => Promise<{ availableIP: string | null; subnetCidr: string; totalUsable: number; allocatedCount: number }>;
+  getNextAvailableIP: (subnetId: string) => Promise<{ availableIP: string | null; subnetCidr: string; totalUsable: number; allocatedCount: number }>;
 }
 
 const defaultFilters: FilterState = {
@@ -68,10 +112,33 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [ips, setIps] = useState<IPAddress[]>([]);
   const [stats, setStats] = useState<IPAMStats | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('ipam_current_user');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    return defaultUser;
+  });
+  const [users, setUsers] = useState<UserProfile[]>([defaultUser]);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const authFlag = localStorage.getItem('ipam_is_authenticated');
+      if (authFlag !== null) {
+        return authFlag === 'true';
+      }
+    }
+    return true;
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [wsConnected, setWsConnected] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'datacenters' | 'vlans' | 'subnets' | 'ips' | 'calculator' | 'api-docs'>('dashboard');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [selectedDatacenterId, setSelectedDatacenterId] = useState<string | null>(null);
   const [selectedSubnetForVisualizer, setSelectedSubnetForVisualizer] = useState<Subnet | null>(null);
 
@@ -116,6 +183,13 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIps(json.data.ips || []);
         setStats(json.data.stats || null);
         setActivityLogs(json.data.activityLogs || []);
+        if (json.data.currentUser) {
+          setCurrentUser(json.data.currentUser);
+          localStorage.setItem('ipam_current_user', JSON.stringify(json.data.currentUser));
+        }
+        if (json.data.users && Array.isArray(json.data.users)) {
+          setUsers(json.data.users);
+        }
         setError(null);
       } else {
         setError(json.error || 'Failed to load initial dataset');
@@ -195,7 +269,38 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setIps(msg.payload.ips || []);
             setStats(msg.payload.stats || null);
             setActivityLogs(msg.payload.activityLogs || []);
+            if (msg.payload.currentUser) {
+              setCurrentUser(msg.payload.currentUser);
+              localStorage.setItem('ipam_current_user', JSON.stringify(msg.payload.currentUser));
+            }
+            if (msg.payload.users && Array.isArray(msg.payload.users)) {
+              setUsers(msg.payload.users);
+            }
             setLoading(false);
+          }
+          break;
+
+        case 'USER_UPDATED':
+          if (msg.payload) {
+            setUsers(prev => prev.map(u => u.id === msg.payload.id ? msg.payload : u));
+            setCurrentUser(prev => {
+              if (prev.id === msg.payload.id) {
+                localStorage.setItem('ipam_current_user', JSON.stringify(msg.payload));
+                return msg.payload;
+              }
+              return prev;
+            });
+          }
+          break;
+
+        case 'USER_CREATED':
+          if (msg.payload) {
+            setUsers(prev => {
+              if (prev.some(u => u.id === msg.payload.id)) return prev;
+              return [...prev, msg.payload];
+            });
+            setCurrentUser(msg.payload);
+            localStorage.setItem('ipam_current_user', JSON.stringify(msg.payload));
           }
           break;
 
@@ -479,6 +584,115 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return json.data;
   };
 
+  // --- USER PROFILE & AUTH ACTIONS ---
+  const updateCurrentUser = async (data: Partial<UserProfile>): Promise<UserProfile> => {
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to update profile');
+      setCurrentUser(json.data);
+      setUsers(prev => prev.map(u => u.id === json.data.id ? json.data : u));
+      localStorage.setItem('ipam_current_user', JSON.stringify(json.data));
+      return json.data;
+    } catch (err: any) {
+      // Fallback local update if network issue
+      const updated: UserProfile = { ...currentUser, ...data };
+      setCurrentUser(updated);
+      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+      localStorage.setItem('ipam_current_user', JSON.stringify(updated));
+      return updated;
+    }
+  };
+
+  const signIn = async (email: string, password: string): Promise<UserProfile> => {
+    const res = await fetch('/api/auth/signin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to authenticate');
+    const user: UserProfile = json.data;
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+    localStorage.setItem('ipam_is_authenticated', 'true');
+    localStorage.setItem('ipam_current_user', JSON.stringify(user));
+    setActiveTab('dashboard');
+    return user;
+  };
+
+  const signOut = async (): Promise<void> => {
+    try {
+      await fetch('/api/auth/signout', { method: 'POST' });
+    } catch (e) {
+      // Ignore network error on signout
+    }
+    setIsAuthenticated(false);
+    localStorage.setItem('ipam_is_authenticated', 'false');
+    setActiveTab('signin');
+  };
+
+  const signUpUser = async (data: {
+    name: string;
+    email: string;
+    role?: string;
+    department?: string;
+    organization?: string;
+    location?: string;
+    phone?: string;
+    bio?: string;
+    primaryDatacenterId?: string;
+    password?: string;
+  }): Promise<UserProfile> => {
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to create account');
+    const newUser = json.data;
+    setCurrentUser(newUser);
+    setIsAuthenticated(true);
+    localStorage.setItem('ipam_is_authenticated', 'true');
+    setUsers(prev => [...prev.filter(u => u.id !== newUser.id), newUser]);
+    localStorage.setItem('ipam_current_user', JSON.stringify(newUser));
+    setActiveTab('dashboard');
+    return newUser;
+  };
+
+  const switchUser = async (userId: string): Promise<UserProfile> => {
+    const res = await fetch('/api/auth/switch-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to switch user');
+    const user = json.data;
+    setCurrentUser(user);
+    localStorage.setItem('ipam_current_user', JSON.stringify(user));
+    return user;
+  };
+
+  const generateNewApiKey = async (): Promise<string> => {
+    const res = await fetch('/api/user/generate-api-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to generate API token');
+    if (json.data?.user) {
+      setCurrentUser(json.data.user);
+      localStorage.setItem('ipam_current_user', JSON.stringify(json.data.user));
+    }
+    return json.data.apiKey;
+  };
+
   return (
     <IPAMContext.Provider
       value={{
@@ -488,6 +702,9 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ips,
         stats,
         activityLogs,
+        currentUser,
+        users,
+        isAuthenticated,
         loading,
         error,
         wsConnected,
@@ -503,6 +720,12 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isDark,
         toggleTheme,
         fetchBootstrapData,
+        updateCurrentUser,
+        signIn,
+        signOut,
+        signUpUser,
+        switchUser,
+        generateNewApiKey,
         createDatacenter,
         updateDatacenter,
         deleteDatacenter,
@@ -518,6 +741,7 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         reserveNextIP,
         bulkGenerateIPs,
         fetchNextAvailableIP,
+        getNextAvailableIP: fetchNextAvailableIP,
       }}
     >
       {children}

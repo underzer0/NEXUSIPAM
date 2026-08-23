@@ -15,10 +15,11 @@ import {
   Lock, 
   SlidersHorizontal,
   ChevronRight,
-  Database
+  Database,
+  Sparkles
 } from 'lucide-react';
-import { Subnet, SegmentType } from '../types/ipam';
-import { parseCIDR } from '../utils/ipCalculator';
+import { Subnet, SegmentType, IPVersion } from '../types/ipam';
+import { parseCIDR, getIPVersion } from '../utils/ipCalculator';
 
 interface SubnetsViewProps {
   onOpenNewSubnetModal: () => void;
@@ -48,12 +49,15 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
 
   const [dcFilter, setDcFilter] = useState<string>('All');
   const [segmentFilter, setSegmentFilter] = useState<string>('All');
+  const [versionFilter, setVersionFilter] = useState<string>('All');
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const filteredSubnets = subnets.filter((s) => {
     if (dcFilter !== 'All' && s.datacenterId !== dcFilter) return false;
     if (segmentFilter !== 'All' && s.segmentType !== segmentFilter) return false;
+    const ver = s.ipVersion || getIPVersion(s.cidr);
+    if (versionFilter !== 'All' && ver !== versionFilter) return false;
     if (searchFilter) {
       const q = searchFilter.toLowerCase();
       return (
@@ -81,46 +85,62 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-3.5 sm:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-white dark:text-white flex items-center gap-2.5">
+          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white dark:text-white flex items-center gap-2.5">
             <Network className="w-5 h-5 text-emerald-400" />
-            Subnet & Prefix Allocation Blocks
+            Dual-Stack Subnet & Prefix Allocations
           </h1>
-          <p className="text-xs text-slate-400 mt-1 font-mono">
-            IPv4 address ranges with mathematical CIDR validation, capacity calculators, and VLAN binding.
+          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 font-mono">
+            IPv4 and IPv6 address ranges with mathematical CIDR validation, capacity calculators, and VLAN binding.
           </p>
         </div>
 
         <button
           id="btn-add-subnet"
           onClick={onOpenNewSubnetModal}
-          className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2 self-start sm:self-auto active:scale-95"
+          className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2 active:scale-95"
         >
           <Plus className="w-4 h-4" /> Allocate Subnet
         </button>
       </div>
 
       {deleteError && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-mono">
+        <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-mono">
           {deleteError}
         </div>
       )}
 
       {/* Filter Toolbar */}
-      <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3 ${
+      <div className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3 ${
         isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-white border-slate-200'
       }`}>
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto flex-wrap">
+          {/* Version Filter */}
+          <div className="flex items-center justify-between sm:justify-start gap-2 text-xs font-mono">
+            <span className="font-semibold text-slate-400 text-[11px]">Protocol:</span>
+            <select
+              value={versionFilter}
+              onChange={(e) => setVersionFilter(e.target.value)}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                isDark ? 'bg-slate-900/80 border-slate-700/60 text-slate-200' : 'bg-slate-100 border-slate-200 text-slate-800'
+              }`}
+            >
+              <option value="All">All Protocols (Dual-Stack)</option>
+              <option value="IPv4">IPv4 Only</option>
+              <option value="IPv6">IPv6 Only</option>
+            </select>
+          </div>
+
           {/* DC Filter */}
-          <div className="flex items-center gap-2 text-xs font-mono">
-            <span className="font-semibold text-slate-400">Datacenter:</span>
+          <div className="flex items-center justify-between sm:justify-start gap-2 text-xs font-mono">
+            <span className="font-semibold text-slate-400 text-[11px]">Datacenter:</span>
             <select
               value={dcFilter}
               onChange={(e) => setDcFilter(e.target.value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+              className={`flex-1 sm:flex-initial px-2.5 py-1.5 rounded-lg text-xs font-medium border focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
                 isDark ? 'bg-slate-900/80 border-slate-700/60 text-slate-200' : 'bg-slate-100 border-slate-200 text-slate-800'
               }`}
             >
@@ -132,18 +152,18 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
           </div>
 
           {/* Segment Filter */}
-          <div className="flex items-center gap-2 text-xs font-mono">
-            <span className="font-semibold text-slate-400">Segment:</span>
+          <div className="flex items-center justify-between sm:justify-start gap-2 text-xs font-mono">
+            <span className="font-semibold text-slate-400 text-[11px]">Segment:</span>
             <select
               value={segmentFilter}
               onChange={(e) => setSegmentFilter(e.target.value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+              className={`flex-1 sm:flex-initial px-2.5 py-1.5 rounded-lg text-xs font-medium border focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
                 isDark ? 'bg-slate-900/80 border-slate-700/60 text-slate-200' : 'bg-slate-100 border-slate-200 text-slate-800'
               }`}
             >
               <option value="All">All Segments</option>
-              <option value="Private">Private (RFC 1918)</option>
-              <option value="Public">Public Routed</option>
+              <option value="Private">Private (RFC1918 / ULA)</option>
+              <option value="Public">Public Routed (Global)</option>
             </select>
           </div>
         </div>
@@ -177,6 +197,8 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
             const activeIps = subIps.filter(i => i.status === 'Active').length;
             const reservedIps = subIps.filter(i => i.status === 'Reserved').length;
             const availableIps = subIps.filter(i => i.status === 'Available').length;
+            const ver = subnet.ipVersion || getIPVersion(subnet.cidr);
+            const isV6 = ver === 'IPv6';
 
             let calc;
             try {
@@ -185,7 +207,7 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
               calc = null;
             }
 
-            const totalUsable = calc ? calc.usableHosts : 254;
+            const totalUsable = calc ? (isV6 ? 256 : calc.usableHosts) : 254;
             const totalAllocated = activeIps + reservedIps;
             const utilPercent = totalUsable > 0 ? Math.min(100, Math.round((totalAllocated / totalUsable) * 100)) : 0;
             const isPublic = subnet.segmentType === 'Public';
@@ -198,11 +220,20 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
                 }`}
               >
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  {/* Left: CIDR, Segment, DC & VLAN Info */}
+                  {/* Left: CIDR, Version, Segment, DC & VLAN Info */}
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2.5">
-                      <span className="font-mono font-bold text-base text-emerald-400">
+                      <span className="font-mono font-bold text-base text-emerald-400 break-all">
                         {subnet.cidr}
+                      </span>
+
+                      {/* Protocol Badge */}
+                      <span className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border ${
+                        isV6 
+                          ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' 
+                          : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                      }`}>
+                        {ver}
                       </span>
 
                       {/* Segment Badge */}
@@ -241,32 +272,30 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-mono text-slate-400 pt-1">
                         <span>Netmask: <strong className="text-slate-200">{calc.netmask}</strong></span>
                         <span>•</span>
-                        <span>Range: <strong className="text-slate-200">{calc.firstUsableHost} – {calc.lastUsableHost}</strong></span>
+                        <span className="truncate">Range: <strong className="text-slate-200">{calc.firstUsableHost} – {calc.lastUsableHost}</strong></span>
                         <span>•</span>
-                        <span>Broadcast: <strong className="text-slate-200">{calc.broadcastAddress}</strong></span>
-                        <span>•</span>
-                        <span>Usable: <strong className="text-emerald-400">{calc.usableHosts.toLocaleString()} IPs</strong></span>
+                        <span>Capacity: <strong className="text-emerald-400">{calc.usableHostsFormatted || calc.usableHosts.toLocaleString()}</strong></span>
                       </div>
                     )}
                   </div>
 
                   {/* Right: Allocation Load & Direct Action Tools */}
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 shrink-0">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-700/30">
                     {/* Utilization Bar */}
-                    <div className="w-44 space-y-1.5">
+                    <div className="w-full sm:w-44 space-y-1.5">
                       <div className="flex justify-between text-xs font-mono">
-                        <span className="text-slate-400">{totalAllocated}/{totalUsable} Alloc</span>
-                        <span className="font-bold text-slate-200">{utilPercent}%</span>
+                        <span className="text-slate-400">{totalAllocated} Tracked</span>
+                        <span className="font-bold text-slate-200">{activeIps} Active</span>
                       </div>
                       <div className="w-full bg-slate-700/50 h-2 rounded-full overflow-hidden flex">
                         <div 
                           className="bg-indigo-500 h-full" 
-                          style={{ width: `${totalUsable > 0 ? (activeIps / totalUsable) * 100 : 0}%` }}
+                          style={{ width: `${totalUsable > 0 ? (activeIps / Math.max(activeIps + reservedIps + 1, totalUsable)) * 100 : 0}%` }}
                           title={`Active: ${activeIps}`}
                         />
                         <div 
                           className="bg-amber-500 h-full" 
-                          style={{ width: `${totalUsable > 0 ? (reservedIps / totalUsable) * 100 : 0}%` }}
+                          style={{ width: `${totalUsable > 0 ? (reservedIps / Math.max(activeIps + reservedIps + 1, totalUsable)) * 100 : 0}%` }}
                           title={`Reserved: ${reservedIps}`}
                         />
                       </div>
@@ -276,7 +305,7 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <button
                         onClick={() => onOpenSubnetVisualizer(subnet)}
-                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95"
+                        className="flex-1 sm:flex-initial justify-center px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95"
                         title="Interactive Visual Matrix of all IP hosts in this block"
                       >
                         <Eye className="w-3.5 h-3.5" /> Matrix
@@ -284,7 +313,7 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
 
                       <button
                         onClick={() => onOpenReserveNextModal(subnet.id)}
-                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-all flex items-center gap-1.5 active:scale-95"
+                        className="flex-1 sm:flex-initial justify-center px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-all flex items-center gap-1.5 active:scale-95"
                         title="Reserve Next Available IP in this Subnet"
                       >
                         <BookmarkCheck className="w-3.5 h-3.5" /> Next IP
@@ -292,27 +321,29 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
 
                       <button
                         onClick={() => onOpenBulkGenerateModal(subnet)}
-                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition-all flex items-center gap-1.5 active:scale-95"
+                        className="flex-1 sm:flex-initial justify-center px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition-all flex items-center gap-1.5 active:scale-95"
                         title="Bulk Populate IP addresses for this subnet"
                       >
                         <Database className="w-3.5 h-3.5" /> Bulk
                       </button>
 
-                      <button
-                        onClick={() => onOpenEditSubnetModal(subnet)}
-                        className="p-1.5 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-indigo-400 transition-colors"
-                        title="Edit Subnet"
-                      >
-                        <Edit className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => onOpenEditSubnetModal(subnet)}
+                          className="p-1.5 rounded-lg bg-slate-800 sm:bg-transparent hover:bg-slate-700/50 text-slate-400 hover:text-indigo-400 transition-colors"
+                          title="Edit Subnet"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
 
-                      <button
-                        onClick={() => handleDelete(subnet)}
-                        className="p-1.5 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-rose-400 transition-colors"
-                        title="Delete Subnet"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                        <button
+                          onClick={() => handleDelete(subnet)}
+                          className="p-1.5 rounded-lg bg-slate-800 sm:bg-transparent hover:bg-slate-700/50 text-slate-400 hover:text-rose-400 transition-colors"
+                          title="Delete Subnet"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
