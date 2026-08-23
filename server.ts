@@ -1,6 +1,7 @@
 import express from 'express';
 import http from 'http';
 import path from 'path';
+import fs from 'fs';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer as createViteServer } from 'vite';
 import { createApiRouter } from './server/routes';
@@ -96,17 +97,18 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    // Robust resolution: handles when server is running as dist/server.cjs or from project root
-    let distPath = path.join(process.cwd(), 'dist');
-    if (typeof __dirname !== 'undefined') {
-      if (path.basename(__dirname) === 'dist') {
-        distPath = __dirname;
-      } else if (require('fs').existsSync(path.join(__dirname, 'dist', 'index.html'))) {
-        distPath = path.join(__dirname, 'dist');
-      }
-    }
+    // Robust resolution: finds the directory containing index.html
+    const candidates = [
+      typeof __dirname !== 'undefined' ? __dirname : '',
+      typeof __dirname !== 'undefined' ? path.join(__dirname, 'dist') : '',
+      path.join(process.cwd(), 'dist'),
+      process.cwd()
+    ].filter(Boolean);
+
+    let distPath = candidates.find(dir => fs.existsSync(path.join(dir, 'index.html'))) || path.join(process.cwd(), 'dist');
+    
     console.log(`[IPAM Production] Serving static assets from: ${distPath}`);
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, { index: false }));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
