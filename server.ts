@@ -96,7 +96,16 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    // Robust resolution: handles when server is running as dist/server.cjs or from project root
+    let distPath = path.join(process.cwd(), 'dist');
+    if (typeof __dirname !== 'undefined') {
+      if (path.basename(__dirname) === 'dist') {
+        distPath = __dirname;
+      } else if (require('fs').existsSync(path.join(__dirname, 'dist', 'index.html'))) {
+        distPath = path.join(__dirname, 'dist');
+      }
+    }
+    console.log(`[IPAM Production] Serving static assets from: ${distPath}`);
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));

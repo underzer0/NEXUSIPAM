@@ -1,8 +1,11 @@
+const path = require('path');
+
 module.exports = {
   apps: [
     {
       name: 'beyondip',
       script: './dist/server.cjs',
+      cwd: __dirname,
       instances: 1,
       exec_mode: 'fork',
       autorestart: true,
