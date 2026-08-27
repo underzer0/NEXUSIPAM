@@ -69,8 +69,13 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
   });
 
   // Full bootstrap state
-  router.get('/bootstrap', (req: Request, res: Response) => {
+  router.get('/bootstrap', async (req: Request, res: Response) => {
     try {
+      if (!db.isDatabaseConnected()) {
+        // Attempt to connect using the latest config on disk
+        await db.retryConnection();
+      }
+
       if (!db.isDatabaseConnected()) {
         const cfg = mysqlEngine.getConfig();
         const dbErr = db.getDatabaseError() || 'Could not connect to MySQL server';
@@ -83,7 +88,7 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
             host: cfg?.host || 'localhost',
             port: cfg?.port || 3306,
             database: cfg?.database || 'ipam_db',
-            user: cfg?.user || 'ipam_user',
+            user: cfg?.user || 'beyondip',
             configFile: 'config/mysql.config.json',
           },
         });

@@ -45,28 +45,37 @@ class MySQLEngine {
    * Loads MySQL connection configuration from /config/mysql.config.json or environment variables
    */
   public loadConfig(): MySQLConfig | null {
-    // 1. Check JSON config file in /config/mysql.config.json (Highest Priority)
-    try {
-      const configPath = path.join(process.cwd(), 'config', 'mysql.config.json');
-      if (fs.existsSync(configPath)) {
-        const raw = fs.readFileSync(configPath, 'utf8');
-        const json = JSON.parse(raw);
-        if (json.host && json.database) {
-          this.config = {
-            host: json.host,
-            port: Number(json.port) || 3306,
-            user: json.user || 'root',
-            password: json.password !== undefined ? String(json.password) : '',
-            database: json.database,
-            ssl: Boolean(json.ssl),
-            connectionLimit: Number(json.connectionLimit) || 10,
-            connectTimeout: Number(json.connectTimeout) || 8000,
-          };
-          return this.config;
+    // 1. Search candidate config paths
+    const candidatePaths = [
+      path.resolve(process.cwd(), 'config', 'mysql.config.json'),
+      path.resolve(process.cwd(), 'mysql.config.json'),
+      '/config/mysql.config.json',
+      process.env.MYSQL_CONFIG_PATH,
+    ].filter(Boolean) as string[];
+
+    for (const configPath of candidatePaths) {
+      try {
+        if (fs.existsSync(configPath)) {
+          const raw = fs.readFileSync(configPath, 'utf8');
+          const json = JSON.parse(raw);
+          if (json.host && json.database) {
+            this.config = {
+              host: json.host,
+              port: Number(json.port) || 3306,
+              user: json.user !== undefined ? String(json.user) : (process.env.MYSQL_USER || 'root'),
+              password: json.password !== undefined ? String(json.password) : (process.env.MYSQL_PASSWORD || ''),
+              database: json.database,
+              ssl: Boolean(json.ssl),
+              connectionLimit: Number(json.connectionLimit) || 10,
+              connectTimeout: Number(json.connectTimeout) || 8000,
+            };
+            console.log(`[MySQL Engine] Loaded active config from ${configPath}: user='${this.config.user}', host='${this.config.host}:${this.config.port}', db='${this.config.database}'`);
+            return this.config;
+          }
         }
+      } catch (err) {
+        console.warn(`[MySQL Engine] Warning parsing config file at ${configPath}:`, err);
       }
-    } catch (err) {
-      console.warn('[MySQL] Failed to read config/mysql.config.json:', err);
     }
 
     // 2. Check URI / URL connection string
@@ -95,7 +104,7 @@ class MySQLEngine {
       this.config = {
         host: process.env.MYSQL_HOST || 'localhost',
         port: parseInt(process.env.MYSQL_PORT || '3306', 10),
-        user: process.env.MYSQL_USER || 'ipam_user',
+        user: process.env.MYSQL_USER || 'beyondip',
         password: process.env.MYSQL_PASSWORD || '',
         database: process.env.MYSQL_DATABASE || 'ipam_db',
         ssl: process.env.MYSQL_SSL === 'true',
@@ -108,7 +117,7 @@ class MySQLEngine {
     this.config = {
       host: 'localhost',
       port: 3306,
-      user: 'ipam_user',
+      user: 'beyondip',
       password: '',
       database: 'ipam_db',
       ssl: false,
@@ -127,7 +136,7 @@ class MySQLEngine {
   }
 
   public getConfig(): MySQLConfig | null {
-    return this.config || this.loadConfig();
+    return this.loadConfig();
   }
 
   /**
@@ -161,11 +170,15 @@ class MySQLEngine {
    * Connects to MySQL and establishes connection pool
    */
   public async initialize(): Promise<boolean> {
-    if (!this.config) {
-      this.loadConfig();
-    }
+    this.loadConfig();
 
     try {
+      if (this.pool) {
+        try {
+          await this.pool.end();
+        } catch {}
+        this.pool = null;
+      }
       const poolOptions: PoolOptions = {
         host: this.config!.host,
         port: this.config!.port,
