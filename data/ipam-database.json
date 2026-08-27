@@ -1,11 +1,66 @@
 {
   "version": 1,
-  "lastSaved": "2026-08-27T08:00:00.000Z",
+  "lastSaved": "2026-08-27T10:26:15.565Z",
   "datacenters": [],
   "vlans": [],
   "subnets": [],
   "ips": [],
-  "activityLogs": [],
+  "activityLogs": [
+    {
+      "id": "log-1787826375564-v55y",
+      "action": "DELETE",
+      "entityType": "Datacenter",
+      "entityId": "dc-qa-test-datacenter-zurich--mtbdnw5k",
+      "title": "Datacenter Deleted: QA Test Datacenter (Zurich)",
+      "detail": "Removed datacenter location Zurich, Switzerland",
+      "timestamp": "2026-08-27T10:26:15.564Z"
+    },
+    {
+      "id": "log-1787826375564-gdnj",
+      "action": "DELETE",
+      "entityType": "Subnet",
+      "entityId": "sub-10-200-0-0-24-mtbdnw5l",
+      "title": "Subnet 10.200.0.0/24 Deleted",
+      "detail": "Removed subnet and purged 1 child IP assignment(s).",
+      "timestamp": "2026-08-27T10:26:15.564Z"
+    },
+    {
+      "id": "log-1787826375563-3zbp",
+      "action": "UPDATE",
+      "entityType": "IP",
+      "entityId": "ip-10-200-0-1-mtbdnw5m",
+      "title": "IP 10.200.0.1 Updated",
+      "detail": "Status: Available, Host: None",
+      "timestamp": "2026-08-27T10:26:15.563Z"
+    },
+    {
+      "id": "log-1787826375562-2dqa",
+      "action": "RESERVE",
+      "entityType": "IP",
+      "entityId": "ip-10-200-0-1-mtbdnw5m",
+      "title": "Reserved IP 10.200.0.1",
+      "detail": "Assigned to qa-router-01",
+      "timestamp": "2026-08-27T10:26:15.562Z"
+    },
+    {
+      "id": "log-1787826375561-hmyy",
+      "action": "CREATE",
+      "entityType": "Subnet",
+      "entityId": "sub-10-200-0-0-24-mtbdnw5l",
+      "title": "Subnet 10.200.0.0/24 (IPv4) Created",
+      "detail": "Configured as Private in QA Test Datacenter (Zurich)",
+      "timestamp": "2026-08-27T10:26:15.561Z"
+    },
+    {
+      "id": "log-1787826375560-3kma",
+      "action": "CREATE",
+      "entityType": "Datacenter",
+      "entityId": "dc-qa-test-datacenter-zurich--mtbdnw5k",
+      "title": "Datacenter Created: QA Test Datacenter (Zurich)",
+      "detail": "Added location Zurich, Switzerland",
+      "timestamp": "2026-08-27T10:26:15.560Z"
+    }
+  ],
   "users": [],
   "passwords": {},
   "currentUserId": ""

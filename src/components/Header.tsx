@@ -20,6 +20,7 @@ interface HeaderProps {
   onOpenReserveNextModal: () => void;
   onOpenNewDatacenterModal: () => void;
   onToggleMobileMenu?: () => void;
+  onOpenAuditLogs?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -27,6 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenReserveNextModal,
   onOpenNewDatacenterModal,
   onToggleMobileMenu,
+  onOpenAuditLogs,
 }) => {
   const { 
     filters, 
@@ -252,10 +254,14 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Action Buttons & Websocket Badge */}
       <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-        <span className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold rounded uppercase tracking-wider font-mono">
+        <button
+          onClick={onOpenAuditLogs}
+          className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 hover:border-emerald-500/40 text-[10px] font-bold rounded uppercase tracking-wider font-mono transition-colors cursor-pointer"
+          title="Click to view Live Network Alerts & Audit Stream"
+        >
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
           Websocket Sync
-        </span>
+        </button>
 
         {/* Quick Reserve Next IP Button */}
         <button

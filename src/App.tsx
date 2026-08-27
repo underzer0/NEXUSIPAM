@@ -20,6 +20,7 @@ import { SubnetModal } from './components/modals/SubnetModal';
 import { IPModal } from './components/modals/IPModal';
 import { ReserveNextIPModal } from './components/modals/ReserveNextIPModal';
 import { BulkGenerateModal } from './components/modals/BulkGenerateModal';
+import { AuditLogModal } from './components/modals/AuditLogModal';
 import { Datacenter, VLAN, Subnet, IPAddress } from './types/ipam';
 import { BeyondIPLogo } from './components/BeyondIPLogo';
 import { Sun, Moon } from 'lucide-react';
@@ -53,7 +54,15 @@ const MainAppContent: React.FC = () => {
 
   const [visualizerSubnet, setVisualizerSubnet] = useState<Subnet | null>(null);
 
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
+  const [auditEntityFilter, setAuditEntityFilter] = useState<string | undefined>(undefined);
+
   // Handlers
+  const handleOpenAuditLogs = (entityFilter?: string) => {
+    setAuditEntityFilter(entityFilter);
+    setIsAuditModalOpen(true);
+  };
+
   const handleOpenNewVlan = (dcId?: string) => {
     setDefaultDcForVlan(dcId);
     setEditingVlan(null);
@@ -179,6 +188,7 @@ const MainAppContent: React.FC = () => {
           onOpenReserveNextModal={() => handleOpenReserveNext()}
           onOpenNewDatacenterModal={handleOpenNewDatacenter}
           onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+          onOpenAuditLogs={() => handleOpenAuditLogs()}
         />
 
         {/* Scrollable View Canvas */}
@@ -189,6 +199,7 @@ const MainAppContent: React.FC = () => {
               onOpenNewDatacenterModal={handleOpenNewDatacenter}
               onOpenNewSubnetModal={() => handleOpenNewSubnet()}
               onOpenReserveNextModal={() => handleOpenReserveNext()}
+              onOpenAuditLogs={handleOpenAuditLogs}
             />
           )}
 
@@ -296,6 +307,12 @@ const MainAppContent: React.FC = () => {
         isOpen={isBulkGenerateOpen}
         onClose={() => setIsBulkGenerateOpen(false)}
         subnet={bulkGenerateSubnet}
+      />
+
+      <AuditLogModal
+        isOpen={isAuditModalOpen}
+        onClose={() => setIsAuditModalOpen(false)}
+        initialEntityFilter={auditEntityFilter}
       />
     </div>
   );

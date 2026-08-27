@@ -26,6 +26,7 @@ interface DashboardViewProps {
   onOpenNewDatacenterModal: () => void;
   onOpenNewSubnetModal: () => void;
   onOpenReserveNextModal: (subnetId?: string) => void;
+  onOpenAuditLogs?: (entityFilter?: string) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -33,6 +34,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenNewDatacenterModal,
   onOpenNewSubnetModal,
   onOpenReserveNextModal,
+  onOpenAuditLogs,
 }) => {
   const { 
     stats, 
@@ -752,10 +754,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <h2 className="text-sm font-bold text-white dark:text-white uppercase tracking-wider flex items-center gap-2">
                 <Activity className="w-4 h-4 text-emerald-400" /> Network Alerts & Audit Stream
               </h2>
-              <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                Live Synchronized
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Live Synchronized
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onOpenAuditLogs?.()}
+                  className="text-[10px] font-mono font-semibold text-emerald-400 hover:text-emerald-300 hover:underline px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20"
+                >
+                  View All ({activityLogs.length})
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2.5">
@@ -772,9 +783,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   return (
                     <div 
                       key={log.id}
-                      className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-3 ${
-                        isDark ? 'bg-slate-900/50 border-slate-700/30' : 'bg-slate-50 border-slate-200'
+                      onClick={() => onOpenAuditLogs?.(log.entityType)}
+                      className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-3 cursor-pointer transition-all hover:scale-[1.01] ${
+                        isDark 
+                          ? 'bg-slate-900/50 border-slate-700/30 hover:border-slate-600 hover:bg-slate-900/80' 
+                          : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-slate-100/80'
                       }`}
+                      title="Click to inspect full audit event log"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <span className={`w-2 h-2 rounded-full shrink-0 ${
@@ -798,10 +813,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="pt-3 border-t border-slate-700/40 flex items-center justify-between text-xs text-slate-400 mt-3 font-mono">
             <span>Dual-Stack Audit log history stored securely</span>
             <button
-              onClick={() => setActiveTab('ips')}
-              className={`${isV6 ? 'text-cyan-400 hover:text-cyan-300' : 'text-indigo-400 hover:text-indigo-300'} font-semibold`}
+              type="button"
+              onClick={() => onOpenAuditLogs?.()}
+              className={`${isV6 ? 'text-cyan-400 hover:text-cyan-300' : 'text-indigo-400 hover:text-indigo-300'} font-semibold flex items-center gap-1 hover:underline`}
             >
-              Full Host History →
+              Full Audit Stream History →
             </button>
           </div>
         </div>
