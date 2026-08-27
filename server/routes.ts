@@ -334,6 +334,7 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
   router.put('/user/profile', (req: Request, res: Response) => {
     try {
       const currentUser = db.getCurrentUser();
+      if (!currentUser) return res.status(401).json({ success: false, error: 'No authenticated user session found' });
       const updated = db.updateUserProfile(currentUser.id, req.body);
       broadcast('USER_UPDATED', updated);
       res.json({ success: true, data: updated });
@@ -408,6 +409,7 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
   router.post('/user/generate-api-key', (req: Request, res: Response) => {
     try {
       const currentUser = db.getCurrentUser();
+      if (!currentUser) return res.status(401).json({ success: false, error: 'No authenticated user session found' });
       const apiKey = db.generateApiKey(currentUser.id);
       const updated = db.getCurrentUser();
       broadcast('USER_UPDATED', updated);

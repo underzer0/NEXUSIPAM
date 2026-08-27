@@ -9,17 +9,14 @@ import {
   ShieldCheck, 
   AlertCircle, 
   Server, 
-  CheckCircle2, 
   UserPlus, 
-  KeyRound,
-  Cpu,
   Globe2
 } from 'lucide-react';
 import { useIPAM } from '../context/IPAMContext';
 import { BeyondIPLogo } from './BeyondIPLogo';
 
 export const SignInView: React.FC = () => {
-  const { signIn, setActiveTab, isDark } = useIPAM();
+  const { signIn, setActiveTab, isDark, users } = useIPAM();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,21 +43,6 @@ export const SignInView: React.FC = () => {
       await signIn(email.trim(), password);
     } catch (err: any) {
       setErrorMessage(err.message || 'Authentication failed. Please verify your credentials.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleQuickDemoLogin = async (demoEmail: string, demoPass: string = 'password123') => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setErrorMessage(null);
-    setIsLoading(true);
-
-    try {
-      await signIn(demoEmail, demoPass);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Quick login failed');
     } finally {
       setIsLoading(false);
     }
@@ -133,9 +115,6 @@ export const SignInView: React.FC = () => {
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Password
                 </label>
-                <span className="text-[11px] text-slate-400 hover:text-indigo-400 cursor-pointer transition-colors" title="Default password is password123">
-                  Default: password123
-                </span>
               </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -202,83 +181,6 @@ export const SignInView: React.FC = () => {
               )}
             </button>
           </form>
-
-          {/* Quick Demo Credentials */}
-          <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-700/60">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2.5 text-center flex items-center justify-center gap-1.5">
-              <KeyRound className="w-3 h-3" /> Quick Demo Accounts (One-Click)
-            </p>
-            <div className="grid grid-cols-1 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('hbouslama98@gmail.com', 'password123')}
-                className={`flex items-center justify-between p-2 rounded-xl text-left border text-xs transition-all ${
-                  isDark 
-                    ? 'bg-slate-900/60 hover:bg-indigo-950/40 border-slate-700/60 hover:border-indigo-500/50 text-slate-300' 
-                    : 'bg-slate-50 hover:bg-indigo-50/60 border-slate-200 hover:border-indigo-200 text-slate-700'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 font-bold flex items-center justify-center text-[10px]">
-                    HB
-                  </div>
-                  <div>
-                    <div className="font-semibold text-slate-900 dark:text-white">Habib Bouslama</div>
-                    <div className="text-[10px] text-slate-400">Principal Architect • DC-East</div>
-                  </div>
-                </div>
-                <span className="text-[10px] font-semibold text-indigo-500 dark:text-indigo-400 px-2 py-0.5 rounded bg-indigo-500/10">
-                  Fill & Log In
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('e.rostova@nexus.io', 'password123')}
-                className={`flex items-center justify-between p-2 rounded-xl text-left border text-xs transition-all ${
-                  isDark 
-                    ? 'bg-slate-900/60 hover:bg-indigo-950/40 border-slate-700/60 hover:border-indigo-500/50 text-slate-300' 
-                    : 'bg-slate-50 hover:bg-indigo-50/60 border-slate-200 hover:border-indigo-200 text-slate-700'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-400 font-bold flex items-center justify-center text-[10px]">
-                    ER
-                  </div>
-                  <div>
-                    <div className="font-semibold text-slate-900 dark:text-white">Elena Rostova</div>
-                    <div className="text-[10px] text-slate-400">SecOps Lead • DC-EU</div>
-                  </div>
-                </div>
-                <span className="text-[10px] font-semibold text-indigo-500 dark:text-indigo-400 px-2 py-0.5 rounded bg-indigo-500/10">
-                  Fill & Log In
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('k.sato@nexus.io', 'password123')}
-                className={`flex items-center justify-between p-2 rounded-xl text-left border text-xs transition-all ${
-                  isDark 
-                    ? 'bg-slate-900/60 hover:bg-indigo-950/40 border-slate-700/60 hover:border-indigo-500/50 text-slate-300' 
-                    : 'bg-slate-50 hover:bg-indigo-50/60 border-slate-200 hover:border-indigo-200 text-slate-700'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-[10px]">
-                    KS
-                  </div>
-                  <div>
-                    <div className="font-semibold text-slate-900 dark:text-white">Kenji Sato</div>
-                    <div className="text-[10px] text-slate-400">DevOps / Cloud • DC-APAC</div>
-                  </div>
-                </div>
-                <span className="text-[10px] font-semibold text-indigo-500 dark:text-indigo-400 px-2 py-0.5 rounded bg-indigo-500/10">
-                  Fill & Log In
-                </span>
-              </button>
-            </div>
-          </div>
 
           {/* Switch to Sign Up Action */}
           <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-700/60 text-center">

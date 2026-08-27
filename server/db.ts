@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { Datacenter, VLAN, Subnet, IPAddress, ActivityLog, IPAMStats, SegmentType, IPStatus, UserProfile, IPVersion } from '../src/types/ipam';
 import { isIPInCIDR, isValidCIDR, isValidIP, isValidIPv4, isValidIPv6, parseCIDR, isPrivateRFC1918, ipToInt, intToIp, getIPVersion, compressIPv6, generateIPRange } from '../src/utils/ipCalculator';
 
@@ -9,742 +11,81 @@ class IPAMDatabase {
   private activityLogs: ActivityLog[] = [];
   private users: UserProfile[] = [];
   private passwords: Map<string, string> = new Map();
-  private currentUserId: string = 'user-hbouslama';
+  private currentUserId: string = '';
+  private dataDir: string;
+  private dbFilePath: string;
 
   constructor() {
-    this.seedInitialData();
+    this.dataDir = path.join(process.cwd(), 'data');
+    this.dbFilePath = path.join(this.dataDir, 'ipam-database.json');
+    this.initializeStore();
   }
 
-  private seedInitialData() {
-    const now = new Date().toISOString();
+  private initializeStore(): void {
+    const loaded = this.loadFromFile();
+    if (!loaded) {
+      console.log('[IPAM Storage] Initializing fresh clean database with disk persistence enabled.');
+      this.datacenters = [];
+      this.vlans = [];
+      this.subnets = [];
+      this.ips = [];
+      this.activityLogs = [];
+      this.users = [];
+      this.passwords = new Map();
+      this.currentUserId = '';
+      this.persist();
+    }
+  }
 
-    // 1. Datacenters
-    this.datacenters = [
-      {
-        id: 'dc-east',
-        name: 'DC-East',
-        location: 'Ashburn, VA, USA (US-East)',
-        description: 'Primary Production Datacenter & Core Cloud Fabric with Tier-4 Redundancy',
-        createdAt: new Date(Date.now() - 90 * 86400000).toISOString(),
-      },
-      {
-        id: 'dc-west',
-        name: 'DC-West',
-        location: 'Santa Clara, CA, USA (US-West)',
-        description: 'Secondary Production & Disaster Recovery Hot-Standby Site',
-        createdAt: new Date(Date.now() - 60 * 86400000).toISOString(),
-      },
-      {
-        id: 'dc-eu',
-        name: 'DC-EU',
-        location: 'Frankfurt, Germany (EU-Central)',
-        description: 'European Enterprise Hub with Strict GDPR Data Sovereignty',
-        createdAt: new Date(Date.now() - 45 * 86400000).toISOString(),
-      },
-      {
-        id: 'dc-apac',
-        name: 'DC-APAC',
-        location: 'Tokyo, Japan (AP-Northeast)',
-        description: 'Low-latency Financial Gateway & Asia-Pacific Edge Node',
-        createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
-      },
-    ];
-
-    // 2. VLANs (Notice: VLAN 100 and VLAN 200 are reused across different Datacenters!)
-    this.vlans = [
-      // DC-East VLANs
-      {
-        id: 'vlan-dc-east-100',
-        vlanId: 100,
-        name: 'Prod-App-Backend',
-        description: 'Core microservices and backend application cluster',
-        datacenterId: 'dc-east',
-        createdAt: new Date(Date.now() - 85 * 86400000).toISOString(),
-      },
-      {
-        id: 'vlan-dc-east-200',
-        vlanId: 200,
-        name: 'DB-Cluster-HA',
-        description: 'PostgreSQL primary/replica and distributed cache layer',
-        datacenterId: 'dc-east',
-        createdAt: new Date(Date.now() - 80 * 86400000).toISOString(),
-      },
-      {
-        id: 'vlan-dc-east-300',
-        vlanId: 300,
-        name: 'OOB-Management',
-        description: 'Out-of-band IPMI / iLO server management network',
-        datacenterId: 'dc-east',
-        createdAt: new Date(Date.now() - 75 * 86400000).toISOString(),
-      },
-
-      // DC-West VLANs (Reusing VLAN 100 and VLAN 200 for distinct DC entities)
-      {
-        id: 'vlan-dc-west-100',
-        vlanId: 100,
-        name: 'DMZ-Public-Gateway',
-        description: 'Public ingress routers, WAFs, and edge proxy tier in US-West',
-        datacenterId: 'dc-west',
-        createdAt: new Date(Date.now() - 55 * 86400000).toISOString(),
-      },
-      {
-        id: 'vlan-dc-west-200',
-        vlanId: 200,
-        name: 'DR-Database-Mirror',
-        description: 'Disaster recovery asynchronous snapshot replication target',
-        datacenterId: 'dc-west',
-        createdAt: new Date(Date.now() - 50 * 86400000).toISOString(),
-      },
-
-      // DC-EU VLANs (Reusing VLAN 100)
-      {
-        id: 'vlan-dc-eu-100',
-        vlanId: 100,
-        name: 'EU-Web-Services',
-        description: 'EU sovereign customer portals and API gateways',
-        datacenterId: 'dc-eu',
-        createdAt: new Date(Date.now() - 40 * 86400000).toISOString(),
-      },
-      {
-        id: 'vlan-dc-eu-500',
-        vlanId: 500,
-        name: 'EU-Compliance-Audit',
-        description: 'Isolated audit logging & telemetry monitoring mesh',
-        datacenterId: 'dc-eu',
-        createdAt: new Date(Date.now() - 35 * 86400000).toISOString(),
-      },
-
-      // DC-APAC VLANs
-      {
-        id: 'vlan-dc-apac-888',
-        vlanId: 888,
-        name: 'APAC-Trading-Core',
-        description: 'Ultra low-latency order routing and FIX protocol engines',
-        datacenterId: 'dc-apac',
-        createdAt: new Date(Date.now() - 25 * 86400000).toISOString(),
-      },
-    ];
-
-    // 3. Subnets / Prefixes
-    this.subnets = [
-      // DC-East Subnets
-      {
-        id: 'sub-east-app',
-        cidr: '10.10.10.0/24',
-        segmentType: 'Private',
-        datacenterId: 'dc-east',
-        vlanId: 'vlan-dc-east-100',
-        description: 'Production App Tier (10.10.10.0/24)',
-        createdAt: new Date(Date.now() - 80 * 86400000).toISOString(),
-      },
-      {
-        id: 'sub-east-db',
-        cidr: '10.10.20.0/24',
-        segmentType: 'Private',
-        datacenterId: 'dc-east',
-        vlanId: 'vlan-dc-east-200',
-        description: 'Production HA Database Tier (10.10.20.0/24)',
-        createdAt: new Date(Date.now() - 78 * 86400000).toISOString(),
-      },
-      {
-        id: 'sub-east-pub',
-        cidr: '198.51.100.0/24',
-        segmentType: 'Public',
-        datacenterId: 'dc-east',
-        vlanId: null, // Routed un-tagged public block
-        description: 'US-East Public BGP Anycast Prefix',
-        createdAt: new Date(Date.now() - 70 * 86400000).toISOString(),
-      },
-
-      // DC-West Subnets
-      {
-        id: 'sub-west-dmz',
-        cidr: '203.0.113.0/28',
-        segmentType: 'Public',
-        datacenterId: 'dc-west',
-        vlanId: 'vlan-dc-west-100',
-        description: 'US-West Public Edge Ingress (/28 Public VIPs)',
-        createdAt: new Date(Date.now() - 50 * 86400000).toISOString(),
-      },
-      {
-        id: 'sub-west-dr',
-        cidr: '10.20.10.0/24',
-        segmentType: 'Private',
-        datacenterId: 'dc-west',
-        vlanId: 'vlan-dc-west-200',
-        description: 'US-West DR Replication Target Storage',
-        createdAt: new Date(Date.now() - 48 * 86400000).toISOString(),
-      },
-
-      // DC-EU Subnets
-      {
-        id: 'sub-eu-web',
-        cidr: '172.16.50.0/24',
-        segmentType: 'Private',
-        datacenterId: 'dc-eu',
-        vlanId: 'vlan-dc-eu-100',
-        description: 'EU Container Mesh & Microservices (172.16.50.0/24)',
-        createdAt: new Date(Date.now() - 38 * 86400000).toISOString(),
-      },
-      {
-        id: 'sub-eu-audit',
-        cidr: '172.16.99.0/26',
-        segmentType: 'Private',
-        datacenterId: 'dc-eu',
-        vlanId: 'vlan-dc-eu-500',
-        description: 'EU Compliance & Telemetry (172.16.99.0/26)',
-        createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
-      },
-
-      // DC-APAC Subnets
-      {
-        id: 'sub-apac-core',
-        cidr: '10.30.100.0/25',
-        ipVersion: 'IPv4',
-        segmentType: 'Private',
-        datacenterId: 'dc-apac',
-        vlanId: 'vlan-dc-apac-888',
-        description: 'Tokyo Financial Matching Engine Cluster',
-        createdAt: new Date(Date.now() - 20 * 86400000).toISOString(),
-      },
-
-      // Enterprise IPv6 Subnets
-      {
-        id: 'sub-east-v6-app',
-        cidr: 'fd00:10:10::/64',
-        ipVersion: 'IPv6',
-        segmentType: 'Private',
-        datacenterId: 'dc-east',
-        vlanId: 'vlan-dc-east-100',
-        description: 'US-East Production App Tier (IPv6 ULA fd00:10:10::/64)',
-        createdAt: new Date(Date.now() - 65 * 86400000).toISOString(),
-      },
-      {
-        id: 'sub-east-v6-pub',
-        cidr: '2001:db8:1000::/64',
-        ipVersion: 'IPv6',
-        segmentType: 'Public',
-        datacenterId: 'dc-east',
-        vlanId: null,
-        description: 'US-East Anycast BGP IPv6 Edge Public Block',
-        createdAt: new Date(Date.now() - 60 * 86400000).toISOString(),
-      },
-      {
-        id: 'sub-west-v6-dmz',
-        cidr: '2001:db8:2000::/64',
-        ipVersion: 'IPv6',
-        segmentType: 'Public',
-        datacenterId: 'dc-west',
-        vlanId: 'vlan-dc-west-100',
-        description: 'US-West Public Edge Gateway (IPv6)',
-        createdAt: new Date(Date.now() - 40 * 86400000).toISOString(),
-      },
-      {
-        id: 'sub-eu-v6-web',
-        cidr: 'fd00:20:50::/64',
-        ipVersion: 'IPv6',
-        segmentType: 'Private',
-        datacenterId: 'dc-eu',
-        vlanId: 'vlan-dc-eu-100',
-        description: 'EU Container Mesh (IPv6 ULA fd00:20:50::/64)',
-        createdAt: new Date(Date.now() - 28 * 86400000).toISOString(),
-      },
-      {
-        id: 'sub-apac-v6-core',
-        cidr: 'fd00:30:100::/64',
-        ipVersion: 'IPv6',
-        segmentType: 'Private',
-        datacenterId: 'dc-apac',
-        vlanId: 'vlan-dc-apac-888',
-        description: 'Tokyo Financial Matching Core (IPv6 ULA)',
-        createdAt: new Date(Date.now() - 15 * 86400000).toISOString(),
-      },
-    ];
-
-    // 4. IP Addresses
-    this.ips = [
-      // Subnet 1: 10.10.10.0/24 (East App)
-      {
-        id: 'ip-10-10-10-1',
-        ipAddress: '10.10.10.1',
-        subnetId: 'sub-east-app',
-        status: 'Active',
-        assignedDevice: 'dc1-gw-core01.internal',
-        description: 'Default Virtual Gateway Router (HSRP VIP)',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-10-10-10-10',
-        ipAddress: '10.10.10.10',
-        subnetId: 'sub-east-app',
-        status: 'Active',
-        assignedDevice: 'k8s-master-01.east',
-        description: 'Kubernetes Control Plane Node 1',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-10-10-10-11',
-        ipAddress: '10.10.10.11',
-        subnetId: 'sub-east-app',
-        status: 'Active',
-        assignedDevice: 'k8s-master-02.east',
-        description: 'Kubernetes Control Plane Node 2',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-10-10-10-12',
-        ipAddress: '10.10.10.12',
-        subnetId: 'sub-east-app',
-        status: 'Active',
-        assignedDevice: 'k8s-master-03.east',
-        description: 'Kubernetes Control Plane Node 3',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-10-10-10-20',
-        ipAddress: '10.10.10.20',
-        subnetId: 'sub-east-app',
-        status: 'Reserved',
-        assignedDevice: 'ingress-controller-vip',
-        description: 'Reserved for Envoy Ingress VIP rollout',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-10-10-10-21',
-        ipAddress: '10.10.10.21',
-        subnetId: 'sub-east-app',
-        status: 'Available',
-        assignedDevice: '',
-        description: 'Unallocated host slot',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-10-10-10-50',
-        ipAddress: '10.10.10.50',
-        subnetId: 'sub-east-app',
-        status: 'Active',
-        assignedDevice: 'api-auth-svc-01.east',
-        description: 'Authentication Microservice Cluster Worker',
-        lastUpdated: now,
-      },
-
-      // Subnet 2: 10.10.20.0/24 (East DB)
-      {
-        id: 'ip-10-10-20-1',
-        ipAddress: '10.10.20.1',
-        subnetId: 'sub-east-db',
-        status: 'Active',
-        assignedDevice: 'dc1-db-gw.internal',
-        description: 'DB VLAN Subnet Gateway Switch',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-10-10-20-5',
-        ipAddress: '10.10.20.5',
-        subnetId: 'sub-east-db',
-        status: 'Active',
-        assignedDevice: 'pg-primary-01.prod.east',
-        description: 'PostgreSQL 16 High-Availability Leader',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-10-10-20-6',
-        ipAddress: '10.10.20.6',
-        subnetId: 'sub-east-db',
-        status: 'Active',
-        assignedDevice: 'pg-replica-01.prod.east',
-        description: 'PostgreSQL Synchronous Standby Replica',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-10-10-20-15',
-        ipAddress: '10.10.20.15',
-        subnetId: 'sub-east-db',
-        status: 'Reserved',
-        assignedDevice: 'redis-sentinel-vip',
-        description: 'Reserved for Redis Sentinel Cluster failover',
-        lastUpdated: now,
-      },
-
-      // Subnet 3: 198.51.100.0/24 (East Public)
-      {
-        id: 'ip-198-51-100-1',
-        ipAddress: '198.51.100.1',
-        subnetId: 'sub-east-pub',
-        status: 'Active',
-        assignedDevice: 'bgp-border-router-01.east',
-        description: 'Primary BGP Edge Gateway AS65001',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-198-51-100-2',
-        ipAddress: '198.51.100.2',
-        subnetId: 'sub-east-pub',
-        status: 'Active',
-        assignedDevice: 'bgp-border-router-02.east',
-        description: 'Secondary BGP Edge Gateway AS65001',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-198-51-100-10',
-        ipAddress: '198.51.100.10',
-        subnetId: 'sub-east-pub',
-        status: 'Active',
-        assignedDevice: 'waf-edge-east-vip',
-        description: 'Cloudflare / Akamai Ingress Shield VIP',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-198-51-100-50',
-        ipAddress: '198.51.100.50',
-        subnetId: 'sub-east-pub',
-        status: 'Reserved',
-        assignedDevice: 'vpn-ipsec-east',
-        description: 'Reserved for Site-to-Site IPSec Tunnel Endpoint',
-        lastUpdated: now,
-      },
-
-      // Subnet 4: 203.0.113.0/28 (West Public DMZ)
-      {
-        id: 'ip-203-0-113-1',
-        ipAddress: '203.0.113.1',
-        subnetId: 'sub-west-dmz',
-        status: 'Active',
-        assignedDevice: 'west-edge-fw-01',
-        description: 'Palo Alto Perimeter Firewall Gateway',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-203-0-113-2',
-        ipAddress: '203.0.113.2',
-        subnetId: 'sub-west-dmz',
-        status: 'Active',
-        assignedDevice: 'west-edge-fw-02',
-        description: 'Palo Alto Perimeter Firewall HA Pair',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-203-0-113-5',
-        ipAddress: '203.0.113.5',
-        subnetId: 'sub-west-dmz',
-        status: 'Reserved',
-        assignedDevice: 'west-ssl-vpn-gateway',
-        description: 'Reserved for GlobalProtect Client Portal',
-        lastUpdated: now,
-      },
-
-      // Subnet 5: 10.20.10.0/24 (West DR)
-      {
-        id: 'ip-10-20-10-1',
-        ipAddress: '10.20.10.1',
-        subnetId: 'sub-west-dr',
-        status: 'Active',
-        assignedDevice: 'west-dr-core-router',
-        description: 'DR Inter-datacenter tunnel routing',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-10-20-10-50',
-        ipAddress: '10.20.10.50',
-        subnetId: 'sub-west-dr',
-        status: 'Active',
-        assignedDevice: 'dr-san-storage-target01',
-        description: 'NetApp Ceph DR Storage replication target',
-        lastUpdated: now,
-      },
-
-      // Subnet 6: 172.16.50.0/24 (EU Web)
-      {
-        id: 'ip-172-16-50-1',
-        ipAddress: '172.16.50.1',
-        subnetId: 'sub-eu-web',
-        status: 'Active',
-        assignedDevice: 'eu-gw-leaf01.fra',
-        description: 'Frankfurt Leaf Switch Gateway',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-172-16-50-10',
-        ipAddress: '172.16.50.10',
-        subnetId: 'sub-eu-web',
-        status: 'Active',
-        assignedDevice: 'eu-istio-ingress.fra',
-        description: 'Istio Service Mesh Gateway for EU Users',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-172-16-50-25',
-        ipAddress: '172.16.50.25',
-        subnetId: 'sub-eu-web',
-        status: 'Reserved',
-        assignedDevice: 'eu-keycloak-sso',
-        description: 'Reserved for OAuth2 SSO IdP Cluster',
-        lastUpdated: now,
-      },
-
-      // Subnet 7: 10.30.100.0/25 (APAC Core)
-      {
-        id: 'ip-10-30-100-1',
-        ipAddress: '10.30.100.1',
-        subnetId: 'sub-apac-core',
-        status: 'Active',
-        assignedDevice: 'tyo-arista-7050x.hft',
-        description: 'Tokyo Ultra-low Latency L3 Switch Gateway',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-10-30-100-8',
-        ipAddress: '10.30.100.8',
-        subnetId: 'sub-apac-core',
-        status: 'Active',
-        assignedDevice: 'tyo-matching-engine-01',
-        description: 'Low-latency Matching Engine Worker 1',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-10-30-100-9',
-        ipAddress: '10.30.100.9',
-        ipVersion: 'IPv4',
-        subnetId: 'sub-apac-core',
-        status: 'Active',
-        assignedDevice: 'tyo-matching-engine-02',
-        description: 'Low-latency Matching Engine Worker 2',
-        lastUpdated: now,
-      },
-
-      // IPv6 Seed Addresses (US-East Private ULA fd00:10:10::/64)
-      {
-        id: 'ip-fd00-10-10--1',
-        ipAddress: 'fd00:10:10::1',
-        ipVersion: 'IPv6',
-        subnetId: 'sub-east-v6-app',
-        status: 'Active',
-        assignedDevice: 'dc1-gw-v6.internal',
-        description: 'Default IPv6 Gateway VIP (HSRPv6)',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-fd00-10-10--10',
-        ipAddress: 'fd00:10:10::10',
-        ipVersion: 'IPv6',
-        subnetId: 'sub-east-v6-app',
-        status: 'Active',
-        assignedDevice: 'k8s-v6-master-01.east',
-        description: 'Kubernetes Control Plane IPv6 Node 1',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-fd00-10-10--11',
-        ipAddress: 'fd00:10:10::11',
-        ipVersion: 'IPv6',
-        subnetId: 'sub-east-v6-app',
-        status: 'Active',
-        assignedDevice: 'k8s-v6-master-02.east',
-        description: 'Kubernetes Control Plane IPv6 Node 2',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-fd00-10-10--20',
-        ipAddress: 'fd00:10:10::20',
-        ipVersion: 'IPv6',
-        subnetId: 'sub-east-v6-app',
-        status: 'Reserved',
-        assignedDevice: 'ingress-v6-vip.east',
-        description: 'Reserved for Envoy Dual-Stack Ingress Controller',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-fd00-10-10--21',
-        ipAddress: 'fd00:10:10::21',
-        ipVersion: 'IPv6',
-        subnetId: 'sub-east-v6-app',
-        status: 'Available',
-        assignedDevice: '',
-        description: 'Unallocated IPv6 pool host slot',
-        lastUpdated: now,
-      },
-
-      // IPv6 Seed Addresses (US-East Public 2001:db8:1000::/64)
-      {
-        id: 'ip-2001-db8-1000--1',
-        ipAddress: '2001:db8:1000::1',
-        ipVersion: 'IPv6',
-        subnetId: 'sub-east-v6-pub',
-        status: 'Active',
-        assignedDevice: 'bgp-core-v6-01.east',
-        description: 'Public BGP IPv6 Anycast Ingress Edge Router',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-2001-db8-1000--5',
-        ipAddress: '2001:db8:1000::5',
-        ipVersion: 'IPv6',
-        subnetId: 'sub-east-v6-pub',
-        status: 'Active',
-        assignedDevice: 'api-edge-v6.global',
-        description: 'Cloudflare Edge IPv6 VIP endpoint',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-2001-db8-1000--6',
-        ipAddress: '2001:db8:1000::6',
-        ipVersion: 'IPv6',
-        subnetId: 'sub-east-v6-pub',
-        status: 'Reserved',
-        assignedDevice: 'stg-edge-v6.global',
-        description: 'Reserved for Stage Edge IPv6 Ingress',
-        lastUpdated: now,
-      },
-
-      // IPv6 Seed Addresses (EU Container Mesh fd00:20:50::/64)
-      {
-        id: 'ip-fd00-20-50--1',
-        ipAddress: 'fd00:20:50::1',
-        ipVersion: 'IPv6',
-        subnetId: 'sub-eu-v6-web',
-        status: 'Active',
-        assignedDevice: 'eu-gw-v6.internal',
-        description: 'EU Mesh Gateway IPv6 Default Route',
-        lastUpdated: now,
-      },
-      {
-        id: 'ip-fd00-20-50--10',
-        ipAddress: 'fd00:20:50::10',
-        ipVersion: 'IPv6',
-        subnetId: 'sub-eu-v6-web',
-        status: 'Active',
-        assignedDevice: 'eu-k8s-worker-01.de',
-        description: 'EU Worker Node 1 Dual-Stack IPv6',
-        lastUpdated: now,
-      },
-
-      // IPv6 Seed Addresses (APAC Matching Core fd00:30:100::/64)
-      {
-        id: 'ip-fd00-30-100--1',
-        ipAddress: 'fd00:30:100::1',
-        ipVersion: 'IPv6',
-        subnetId: 'sub-apac-v6-core',
-        status: 'Active',
-        assignedDevice: 'apac-match-gw-v6.jp',
-        description: 'Tokyo Low-Latency IPv6 Gateway Interface',
-        lastUpdated: now,
-      },
-    ];
-
-    // Seed initial activity logs
-    this.activityLogs = [
-      {
-        id: 'log-1',
-        action: 'CREATE',
-        entityType: 'Datacenter',
-        entityId: 'dc-east',
-        title: 'Datacenter Provisioned',
-        detail: 'DC-East (Ashburn, VA) initialized as primary region.',
-        timestamp: new Date(Date.now() - 3600000 * 24).toISOString(),
-      },
-      {
-        id: 'log-2',
-        action: 'CREATE',
-        entityType: 'VLAN',
-        entityId: 'vlan-dc-east-100',
-        title: 'VLAN 100 Created',
-        detail: 'VLAN 100 (Prod-App-Backend) scoped to DC-East.',
-        timestamp: new Date(Date.now() - 3600000 * 18).toISOString(),
-      },
-      {
-        id: 'log-3',
-        action: 'CREATE',
-        entityType: 'VLAN',
-        entityId: 'vlan-dc-west-100',
-        title: 'VLAN 100 Reused in DC-West',
-        detail: 'VLAN 100 (DMZ-Public-Gateway) created with independent DC-West scope.',
-        timestamp: new Date(Date.now() - 3600000 * 12).toISOString(),
-      },
-      {
-        id: 'log-4',
-        action: 'CREATE',
-        entityType: 'Subnet',
-        entityId: 'sub-east-app',
-        title: 'Subnet 10.10.10.0/24 Allocated',
-        detail: 'Allocated RFC 1918 Private subnet bound to VLAN 100 in DC-East.',
-        timestamp: new Date(Date.now() - 3600000 * 6).toISOString(),
-      },
-      {
-        id: 'log-5',
-        action: 'RESERVE',
-        entityType: 'IP',
-        entityId: 'ip-10-10-10-20',
-        title: 'IP 10.10.10.20 Reserved',
-        detail: 'Reserved for ingress-controller-vip in 10.10.10.0/24.',
-        timestamp: new Date(Date.now() - 3600000 * 1).toISOString(),
-      },
-    ];
-
-    // 5. Seed Users
-    this.users = [
-      {
-        id: 'user-hbouslama',
-        name: 'Habib Bouslama',
-        email: 'hbouslama98@gmail.com',
-        role: 'Principal Network Architect',
-        department: 'Core Infrastructure & Cloud Engineering',
-        organization: 'BeyondIP Global Networks',
-        location: 'Ashburn, VA / Remote',
-        phone: '+1 (555) 234-8900',
-        bio: 'Lead Infrastructure Architect overseeing multi-region datacenters, BGP routing fabrics, RFC 1918 allocations, and Kubernetes overlay networks.',
-        primaryDatacenterId: 'dc-east',
-        twoFactorEnabled: true,
-        emailNotifications: true,
-        collisionAlerts: true,
-        exhaustionAlerts: true,
-        themePreference: 'dark',
-        apiKey: 'nx_live_9f82b7c4e201a68d',
-        createdAt: new Date(Date.now() - 120 * 86400000).toISOString(),
-      },
-      {
-        id: 'user-secops',
-        name: 'Elena Rostova',
-        email: 'e.rostova@nexus.io',
-        role: 'SecOps Administrator',
-        department: 'Cybersecurity & Compliance',
-        organization: 'Nexus Global Networks',
-        location: 'Frankfurt, Germany',
-        phone: '+49 69 1234 5678',
-        bio: 'Security architect enforcing IP isolation policies, firewall perimeter rules, and GDPR compliance.',
-        primaryDatacenterId: 'dc-eu',
-        twoFactorEnabled: true,
-        emailNotifications: true,
-        collisionAlerts: true,
-        exhaustionAlerts: false,
-        themePreference: 'dark',
-        apiKey: 'nx_live_3c19d45e8812f0ab',
-        createdAt: new Date(Date.now() - 60 * 86400000).toISOString(),
-      },
-      {
-        id: 'user-devops',
-        name: 'Kenji Sato',
-        email: 'k.sato@nexus.io',
-        role: 'Cloud Infrastructure Lead',
-        department: 'APAC Operations',
-        organization: 'Nexus Global Networks',
-        location: 'Tokyo, Japan',
-        phone: '+81 3 5555 0192',
-        bio: 'Specialist in low-latency financial exchange networks, high-performance L3 routing, and automated IPAM pipelines.',
-        primaryDatacenterId: 'dc-apac',
-        twoFactorEnabled: false,
-        emailNotifications: true,
-        collisionAlerts: true,
-        exhaustionAlerts: true,
-        themePreference: 'light',
-        apiKey: 'nx_live_7a44e991cb3209dd',
-        createdAt: new Date(Date.now() - 40 * 86400000).toISOString(),
+  private loadFromFile(): boolean {
+    try {
+      if (fs.existsSync(this.dbFilePath)) {
+        const raw = fs.readFileSync(this.dbFilePath, 'utf-8');
+        const data = JSON.parse(raw);
+        if (data && typeof data === 'object') {
+          this.datacenters = Array.isArray(data.datacenters) ? data.datacenters : [];
+          this.vlans = Array.isArray(data.vlans) ? data.vlans : [];
+          this.subnets = Array.isArray(data.subnets) ? data.subnets : [];
+          this.ips = Array.isArray(data.ips) ? data.ips : [];
+          this.activityLogs = Array.isArray(data.activityLogs) ? data.activityLogs : [];
+          this.users = Array.isArray(data.users) ? data.users : [];
+          this.passwords = new Map(Object.entries(data.passwords || {}));
+          this.currentUserId = typeof data.currentUserId === 'string' ? data.currentUserId : (this.users[0]?.id || '');
+          console.log(`[IPAM Storage] Successfully loaded from disk (${this.dbFilePath}): ${this.datacenters.length} Datacenters, ${this.vlans.length} VLANs, ${this.subnets.length} Subnets, ${this.ips.length} IPs, ${this.users.length} Users.`);
+          return true;
+        }
       }
-    ];
+    } catch (err) {
+      console.error('[IPAM Storage] Error loading database file from disk:', err);
+    }
+    return false;
+  }
 
-    // Seed passwords for demo accounts
-    this.passwords.set('user-hbouslama', 'password123');
-    this.passwords.set('user-secops', 'password123');
-    this.passwords.set('user-devops', 'password123');
+  private persist(): void {
+    try {
+      if (!fs.existsSync(this.dataDir)) {
+        fs.mkdirSync(this.dataDir, { recursive: true });
+      }
+
+      const payload = {
+        version: 1,
+        lastSaved: new Date().toISOString(),
+        datacenters: this.datacenters,
+        vlans: this.vlans,
+        subnets: this.subnets,
+        ips: this.ips,
+        activityLogs: this.activityLogs,
+        users: this.users,
+        passwords: Object.fromEntries(this.passwords.entries()),
+        currentUserId: this.currentUserId,
+      };
+
+      const tempPath = `${this.dbFilePath}.tmp.${Date.now()}`;
+      fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf-8');
+      fs.renameSync(tempPath, this.dbFilePath);
+    } catch (err) {
+      console.error('[IPAM Storage] Error writing database to disk:', err);
+    }
   }
 
   public logActivity(action: ActivityLog['action'], entityType: ActivityLog['entityType'], entityId: string, title: string, detail: string): ActivityLog {
@@ -758,9 +99,10 @@ class IPAMDatabase {
       timestamp: new Date().toISOString(),
     };
     this.activityLogs.unshift(log);
-    if (this.activityLogs.length > 100) {
+    if (this.activityLogs.length > 200) {
       this.activityLogs.pop();
     }
+    this.persist();
     return log;
   }
 
@@ -796,6 +138,7 @@ class IPAMDatabase {
     };
     this.datacenters.push(newDc);
     this.logActivity('CREATE', 'Datacenter', newDc.id, `Datacenter Created: ${newDc.name}`, `Added location ${newDc.location}`);
+    this.persist();
     return newDc;
   }
 
@@ -813,6 +156,7 @@ class IPAMDatabase {
 
     const updated = this.datacenters[index];
     this.logActivity('UPDATE', 'Datacenter', updated.id, `Datacenter Updated: ${updated.name}`, `Modified configuration for ${updated.name}`);
+    this.persist();
     return updated;
   }
 
@@ -830,6 +174,7 @@ class IPAMDatabase {
 
     this.datacenters = this.datacenters.filter(d => d.id !== id);
     this.logActivity('DELETE', 'Datacenter', id, `Datacenter Deleted: ${dc.name}`, `Removed datacenter location ${dc.location}`);
+    this.persist();
     return { success: true, deletedId: id };
   }
 
@@ -873,6 +218,7 @@ class IPAMDatabase {
     };
     this.vlans.push(newVlan);
     this.logActivity('CREATE', 'VLAN', newVlan.id, `VLAN ${vlanNum} Created`, `Assigned "${newVlan.name}" in ${dc.name}`);
+    this.persist();
     return newVlan;
   }
 
@@ -904,6 +250,7 @@ class IPAMDatabase {
     current.vlanId = targetVlanId;
 
     this.logActivity('UPDATE', 'VLAN', current.id, `VLAN ${current.vlanId} Updated`, `Updated "${current.name}" in ${dc.name}`);
+    this.persist();
     return current;
   }
 
@@ -919,6 +266,7 @@ class IPAMDatabase {
 
     this.vlans = this.vlans.filter(v => v.id !== id);
     this.logActivity('DELETE', 'VLAN', id, `VLAN ${vlan.vlanId} Deleted`, `Removed VLAN "${vlan.name}"`);
+    this.persist();
     return { success: true, deletedId: id };
   }
 
@@ -985,6 +333,7 @@ class IPAMDatabase {
     };
     this.subnets.push(newSubnet);
     this.logActivity('CREATE', 'Subnet', newSubnet.id, `Subnet ${newSubnet.cidr} (${calc.ipVersion}) Created`, `Configured as ${segmentType} in ${dc.name}`);
+    this.persist();
     return newSubnet;
   }
 
@@ -1038,6 +387,7 @@ class IPAMDatabase {
     if (data.description !== undefined) current.description = data.description.trim();
 
     this.logActivity('UPDATE', 'Subnet', current.id, `Subnet ${current.cidr} Updated`, `Updated settings for subnet in DC.`);
+    this.persist();
     return current;
   }
 
@@ -1051,6 +401,7 @@ class IPAMDatabase {
     this.subnets = this.subnets.filter(s => s.id !== id);
 
     this.logActivity('DELETE', 'Subnet', id, `Subnet ${subnet.cidr} Deleted`, `Removed subnet and purged ${deletedIPCount} child IP assignment(s).`);
+    this.persist();
     return { success: true, deletedId: id, deletedIPCount };
   }
 
@@ -1130,6 +481,7 @@ class IPAMDatabase {
     };
     this.ips.push(newIp);
     this.logActivity('CREATE', 'IP', newIp.id, `IP ${newIp.ipAddress} (${newIp.ipVersion}) Assigned`, `Status: ${newIp.status} (Host: ${newIp.assignedDevice || 'None'})`);
+    this.persist();
     return newIp;
   }
 
@@ -1179,6 +531,7 @@ class IPAMDatabase {
 
     const actionType: ActivityLog['action'] = current.status === 'Reserved' ? 'RESERVE' : 'UPDATE';
     this.logActivity(actionType, 'IP', current.id, `IP ${current.ipAddress} Updated`, `Status: ${current.status}, Host: ${current.assignedDevice || 'None'}`);
+    this.persist();
     return current;
   }
 
@@ -1188,6 +541,7 @@ class IPAMDatabase {
 
     this.ips = this.ips.filter(i => i.id !== id);
     this.logActivity('DELETE', 'IP', id, `IP ${ip.ipAddress} Released`, `Removed IP assignment record.`);
+    this.persist();
     return { success: true, deletedId: id, ipAddress: ip.ipAddress };
   }
 
@@ -1238,7 +592,6 @@ class IPAMDatabase {
     } else {
       // IPv6 bulk generation
       const range = generateIPRange(subnet.cidr, 500);
-      let count = 0;
       for (let i = offset; i < range.length && created.length < requestedCount; i++) {
         const ipStr = range[i];
         if (!existingIps.has(ipStr)) {
@@ -1260,6 +613,7 @@ class IPAMDatabase {
     }
 
     this.logActivity('CREATE', 'IP', subnetId, `Bulk Generated ${created.length} ${calc.ipVersion} IPs`, `Populated IP slots for subnet ${subnet.cidr}`);
+    this.persist();
     return { created, totalGenerated: created.length };
   }
 
@@ -1270,7 +624,7 @@ class IPAMDatabase {
     const calc = parseCIDR(subnet.cidr);
     const trackedIps = this.ips.filter(i => i.subnetId === subnetId);
 
-    // Any IP that is Active or Reserved is considered taken. If an IP is marked 'Available' in DB, it is a candidate!
+    // Any IP that is Active or Reserved is considered taken.
     const activeOrReservedSet = new Set(
       trackedIps
         .filter(i => i.status === 'Active' || i.status === 'Reserved')
@@ -1336,6 +690,7 @@ class IPAMDatabase {
       existing.description = data.description?.trim() || 'Reserved via Next Available API';
       existing.lastUpdated = new Date().toISOString();
       this.logActivity('RESERVE', 'IP', existing.id, `Reserved IP ${existing.ipAddress}`, `Assigned to ${existing.assignedDevice || 'Reserved Pool'}`);
+      this.persist();
       return existing;
     }
 
@@ -1352,6 +707,7 @@ class IPAMDatabase {
     };
     this.ips.push(newIp);
     this.logActivity('RESERVE', 'IP', newIp.id, `Reserved IP ${newIp.ipAddress}`, `Assigned to ${newIp.assignedDevice || 'Reserved Pool'}`);
+    this.persist();
     return newIp;
   }
 
@@ -1402,7 +758,6 @@ class IPAMDatabase {
       const reserved = dcIPs.filter(i => i.status === 'Reserved').length;
       const available = dcIPs.filter(i => i.status === 'Available').length;
 
-      // Sum of usable capacities across DC subnets
       let totalUsableCapacity = 0;
       for (const sub of dcSubnets) {
         try {
@@ -1552,11 +907,13 @@ class IPAMDatabase {
     return [...this.users];
   }
 
-  public getCurrentUser(): UserProfile {
-    const user = this.users.find(u => u.id === this.currentUserId);
-    if (user) return user;
+  public getCurrentUser(): UserProfile | null {
+    if (this.currentUserId) {
+      const user = this.users.find(u => u.id === this.currentUserId);
+      if (user) return user;
+    }
     if (this.users.length > 0) return this.users[0];
-    throw new Error('No active user profile exists');
+    return null;
   }
 
   public getUserById(id: string): UserProfile | undefined {
@@ -1568,6 +925,7 @@ class IPAMDatabase {
     if (!user) throw new Error(`User account ${id} not found`);
     this.currentUserId = user.id;
     this.logActivity('UPDATE', 'Datacenter', user.id, `User Switched: ${user.name}`, `Active engineer session updated to ${user.email}`);
+    this.persist();
     return user;
   }
 
@@ -1602,6 +960,7 @@ class IPAMDatabase {
     if (data.themePreference !== undefined) current.themePreference = data.themePreference;
 
     this.logActivity('UPDATE', 'Datacenter', current.id, `Profile Updated: ${current.name}`, `Updated contact & preferences for ${current.email}`);
+    this.persist();
     return current;
   }
 
@@ -1633,13 +992,13 @@ class IPAMDatabase {
       id,
       name: data.name.trim(),
       email,
-      role: data.role?.trim() || 'Network Engineer',
-      department: data.department?.trim() || 'Core Infrastructure Engineering',
-      organization: data.organization?.trim() || 'Nexus Enterprise Grid',
-      location: data.location?.trim() || 'Global Remote',
+      role: data.role?.trim() || 'Principal Network Architect',
+      department: data.department?.trim() || 'Infrastructure & Network Engineering',
+      organization: data.organization?.trim() || 'BeyondIP Enterprise',
+      location: data.location?.trim() || 'Corporate Headquarters',
       phone: data.phone?.trim() || '',
-      bio: data.bio?.trim() || `Infrastructure engineer managing network segments and enterprise IP allocations.`,
-      primaryDatacenterId: data.primaryDatacenterId || 'dc-east',
+      bio: data.bio?.trim() || `Infrastructure engineer managing multi-region network segments and IP allocations.`,
+      primaryDatacenterId: data.primaryDatacenterId || '',
       twoFactorEnabled: false,
       emailNotifications: true,
       collisionAlerts: true,
@@ -1657,6 +1016,7 @@ class IPAMDatabase {
     }
     this.currentUserId = newUser.id;
     this.logActivity('CREATE', 'Datacenter', newUser.id, `New Account Created: ${newUser.name}`, `Registered ${newUser.email} with ${newUser.role} role`);
+    this.persist();
     return newUser;
   }
 
@@ -1667,7 +1027,7 @@ class IPAMDatabase {
     const cleanEmail = email.trim().toLowerCase();
     const user = this.users.find(u => u.email.toLowerCase() === cleanEmail);
     if (!user) {
-      throw new Error(`No account found with email "${email}". Please verify your email or sign up.`);
+      throw new Error(`No account found with email "${email}". Please verify your email or create an account.`);
     }
 
     const storedPass = this.passwords.get(user.id) || 'password123';
@@ -1677,14 +1037,17 @@ class IPAMDatabase {
 
     this.currentUserId = user.id;
     this.logActivity('UPDATE', 'Datacenter', user.id, `Engineer Authenticated: ${user.name}`, `Logged into IPAM session as ${user.email}`);
+    this.persist();
     return user;
   }
 
   public signOut(): boolean {
-    const user = this.users.find(u => u.id === this.currentUserId);
+    const user = this.getCurrentUser();
     if (user) {
       this.logActivity('UPDATE', 'Datacenter', user.id, `Engineer Signed Out: ${user.name}`, `Session ended for ${user.email}`);
     }
+    this.currentUserId = '';
+    this.persist();
     return true;
   }
 
@@ -1694,6 +1057,7 @@ class IPAMDatabase {
     const randomHex = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
     user.apiKey = `nx_live_${randomHex}`;
     this.logActivity('UPDATE', 'Datacenter', user.id, `API Key Regenerated`, `New token issued for ${user.email}`);
+    this.persist();
     return user.apiKey;
   }
 }

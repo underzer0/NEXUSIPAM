@@ -3,23 +3,23 @@ import { Datacenter, VLAN, Subnet, IPAddress, ActivityLog, IPAMStats, FilterStat
 
 export type ActiveTab = 'dashboard' | 'datacenters' | 'vlans' | 'subnets' | 'ips' | 'calculator' | 'api-docs' | 'profile' | 'signup' | 'signin';
 
-const defaultUser: UserProfile = {
-  id: 'user-hbouslama',
-  name: 'Habib Bouslama',
-  email: 'hbouslama98@gmail.com',
-  role: 'Principal Network Architect',
-  department: 'Core Infrastructure & Cloud Engineering',
-  organization: 'BeyondIP Global Networks',
-  location: 'Ashburn, VA / Remote',
-  phone: '+1 (555) 234-8900',
-  bio: 'Lead Infrastructure Architect overseeing multi-region datacenters, BGP routing fabrics, RFC 1918 allocations, and Kubernetes overlay networks.',
-  primaryDatacenterId: 'dc-east',
-  twoFactorEnabled: true,
+const emptyUser: UserProfile = {
+  id: '',
+  name: '',
+  email: '',
+  role: 'Network Engineer',
+  department: 'Core Infrastructure',
+  organization: 'BeyondIP Enterprise',
+  location: 'Corporate HQ',
+  phone: '',
+  bio: '',
+  primaryDatacenterId: '',
+  twoFactorEnabled: false,
   emailNotifications: true,
   collisionAlerts: true,
   exhaustionAlerts: true,
   themePreference: 'dark',
-  apiKey: 'nx_live_9f82b7c4e201a68d',
+  apiKey: '',
   createdAt: new Date().toISOString(),
 };
 
@@ -123,9 +123,9 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     }
-    return defaultUser;
+    return emptyUser;
   });
-  const [users, setUsers] = useState<UserProfile[]>([defaultUser]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const authFlag = localStorage.getItem('ipam_is_authenticated');
@@ -133,7 +133,7 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return authFlag === 'true';
       }
     }
-    return true;
+    return false;
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -183,12 +183,24 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIps(json.data.ips || []);
         setStats(json.data.stats || null);
         setActivityLogs(json.data.activityLogs || []);
+        const loadedUsers = Array.isArray(json.data.users) ? json.data.users : [];
+        setUsers(loadedUsers);
+
         if (json.data.currentUser) {
           setCurrentUser(json.data.currentUser);
+          setIsAuthenticated(true);
+          localStorage.setItem('ipam_is_authenticated', 'true');
           localStorage.setItem('ipam_current_user', JSON.stringify(json.data.currentUser));
-        }
-        if (json.data.users && Array.isArray(json.data.users)) {
-          setUsers(json.data.users);
+        } else if (loadedUsers.length > 0) {
+          setCurrentUser(loadedUsers[0]);
+          setIsAuthenticated(true);
+          localStorage.setItem('ipam_is_authenticated', 'true');
+          localStorage.setItem('ipam_current_user', JSON.stringify(loadedUsers[0]));
+        } else {
+          setCurrentUser(emptyUser);
+          setIsAuthenticated(false);
+          localStorage.removeItem('ipam_is_authenticated');
+          localStorage.removeItem('ipam_current_user');
         }
         setError(null);
       } else {

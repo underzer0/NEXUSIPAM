@@ -116,21 +116,23 @@ async function runTestSuite() {
   assert(formatCapacityCompact(18446744073709551616n, true).includes('10¹⁹'), 'IPv6 Capacity uses 10¹⁹ notation');
 
   // ----------------------------------------------------
-  // TEST SUITE 7: In-Memory / Database State Operations
+  // TEST SUITE 7: Database Store & IPAM Business Logic
   // ----------------------------------------------------
-  console.log('\n📌 Test Suite 7: Database Store & IPAM Business Logic');
+  console.log('\n📌 Test Suite 7: Database Store & Disk Persistence');
   const stats = db.getStats();
-  assert(stats.totalDatacenters > 0, `Datacenters initialized (${stats.totalDatacenters})`);
-  assert(stats.totalSubnets > 0, `Subnets initialized (${stats.totalSubnets})`);
-  assert(stats.totalTrackedIPs > 0, `IPs initialized (${stats.totalTrackedIPs})`);
+  assert(typeof stats.totalDatacenters === 'number', `Datacenters stats verified (${stats.totalDatacenters})`);
+  assert(typeof stats.totalSubnets === 'number', `Subnets stats verified (${stats.totalSubnets})`);
+  assert(typeof stats.totalTrackedIPs === 'number', `IPs stats verified (${stats.totalTrackedIPs})`);
 
   // Test Datacenter operations
+  const initialDcCount = db.getDatacenters().length;
   const newDC = db.createDatacenter({
     name: 'QA Test Datacenter (Zurich)',
     location: 'Zurich, Switzerland',
     description: 'Tier 4 High-Availability Datacenter'
   });
   assert(!!newDC.id, 'Datacenter creation with ID');
+  assert(db.getDatacenters().length === initialDcCount + 1, 'Datacenter count incremented');
 
   // Test Subnet operations with Overlap checking
   const sub1 = db.createSubnet({
@@ -155,10 +157,11 @@ async function runTestSuite() {
   const released = db.updateIP(nextAllocated!.id, { status: 'Available', assignedDevice: '' });
   assert(released?.status === 'Available', 'IP released back to Available');
 
-  // Cleanup QA Datacenter
+  // Cleanup QA Datacenter & Subnet
   db.deleteSubnet(sub1.id);
   db.deleteDatacenter(newDC.id);
   assert(!db.getDatacenterById(newDC.id), 'QA Datacenter cleanly deleted');
+  assert(db.getDatacenters().length === initialDcCount, 'Datacenter count restored');
 
   // ----------------------------------------------------
   // SUMMARY

@@ -29,11 +29,11 @@ export const SignUpView: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState('Senior Network Engineer');
-  const [department, setDepartment] = useState('Core Infrastructure & Cloud Operations');
-  const [organization, setOrganization] = useState('BeyondIP Global Networks');
-  const [location, setLocation] = useState('Ashburn, VA / Remote');
+  const [department, setDepartment] = useState('Infrastructure Engineering');
+  const [organization, setOrganization] = useState('BeyondIP Enterprise');
+  const [location, setLocation] = useState('');
   const [phone, setPhone] = useState('');
-  const [primaryDatacenterId, setPrimaryDatacenterId] = useState('dc-east');
+  const [primaryDatacenterId, setPrimaryDatacenterId] = useState(datacenters[0]?.id || '');
   const [agreedToTerms, setAgreedToTerms] = useState(true);
 
   // UI state
@@ -103,7 +103,7 @@ export const SignUpView: React.FC = () => {
         organization: organization.trim(),
         location: location.trim(),
         phone: phone.trim(),
-        primaryDatacenterId,
+        primaryDatacenterId: primaryDatacenterId || (datacenters[0]?.id || ''),
         password,
       });
 
@@ -113,38 +113,6 @@ export const SignUpView: React.FC = () => {
       setErrorMessage(err.message || 'Failed to create account. Please try again.');
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  // Quick Pre-fills
-  const handlePreFill = (roleType: 'sre' | 'secops' | 'neteng') => {
-    if (roleType === 'sre') {
-      setName('Maya Lin');
-      setEmail(`m.lin.${Date.now().toString(36).slice(-4)}@nexus.io`);
-      setPassword('NexusCloud#2026!');
-      setConfirmPassword('NexusCloud#2026!');
-      setRole('Site Reliability Engineer (SRE)');
-      setDepartment('Global Cloud Fabric & Kubernetes');
-      setLocation('Santa Clara, CA / Remote');
-      setPrimaryDatacenterId('dc-west');
-    } else if (roleType === 'secops') {
-      setName('Viktor Vance');
-      setEmail(`v.vance.${Date.now().toString(36).slice(-4)}@nexus.io`);
-      setPassword('SecOpsShield#2026');
-      setConfirmPassword('SecOpsShield#2026');
-      setRole('SecOps Administrator');
-      setDepartment('Infrastructure Security & Firewall');
-      setLocation('Frankfurt, Germany');
-      setPrimaryDatacenterId('dc-eu');
-    } else {
-      setName('Sarah Chen');
-      setEmail(`s.chen.${Date.now().toString(36).slice(-4)}@nexus.io`);
-      setPassword('NetEngineer#2026');
-      setConfirmPassword('NetEngineer#2026');
-      setRole('Senior Network Engineer');
-      setDepartment('Core Infrastructure');
-      setLocation('Ashburn, VA / Hybrid');
-      setPrimaryDatacenterId('dc-east');
     }
   };
 
@@ -201,34 +169,6 @@ export const SignUpView: React.FC = () => {
               <span>Sign In</span>
             </button>
           </div>
-        </div>
-
-        {/* Quick Pre-fill Buttons */}
-        <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800/80 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-slate-400 flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Quick Pre-fill:
-          </span>
-          <button
-            type="button"
-            onClick={() => handlePreFill('sre')}
-            className="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors font-medium"
-          >
-            + Cloud SRE (Maya)
-          </button>
-          <button
-            type="button"
-            onClick={() => handlePreFill('secops')}
-            className="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium"
-          >
-            + SecOps Lead (Viktor)
-          </button>
-          <button
-            type="button"
-            onClick={() => handlePreFill('neteng')}
-            className="text-[11px] px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors font-medium"
-          >
-            + Network Eng (Sarah)
-          </button>
         </div>
       </div>
 
@@ -413,11 +353,15 @@ export const SignUpView: React.FC = () => {
                       : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
                   }`}
                 >
-                  {datacenters.map(dc => (
-                    <option key={dc.id} value={dc.id}>
-                      {dc.name} — {dc.location}
-                    </option>
-                  ))}
+                  {datacenters.length === 0 ? (
+                    <option value="">Default / Unassigned (Can create Datacenter later)</option>
+                  ) : (
+                    datacenters.map(dc => (
+                      <option key={dc.id} value={dc.id}>
+                        {dc.name} — {dc.location}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
             </div>
