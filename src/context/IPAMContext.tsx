@@ -54,6 +54,7 @@ interface IPAMContextType {
 
   // Actions
   fetchBootstrapData: () => Promise<void>;
+  retryDatabaseConnection: () => Promise<boolean>;
   updateCurrentUser: (data: Partial<UserProfile>) => Promise<UserProfile>;
   signIn: (email: string, password: string) => Promise<UserProfile>;
   signOut: () => Promise<void>;
@@ -213,6 +214,28 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     }
   }, []);
+
+  // Retry Database Connection
+  const retryDatabaseConnection = useCallback(async (): Promise<boolean> => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/db/retry', { method: 'POST' });
+      const json = await res.json();
+      if (json.success) {
+        await fetchBootstrapData();
+        setError(null);
+        return true;
+      } else {
+        setError(json.error || json.dbError || 'Failed to reconnect to MySQL database');
+        return false;
+      }
+    } catch (err: any) {
+      setError(err.message || 'Network error attempting MySQL reconnection');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchBootstrapData]);
 
   // Refresh stats after mutations
   const refreshStats = useCallback(async () => {
@@ -732,6 +755,7 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isDark,
         toggleTheme,
         fetchBootstrapData,
+        retryDatabaseConnection,
         updateCurrentUser,
         signIn,
         signOut,

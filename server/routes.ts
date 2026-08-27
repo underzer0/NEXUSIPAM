@@ -11,20 +11,18 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
     res.json({ status: 'healthy', uptime: process.uptime(), timestamp: new Date().toISOString() });
   });
 
-  // MySQL Database status & security diagnostics
+  // MySQL Database status & connection retry
   router.get('/db/status', async (req: Request, res: Response) => {
     try {
       const mysqlStatus = await mysqlEngine.getStatus();
       res.json({
         success: true,
         data: {
-          storageEngine: 'MySQL Relational Database + In-Memory Microsecond Cache',
+          storageEngine: 'MySQL Relational Database Engine',
           mysql: mysqlStatus,
-          security: {
-            passwordHashing: 'BCrypt (10 Salt Rounds, zero plaintext)',
-            apiKeyStorage: 'SHA-256 Digest + AES-256-GCM Symmetrically Encrypted',
-            sensitiveDataPolicy: 'Enforced Zero-Plaintext Storage',
-          },
+          connected: db.isDatabaseConnected(),
+          error: db.getDatabaseError(),
+          configFile: 'config/mysql.config.json',
         },
       });
     } catch (err: any) {
@@ -32,29 +30,66 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
     }
   });
 
-  // MySQL Config template and guidance
-  router.get('/db/config-template', (req: Request, res: Response) => {
-    res.json({
-      success: true,
-      configFile: 'config/mysql.config.json',
-      envExampleFile: '.env.example',
-      schemaFile: 'server/schema.sql',
-      environmentVariables: [
-        'MYSQL_HOST',
-        'MYSQL_PORT',
-        'MYSQL_USER',
-        'MYSQL_PASSWORD',
-        'MYSQL_DATABASE',
-        'MYSQL_URL',
-        'MYSQL_SSL',
-        'APP_SECRET_KEY',
-      ],
-    });
+  // Re-read /config/mysql.config.json and attempt reconnection
+  router.post('/db/retry', async (req: Request, res: Response) => {
+    try {
+      const result = await db.retryConnection();
+      if (result.success) {
+        broadcast('INIT_STATE', {
+          datacenters: db.getDatacenters(),
+          vlans: db.getVlans(),
+          subnets: db.getSubnets(),
+          ips: db.getIPs(),
+          stats: db.getStats(),
+        });
+        res.json({
+          success: true,
+          dbConnected: true,
+          message: 'Successfully reconnected to MySQL database',
+        });
+      } else {
+        const cfg = mysqlEngine.getConfig();
+        res.json({
+          success: false,
+          dbConnected: false,
+          error: result.error || 'Connection failed',
+          dbError: result.error || 'Connection failed',
+          config: {
+            host: cfg?.host || 'localhost',
+            port: cfg?.port || 3306,
+            database: cfg?.database || 'ipam_db',
+            user: cfg?.user || 'ipam_user',
+            configFile: 'config/mysql.config.json',
+          },
+        });
+      }
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
   });
 
   // Full bootstrap state
   router.get('/bootstrap', (req: Request, res: Response) => {
     try {
+      if (!db.isDatabaseConnected()) {
+        const cfg = mysqlEngine.getConfig();
+        const dbErr = db.getDatabaseError() || 'Could not connect to MySQL server';
+        res.json({
+          success: false,
+          dbConnected: false,
+          error: `Database Connection Error: ${dbErr}. Please verify /config/mysql.config.json.`,
+          dbError: dbErr,
+          config: {
+            host: cfg?.host || 'localhost',
+            port: cfg?.port || 3306,
+            database: cfg?.database || 'ipam_db',
+            user: cfg?.user || 'ipam_user',
+            configFile: 'config/mysql.config.json',
+          },
+        });
+        return;
+      }
+
       const datacenters = db.getDatacenters();
       const vlans = db.getVlans();
       const subnets = db.getSubnets();
@@ -66,6 +101,7 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
 
       res.json({
         success: true,
+        dbConnected: true,
         data: {
           datacenters,
           vlans,

@@ -42,10 +42,34 @@ class MySQLEngine {
   }
 
   /**
-   * Loads MySQL connection configuration from Environment Variables or config files
+   * Loads MySQL connection configuration from /config/mysql.config.json or environment variables
    */
   public loadConfig(): MySQLConfig | null {
-    // 1. Check URI / URL connection string
+    // 1. Check JSON config file in /config/mysql.config.json (Highest Priority)
+    try {
+      const configPath = path.join(process.cwd(), 'config', 'mysql.config.json');
+      if (fs.existsSync(configPath)) {
+        const raw = fs.readFileSync(configPath, 'utf8');
+        const json = JSON.parse(raw);
+        if (json.host && json.database) {
+          this.config = {
+            host: json.host,
+            port: Number(json.port) || 3306,
+            user: json.user || 'root',
+            password: json.password !== undefined ? String(json.password) : '',
+            database: json.database,
+            ssl: Boolean(json.ssl),
+            connectionLimit: Number(json.connectionLimit) || 10,
+            connectTimeout: Number(json.connectTimeout) || 8000,
+          };
+          return this.config;
+        }
+      }
+    } catch (err) {
+      console.warn('[MySQL] Failed to read config/mysql.config.json:', err);
+    }
+
+    // 2. Check URI / URL connection string
     const dbUrl = process.env.MYSQL_URL || process.env.DATABASE_URL;
     if (dbUrl && dbUrl.startsWith('mysql')) {
       try {
@@ -66,7 +90,7 @@ class MySQLEngine {
       }
     }
 
-    // 2. Check individual environment variables
+    // 3. Check individual environment variables
     if (process.env.MYSQL_HOST || process.env.MYSQL_DATABASE || process.env.MYSQL_USER) {
       this.config = {
         host: process.env.MYSQL_HOST || 'localhost',
@@ -78,29 +102,6 @@ class MySQLEngine {
         connectionLimit: parseInt(process.env.MYSQL_CONNECTION_LIMIT || '10', 10),
       };
       return this.config;
-    }
-
-    // 3. Check JSON config file in /config/mysql.config.json
-    try {
-      const configPath = path.join(process.cwd(), 'config', 'mysql.config.json');
-      if (fs.existsSync(configPath)) {
-        const raw = fs.readFileSync(configPath, 'utf8');
-        const json = JSON.parse(raw);
-        if (json.host && json.database) {
-          this.config = {
-            host: json.host,
-            port: json.port || 3306,
-            user: json.user || 'root',
-            password: json.password || '',
-            database: json.database,
-            ssl: Boolean(json.ssl),
-            connectionLimit: json.connectionLimit || 10,
-          };
-          return this.config;
-        }
-      }
-    } catch (err) {
-      console.warn('[MySQL] Failed to read config/mysql.config.json:', err);
     }
 
     // Default configuration for standard local MySQL
@@ -115,6 +116,45 @@ class MySQLEngine {
     };
 
     return this.config;
+  }
+
+  public getLastError(): string | null {
+    return this.lastError;
+  }
+
+  public getIsConnected(): boolean {
+    return this.isConnected;
+  }
+
+  public getConfig(): MySQLConfig | null {
+    return this.config || this.loadConfig();
+  }
+
+  /**
+   * Reloads /config/mysql.config.json and re-establishes connection
+   */
+  public async reloadConfigAndReconnect(): Promise<{ success: boolean; error?: string; latencyMs?: number }> {
+    try {
+      if (this.pool) {
+        try {
+          await this.pool.end();
+        } catch {}
+        this.pool = null;
+      }
+      this.isConnected = false;
+      this.schemaReady = false;
+      this.loadConfig();
+      const connected = await this.initialize();
+      if (connected) {
+        return { success: true };
+      } else {
+        return { success: false, error: this.lastError || 'Could not connect to MySQL' };
+      }
+    } catch (err: any) {
+      this.isConnected = false;
+      this.lastError = err.message || String(err);
+      return { success: false, error: err.message };
+    }
   }
 
   /**
@@ -293,6 +333,84 @@ class MySQLEngine {
     } catch (err: any) {
       console.error('[MySQL] Error creating schema tables:', err);
       this.lastError = err.message || String(err);
+    }
+  }
+
+  /**
+   * Reconfigures MySQL with dynamic parameters and tests connection
+   */
+  public async reconfigureAndConnect(newConfig: Partial<MySQLConfig>): Promise<{ success: boolean; error?: string; latencyMs?: number }> {
+    try {
+      if (this.pool) {
+        try {
+          await this.pool.end();
+        } catch {}
+        this.pool = null;
+      }
+
+      this.config = {
+        host: newConfig.host || this.config?.host || 'localhost',
+        port: newConfig.port || this.config?.port || 3306,
+        user: newConfig.user || this.config?.user || 'root',
+        password: newConfig.password !== undefined ? newConfig.password : (this.config?.password || ''),
+        database: newConfig.database || this.config?.database || 'ipam_db',
+        ssl: newConfig.ssl !== undefined ? newConfig.ssl : Boolean(this.config?.ssl),
+        connectionLimit: newConfig.connectionLimit || 10,
+        uri: newConfig.uri,
+      };
+
+      // Save to config/mysql.config.json if possible
+      try {
+        const configDir = path.join(process.cwd(), 'config');
+        if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
+        const configPath = path.join(configDir, 'mysql.config.json');
+        fs.writeFileSync(configPath, JSON.stringify(this.config, null, 2), 'utf-8');
+      } catch (err) {
+        console.warn('[MySQL] Could not save config/mysql.config.json:', err);
+      }
+
+      const connected = await this.initialize();
+      if (connected) {
+        return { success: true };
+      } else {
+        return { success: false, error: this.lastError || 'Could not connect to MySQL' };
+      }
+    } catch (err: any) {
+      this.isConnected = false;
+      this.lastError = err.message || String(err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Test a prospective configuration without overriding active pool if it fails
+   */
+  public async testRawConfig(testCfg: MySQLConfig): Promise<{ success: boolean; latencyMs?: number; error?: string }> {
+    let testPool: Pool | null = null;
+    try {
+      const poolOptions: PoolOptions = {
+        host: testCfg.host,
+        port: testCfg.port || 3306,
+        user: testCfg.user,
+        password: testCfg.password || '',
+        database: testCfg.database,
+        waitForConnections: false,
+        connectionLimit: 1,
+        connectTimeout: 7000,
+        ssl: testCfg.ssl ? { rejectUnauthorized: false } : undefined,
+      };
+
+      testPool = mysql.createPool(poolOptions);
+      const start = Date.now();
+      await testPool.query('SELECT 1 as ping');
+      const latencyMs = Date.now() - start;
+      await testPool.end();
+      return { success: true, latencyMs };
+    } catch (err: any) {
+      if (testPool) {
+        try { await testPool.end(); } catch {}
+      }
+      return { success: false, error: err.message || String(err) };
     }
   }
 

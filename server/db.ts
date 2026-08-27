@@ -17,6 +17,8 @@ class IPAMDatabase {
   private currentUserId: string = '';
   private dataDir: string;
   private dbFilePath: string;
+  private isDbConnected: boolean = false;
+  private dbError: string | null = null;
 
   constructor() {
     this.dataDir = path.join(process.cwd(), 'data');
@@ -24,10 +26,34 @@ class IPAMDatabase {
     this.initializeStore();
   }
 
+  public isDatabaseConnected(): boolean {
+    return this.isDbConnected;
+  }
+
+  public getDatabaseError(): string | null {
+    return this.dbError || mysqlEngine.getLastError();
+  }
+
+  public async retryConnection(): Promise<{ success: boolean; error?: string }> {
+    const res = await mysqlEngine.reloadConfigAndReconnect();
+    if (res.success) {
+      this.isDbConnected = true;
+      this.dbError = null;
+      await this.reloadFromMySQL();
+      return { success: true };
+    } else {
+      this.isDbConnected = false;
+      this.dbError = res.error || mysqlEngine.getLastError() || 'Could not connect to MySQL server';
+      return { success: false, error: this.dbError };
+    }
+  }
+
   private async initializeStore(): Promise<void> {
-    // 1. Try to load from MySQL database first
+    // 1. Connect to MySQL database from /config/mysql.config.json
     const mysqlConnected = await mysqlEngine.initialize();
     if (mysqlConnected) {
+      this.isDbConnected = true;
+      this.dbError = null;
       const mysqlData = await mysqlEngine.loadAll();
       if (mysqlData && (mysqlData.datacenters.length > 0 || mysqlData.users.length > 0)) {
         this.datacenters = mysqlData.datacenters;
@@ -38,24 +64,175 @@ class IPAMDatabase {
         this.users = mysqlData.users;
         this.passwordHashes = mysqlData.passwords;
         this.currentUserId = mysqlData.currentUserId;
-        console.log(`[IPAM Database] Synchronized directly from MySQL: ${this.datacenters.length} Datacenters, ${this.vlans.length} VLANs, ${this.subnets.length} Subnets, ${this.ips.length} IPs, ${this.users.length} Users.`);
+        console.log(`[IPAM Database] Connected to MySQL: ${this.datacenters.length} Datacenters, ${this.vlans.length} VLANs, ${this.subnets.length} Subnets, ${this.ips.length} IPs, ${this.users.length} Users.`);
+        return;
+      } else {
+        // Connected to MySQL, initialize default root user and default datacenter if schema is fresh
+        console.log('[IPAM Database] Connected to MySQL with empty tables. Seeding initial schema...');
+        await this.seedInitialDataset();
         return;
       }
     }
 
-    // 2. Load and sanitize local encrypted store
-    const loaded = this.loadFromFile();
-    if (!loaded) {
-      console.log('[IPAM Storage] Initializing fresh clean database with secure BCrypt hashing & MySQL write-through.');
-      this.datacenters = [];
-      this.vlans = [];
-      this.subnets = [];
-      this.ips = [];
-      this.activityLogs = [];
-      this.users = [];
-      this.passwordHashes = new Map();
-      this.currentUserId = '';
+    // 2. Database connection failed - DO NOT FALL BACK TO LOCAL STORAGE
+    this.isDbConnected = false;
+    this.dbError = mysqlEngine.getLastError() || 'Connection refused or host unreachable. Check /config/mysql.config.json';
+    console.error(`[IPAM Database Error] MySQL connection failed: ${this.dbError}. Please configure /config/mysql.config.json.`);
+    this.datacenters = [];
+    this.vlans = [];
+    this.subnets = [];
+    this.ips = [];
+    this.activityLogs = [];
+    this.users = [];
+    this.passwordHashes = new Map();
+    this.currentUserId = '';
+  }
+
+  private async seedInitialDataset(): Promise<void> {
+    const adminUser: UserProfile = {
+      id: 'usr-admin-default',
+      name: 'System Administrator',
+      email: 'admin@beyondip.internal',
+      role: 'Super Administrator',
+      department: 'Infrastructure & Cloud Ops',
+      organization: 'BeyondIP Enterprise',
+      location: 'Corporate HQ',
+      phone: '+1 (555) 019-2834',
+      bio: 'Primary Enterprise IPAM & Network Infrastructure Administrator.',
+      primaryDatacenterId: 'dc-us-east-1',
+      twoFactorEnabled: false,
+      emailNotifications: true,
+      collisionAlerts: true,
+      exhaustionAlerts: true,
+      themePreference: 'dark',
+      apiKey: generateSecureApiKey().maskedKey,
+      createdAt: new Date().toISOString(),
+    };
+    const defaultPasswordHash = hashPasswordSync('admin123');
+
+    const defaultDc: Datacenter = {
+      id: 'dc-us-east-1',
+      name: 'US-East (Virginia)',
+      location: 'Ashburn, VA, USA',
+      description: 'Primary Production Cloud Hub and Core Network Router',
+      createdAt: new Date().toISOString(),
+    };
+
+    const defaultVlan: VLAN = {
+      id: 'vlan-10',
+      vlanId: 10,
+      name: 'VLAN 10 - Corp Internal',
+      description: 'Core Corporate Local Subnet',
+      datacenterId: defaultDc.id,
+      createdAt: new Date().toISOString(),
+    };
+
+    const defaultSubnet: Subnet = {
+      id: 'sub-10-10-0-0-24',
+      cidr: '10.10.0.0/24',
+      segmentType: 'Private',
+      datacenterId: defaultDc.id,
+      vlanId: defaultVlan.id,
+      description: 'Core Production Subnet',
+      createdAt: new Date().toISOString(),
+    };
+
+    this.users = [adminUser];
+    this.passwordHashes.set(adminUser.id, defaultPasswordHash);
+    this.currentUserId = adminUser.id;
+    this.datacenters = [defaultDc];
+    this.vlans = [defaultVlan];
+    this.subnets = [defaultSubnet];
+    this.ips = [];
+    this.activityLogs = [];
+
+    // Save directly into MySQL
+    try {
+      await mysqlEngine.saveDatacenter(defaultDc);
+      await mysqlEngine.saveVlan(defaultVlan);
+      await mysqlEngine.saveSubnet(defaultSubnet);
+      await mysqlEngine.saveUser(adminUser, defaultPasswordHash);
+      await mysqlEngine.saveSystemConfig('current_user_id', this.currentUserId);
+    } catch (err) {
+      console.warn('[MySQL Seed Warning]', err);
+    }
+  }
+
+  public async reloadFromMySQL(): Promise<{ success: boolean; stats: any; error?: string }> {
+    const mysqlData = await mysqlEngine.loadAll();
+    if (mysqlData) {
+      this.datacenters = mysqlData.datacenters;
+      this.vlans = mysqlData.vlans;
+      this.subnets = mysqlData.subnets;
+      this.ips = mysqlData.ips;
+      this.activityLogs = mysqlData.activityLogs;
+      this.users = mysqlData.users;
+      this.passwordHashes = mysqlData.passwords;
+      if (mysqlData.currentUserId) this.currentUserId = mysqlData.currentUserId;
       this.persist();
+      return {
+        success: true,
+        stats: {
+          datacenters: this.datacenters.length,
+          vlans: this.vlans.length,
+          subnets: this.subnets.length,
+          ips: this.ips.length,
+          users: this.users.length,
+        },
+      };
+    }
+    return { success: false, stats: null, error: 'Could not load records from MySQL database' };
+  }
+
+  public async syncAllToMySQL(): Promise<{ success: boolean; synced: any; error?: string }> {
+    try {
+      const status = await mysqlEngine.getStatus();
+      if (!status.connected) {
+        return { success: false, synced: null, error: status.error || 'MySQL is not connected' };
+      }
+
+      // Sync all datacenters
+      for (const dc of this.datacenters) {
+        await mysqlEngine.saveDatacenter(dc);
+      }
+      // Sync all vlans
+      for (const vlan of this.vlans) {
+        await mysqlEngine.saveVlan(vlan);
+      }
+      // Sync all subnets
+      for (const sub of this.subnets) {
+        await mysqlEngine.saveSubnet(sub);
+      }
+      // Sync all ips
+      for (const ip of this.ips) {
+        await mysqlEngine.saveIP(ip);
+      }
+      // Sync all activity logs
+      for (const log of this.activityLogs) {
+        await mysqlEngine.saveActivityLog(log);
+      }
+      // Sync all users
+      for (const user of this.users) {
+        const hash = this.passwordHashes.get(user.id) || hashPasswordSync('password123');
+        await mysqlEngine.saveUser(user, hash);
+      }
+      if (this.currentUserId) {
+        await mysqlEngine.saveSystemConfig('current_user_id', this.currentUserId);
+      }
+
+      return {
+        success: true,
+        synced: {
+          datacenters: this.datacenters.length,
+          vlans: this.vlans.length,
+          subnets: this.subnets.length,
+          ips: this.ips.length,
+          users: this.users.length,
+          activityLogs: this.activityLogs.length,
+        },
+      };
+    } catch (err: any) {
+      return { success: false, synced: null, error: err.message };
     }
   }
 
