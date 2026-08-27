@@ -1,11 +1,74 @@
 {
   "version": 1,
-  "lastSaved": "2026-08-27T10:26:15.565Z",
+  "lastSaved": "2026-08-27T10:32:05.023Z",
   "datacenters": [],
   "vlans": [],
   "subnets": [],
   "ips": [],
   "activityLogs": [
+    {
+      "id": "log-1787826725023-9li6",
+      "action": "DELETE",
+      "entityType": "Datacenter",
+      "entityId": "dc-qa-test-datacenter-zurich--mtbdvdsp",
+      "title": "Datacenter Deleted: QA Test Datacenter (Zurich)",
+      "detail": "Removed datacenter location Zurich, Switzerland",
+      "timestamp": "2026-08-27T10:32:05.023Z"
+    },
+    {
+      "id": "log-1787826725022-lpq9",
+      "action": "DELETE",
+      "entityType": "Subnet",
+      "entityId": "sub-10-200-0-0-24-mtbdvdsr",
+      "title": "Subnet 10.200.0.0/24 Deleted",
+      "detail": "Removed subnet and purged 1 child IP assignment(s).",
+      "timestamp": "2026-08-27T10:32:05.022Z"
+    },
+    {
+      "id": "log-1787826725022-b239",
+      "action": "UPDATE",
+      "entityType": "IP",
+      "entityId": "ip-10-200-0-1-mtbdvdst",
+      "title": "IP 10.200.0.1 Updated",
+      "detail": "Status: Available, Host: None",
+      "timestamp": "2026-08-27T10:32:05.022Z"
+    },
+    {
+      "id": "log-1787826725021-6cw9",
+      "action": "RESERVE",
+      "entityType": "IP",
+      "entityId": "ip-10-200-0-1-mtbdvdst",
+      "title": "Reserved IP 10.200.0.1",
+      "detail": "Assigned to qa-router-01",
+      "timestamp": "2026-08-27T10:32:05.021Z"
+    },
+    {
+      "id": "log-1787826725019-j9q4",
+      "action": "CREATE",
+      "entityType": "Subnet",
+      "entityId": "sub-10-200-0-0-24-mtbdvdsr",
+      "title": "Subnet 10.200.0.0/24 (IPv4) Created",
+      "detail": "Configured as Private in QA Test Datacenter (Zurich)",
+      "timestamp": "2026-08-27T10:32:05.019Z"
+    },
+    {
+      "id": "log-1787826725018-vuqq",
+      "action": "CREATE",
+      "entityType": "Datacenter",
+      "entityId": "dc-qa-test-datacenter-zurich--mtbdvdsp",
+      "title": "Datacenter Created: QA Test Datacenter (Zurich)",
+      "detail": "Added location Zurich, Switzerland",
+      "timestamp": "2026-08-27T10:32:05.018Z"
+    },
+    {
+      "id": "log-1787826645299-lt0u",
+      "action": "CREATE",
+      "entityType": "Datacenter",
+      "entityId": "user-qss-mtbdtoab",
+      "title": "New Account Created: dsd",
+      "detail": "Registered qss@emial.com with Senior Network Engineer role",
+      "timestamp": "2026-08-27T10:30:45.299Z"
+    },
     {
       "id": "log-1787826375564-v55y",
       "action": "DELETE",
@@ -61,7 +124,29 @@
       "timestamp": "2026-08-27T10:26:15.560Z"
     }
   ],
-  "users": [],
-  "passwords": {},
-  "currentUserId": ""
+  "users": [
+    {
+      "id": "user-qss-mtbdtoab",
+      "name": "dsd",
+      "email": "qss@emial.com",
+      "role": "Senior Network Engineer",
+      "department": "Infrastructure Engineering",
+      "organization": "BeyondIP Enterprise",
+      "location": "Corporate Headquarters",
+      "phone": "",
+      "bio": "Infrastructure engineer managing multi-region network segments and IP allocations.",
+      "primaryDatacenterId": "",
+      "twoFactorEnabled": false,
+      "emailNotifications": true,
+      "collisionAlerts": true,
+      "exhaustionAlerts": true,
+      "themePreference": "dark",
+      "apiKey": "nx_live_05vx2vjmtngen46s",
+      "createdAt": "2026-08-27T10:30:45.299Z"
+    }
+  ],
+  "passwords": {
+    "user-qss-mtbdtoab": "sdqsdsq88"
+  },
+  "currentUserId": "user-qss-mtbdtoab"
 }

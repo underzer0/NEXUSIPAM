@@ -52,25 +52,18 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  if (!isOpen) return null;
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await fetchBootstrapData();
-    } finally {
-      setTimeout(() => setIsRefreshing(false), 400);
+  // Sync initial filter if passed
+  React.useEffect(() => {
+    if (initialEntityFilter) {
+      setEntityFilter(initialEntityFilter as any);
+    } else {
+      setEntityFilter('ALL');
     }
-  };
-
-  const handleCopy = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 1500);
-  };
+  }, [initialEntityFilter, isOpen]);
 
   // Filter logs
   const filteredLogs = useMemo(() => {
+    if (!isOpen) return [];
     return activityLogs.filter((log) => {
       // Action filter
       if (actionFilter !== 'ALL' && log.action !== actionFilter) {
@@ -94,7 +87,24 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({
       }
       return true;
     });
-  }, [activityLogs, actionFilter, entityFilter, searchQuery]);
+  }, [activityLogs, actionFilter, entityFilter, searchQuery, isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchBootstrapData();
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 400);
+    }
+  };
+
+  const handleCopy = (id: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1500);
+  };
 
   const handleNavigateToEntity = (log: ActivityLog) => {
     onClose();
