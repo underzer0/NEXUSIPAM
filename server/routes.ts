@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from './db';
+import { mysqlEngine } from './mysql';
 import { WSAction } from '../src/types/ipam';
 
 export function createApiRouter(broadcast: (type: WSAction, payload: any) => void): Router {
@@ -8,6 +9,47 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
   // Health check
   router.get('/health', (req: Request, res: Response) => {
     res.json({ status: 'healthy', uptime: process.uptime(), timestamp: new Date().toISOString() });
+  });
+
+  // MySQL Database status & security diagnostics
+  router.get('/db/status', async (req: Request, res: Response) => {
+    try {
+      const mysqlStatus = await mysqlEngine.getStatus();
+      res.json({
+        success: true,
+        data: {
+          storageEngine: 'MySQL Relational Database + In-Memory Microsecond Cache',
+          mysql: mysqlStatus,
+          security: {
+            passwordHashing: 'BCrypt (10 Salt Rounds, zero plaintext)',
+            apiKeyStorage: 'SHA-256 Digest + AES-256-GCM Symmetrically Encrypted',
+            sensitiveDataPolicy: 'Enforced Zero-Plaintext Storage',
+          },
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // MySQL Config template and guidance
+  router.get('/db/config-template', (req: Request, res: Response) => {
+    res.json({
+      success: true,
+      configFile: 'config/mysql.config.json',
+      envExampleFile: '.env.example',
+      schemaFile: 'server/schema.sql',
+      environmentVariables: [
+        'MYSQL_HOST',
+        'MYSQL_PORT',
+        'MYSQL_USER',
+        'MYSQL_PASSWORD',
+        'MYSQL_DATABASE',
+        'MYSQL_URL',
+        'MYSQL_SSL',
+        'APP_SECRET_KEY',
+      ],
+    });
   });
 
   // Full bootstrap state

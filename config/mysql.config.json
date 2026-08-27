@@ -1,0 +1,13 @@
+{
+  "_comment": "MySQL Database Connection Configuration for BeyondIP IPAM",
+  "host": "localhost",
+  "port": 3306,
+  "user": "ipam_user",
+  "password": "CHANGE_ME_SECURE_PASSWORD",
+  "database": "ipam_db",
+  "ssl": false,
+  "connectionLimit": 10,
+  "connectTimeout": 10000,
+  "enableKeepAlive": true,
+  "keepAliveInitialDelay": 10000
+}

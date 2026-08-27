@@ -164,6 +164,33 @@ async function runTestSuite() {
   assert(db.getDatacenters().length === initialDcCount, 'Datacenter count restored');
 
   // ----------------------------------------------------
+  // TEST SUITE 8: Cryptographic Security & Password Hashing
+  // ----------------------------------------------------
+  console.log('\n📌 Test Suite 8: Cryptography & Zero-Plaintext Security');
+  const testUser = db.createUser({
+    name: 'Security QA Engineer',
+    email: `security.qa.${Date.now()}@beyondip.net`,
+    password: 'superSecretPassword99!',
+    role: 'Security Architect',
+  });
+  assert(!!testUser.id, 'User created successfully with unique ID');
+  assert(testUser.email.includes('@beyondip.net'), 'User email formatted correctly');
+  assert(testUser.apiKey.startsWith('nx_live_'), 'Secure API Key generated with live prefix');
+
+  // Verify BCrypt sign in
+  const authed = db.signIn(testUser.email, 'superSecretPassword99!');
+  assert(authed.id === testUser.id, 'BCrypt authentication successfully verifies correct password');
+
+  // Verify wrong password rejection
+  let wrongPassRejected = false;
+  try {
+    db.signIn(testUser.email, 'wrongPassword123');
+  } catch {
+    wrongPassRejected = true;
+  }
+  assert(wrongPassRejected, 'BCrypt authentication correctly rejects incorrect password');
+
+  // ----------------------------------------------------
   // SUMMARY
   // ----------------------------------------------------
   console.log('\n====================================================');
