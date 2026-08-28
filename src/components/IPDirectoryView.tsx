@@ -164,11 +164,11 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white dark:text-white flex items-center gap-2.5">
+          <h1 className={`text-lg sm:text-xl font-bold tracking-tight flex items-center gap-2.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
             <Hash className="w-5 h-5 text-indigo-400" />
             Dual-Stack IP Directory & Host Inventory
           </h1>
-          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 font-mono">
+          <p className={`text-[11px] sm:text-xs mt-0.5 sm:mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
             IPv4 & IPv6 host assignments, hostname bindings, status flags, and subnet allocations.
           </p>
         </div>

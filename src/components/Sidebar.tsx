@@ -276,8 +276,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             id="btn-toggle-theme"
             onClick={toggleTheme}
-            className={`flex items-center justify-center p-2 rounded-lg text-sm font-medium transition-colors ${
-              isDark ? 'bg-slate-800 text-amber-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            className={`flex items-center justify-center p-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+              isDark ? 'bg-slate-800 text-amber-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
             }`}
             title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
@@ -290,7 +290,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             id="btn-toggle-sidebar"
             onClick={() => setCollapsed(!collapsed)}
-            className={`hidden md:block p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors text-xs font-mono`}
+            className={`hidden md:block p-2 rounded-lg text-xs font-mono transition-colors cursor-pointer ${
+              isDark
+                ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
             title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           >
             {collapsed ? '→' : '← Collapse'}

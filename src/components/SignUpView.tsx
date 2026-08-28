@@ -131,8 +131,8 @@ export const SignUpView: React.FC = () => {
       {/* Top Header Card */}
       <div className={`rounded-2xl border p-6 shadow-xl relative overflow-hidden transition-all ${
         isDark 
-          ? 'bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/50 border-slate-700/60' 
-          : 'bg-gradient-to-r from-white via-indigo-50/40 to-purple-50/40 border-slate-200'
+          ? 'bg-slate-800/90 border-slate-700' 
+          : 'bg-white border-slate-200'
       }`}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 sm:gap-4">
@@ -141,14 +141,16 @@ export const SignUpView: React.FC = () => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                <h1 className={`text-xl sm:text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   Create Engineer Account
                 </h1>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full font-mono ${
+                  isDark ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                }`}>
                   Enterprise Access
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className={`text-xs sm:text-sm mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                 Register a new network architect or systems engineer to manage IP allocations and subnets.
               </p>
             </div>
@@ -157,7 +159,7 @@ export const SignUpView: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setActiveTab('signin')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
                 isDark ? 'border-slate-700 text-indigo-400 hover:bg-slate-800' : 'border-slate-300 text-indigo-600 hover:bg-slate-100'
               }`}
             >
@@ -170,8 +172,10 @@ export const SignUpView: React.FC = () => {
 
       {/* Error Banner */}
       {errorMessage && (
-        <div className="p-4 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center gap-3 animate-fadeIn">
-          <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+        <div className={`p-4 rounded-xl border flex items-center gap-3 animate-fadeIn ${
+          isDark ? 'bg-rose-500/15 border-rose-500/30 text-rose-300' : 'bg-rose-50 border-rose-200 text-rose-700'
+        }`}>
+          <AlertTriangle className="w-5 h-5 shrink-0" />
           <p className="text-sm font-medium">{errorMessage}</p>
         </div>
       )}
@@ -179,21 +183,23 @@ export const SignUpView: React.FC = () => {
       {/* Main Registration Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className={`rounded-2xl border p-6 shadow-sm transition-colors ${
-          isDark ? 'bg-[#1E293B]/70 border-slate-700/60' : 'bg-white border-slate-200'
+          isDark ? 'bg-slate-800/90 border-slate-700' : 'bg-white border-slate-200'
         }`}>
           
-          <h2 className="text-base font-semibold text-slate-900 dark:text-white pb-3 mb-5 border-b border-slate-200 dark:border-slate-700/60 flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-indigo-400" /> Account Credentials & Identity
+          <h2 className={`text-base font-semibold pb-3 mb-5 border-b flex items-center gap-2 ${
+            isDark ? 'text-white border-slate-700/60' : 'text-slate-900 border-slate-200'
+          }`}>
+            <ShieldCheck className={`w-4 h-4 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} /> Account Credentials & Identity
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Full Name */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <label className={`text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                 Full Name <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
-                <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <User className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
                 <input
                   id="signup-input-name"
                   type="text"
@@ -203,7 +209,7 @@ export const SignUpView: React.FC = () => {
                   placeholder="e.g. Elena Vance"
                   className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all ${
                     isDark 
-                      ? 'bg-slate-900/90 border-slate-700 text-white placeholder-slate-500 focus:border-indigo-500' 
+                      ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-indigo-500' 
                       : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400 focus:border-indigo-500'
                   }`}
                 />
@@ -212,11 +218,11 @@ export const SignUpView: React.FC = () => {
 
             {/* Email Address */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <label className={`text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                 Work Email Address <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Mail className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
                 <input
                   id="signup-input-email"
                   type="email"
@@ -226,7 +232,7 @@ export const SignUpView: React.FC = () => {
                   placeholder="e.g. e.vance@nexus.io"
                   className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all ${
                     isDark 
-                      ? 'bg-slate-900/90 border-slate-700 text-white placeholder-slate-500 focus:border-indigo-500' 
+                      ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-indigo-500' 
                       : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400 focus:border-indigo-500'
                   }`}
                 />
@@ -235,7 +241,7 @@ export const SignUpView: React.FC = () => {
 
             {/* Password */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+              <label className={`text-xs font-semibold flex items-center justify-between ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                 <span>Password <span className="text-rose-500">*</span></span>
                 {password && (
                   <span className={`text-[10px] font-bold ${strengthInfo.color}`}>
@@ -244,7 +250,7 @@ export const SignUpView: React.FC = () => {
                 )}
               </label>
               <div className="relative">
-                <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Lock className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
                 <input
                   id="signup-input-password"
                   type={showPassword ? 'text' : 'password'}
@@ -254,14 +260,14 @@ export const SignUpView: React.FC = () => {
                   placeholder="At least 6 characters"
                   className={`w-full pl-9 pr-10 py-2 text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all ${
                     isDark 
-                      ? 'bg-slate-900/90 border-slate-700 text-white placeholder-slate-500 focus:border-indigo-500' 
+                      ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-indigo-500' 
                       : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400 focus:border-indigo-500'
                   }`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -269,7 +275,7 @@ export const SignUpView: React.FC = () => {
 
               {/* Password Strength Bar */}
               {password && (
-                <div className="w-full bg-slate-800 rounded-full h-1.5 mt-1 overflow-hidden">
+                <div className={`w-full rounded-full h-1.5 mt-1 overflow-hidden ${isDark ? 'bg-slate-900' : 'bg-slate-200'}`}>
                   <div 
                     className={`h-full transition-all duration-300 ${
                       strengthScore <= 25 ? 'bg-rose-500' :
@@ -284,11 +290,11 @@ export const SignUpView: React.FC = () => {
 
             {/* Confirm Password */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <label className={`text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                 Confirm Password <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
-                <KeyRound className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <KeyRound className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
                 <input
                   id="signup-input-confirm-password"
                   type={showPassword ? 'text' : 'password'}
@@ -298,7 +304,7 @@ export const SignUpView: React.FC = () => {
                   placeholder="Repeat your password"
                   className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all ${
                     isDark 
-                      ? 'bg-slate-900/90 border-slate-700 text-white placeholder-slate-500 focus:border-indigo-500' 
+                      ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-indigo-500' 
                       : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400 focus:border-indigo-500'
                   }`}
                 />
@@ -306,14 +312,16 @@ export const SignUpView: React.FC = () => {
             </div>
           </div>
 
-          <h2 className="text-base font-semibold text-slate-900 dark:text-white pt-6 pb-3 my-5 border-t border-slate-200 dark:border-slate-700/60 flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-emerald-400" /> Role & Datacenter Affiliation
+          <h2 className={`text-base font-semibold pt-6 pb-3 my-5 border-t flex items-center gap-2 ${
+            isDark ? 'text-white border-slate-700/60' : 'text-slate-900 border-slate-200'
+          }`}>
+            <Building2 className={`w-4 h-4 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} /> Role & Datacenter Affiliation
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Role */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <label className={`text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                 Engineering Role / Specialization
               </label>
               <select
@@ -322,7 +330,7 @@ export const SignUpView: React.FC = () => {
                 onChange={(e) => setRole(e.target.value)}
                 className={`w-full px-3 py-2 text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all ${
                   isDark 
-                    ? 'bg-slate-900/90 border-slate-700 text-white focus:border-indigo-500' 
+                    ? 'bg-slate-900 border-slate-700 text-white focus:border-indigo-500' 
                     : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
                 }`}
               >
@@ -334,18 +342,18 @@ export const SignUpView: React.FC = () => {
 
             {/* Primary Datacenter */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <label className={`text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                 Primary Datacenter Assignment
               </label>
               <div className="relative">
-                <Server className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Server className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
                 <select
                   id="signup-select-dc"
                   value={primaryDatacenterId}
                   onChange={(e) => setPrimaryDatacenterId(e.target.value)}
                   className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all ${
                     isDark 
-                      ? 'bg-slate-900/90 border-slate-700 text-white focus:border-indigo-500' 
+                      ? 'bg-slate-900 border-slate-700 text-white focus:border-indigo-500' 
                       : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
                   }`}
                 >
@@ -364,7 +372,7 @@ export const SignUpView: React.FC = () => {
 
             {/* Department */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <label className={`text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                 Department
               </label>
               <input
@@ -375,7 +383,7 @@ export const SignUpView: React.FC = () => {
                 placeholder="Core Infrastructure Engineering"
                 className={`w-full px-3 py-2 text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all ${
                   isDark 
-                    ? 'bg-slate-900/90 border-slate-700 text-white placeholder-slate-500 focus:border-indigo-500' 
+                    ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-indigo-500' 
                     : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400 focus:border-indigo-500'
                 }`}
               />
@@ -383,11 +391,11 @@ export const SignUpView: React.FC = () => {
 
             {/* Location */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <label className={`text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                 Geographic Office / Base
               </label>
               <div className="relative">
-                <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <MapPin className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
                 <input
                   id="signup-input-location"
                   type="text"
@@ -396,7 +404,7 @@ export const SignUpView: React.FC = () => {
                   placeholder="Ashburn, VA / Remote"
                   className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all ${
                     isDark 
-                      ? 'bg-slate-900/90 border-slate-700 text-white placeholder-slate-500 focus:border-indigo-500' 
+                      ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-indigo-500' 
                       : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400 focus:border-indigo-500'
                   }`}
                 />
@@ -405,35 +413,37 @@ export const SignUpView: React.FC = () => {
           </div>
 
           {/* Terms & Compliance */}
-          <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700/60">
+          <div className={`mt-6 pt-4 border-t ${isDark ? 'border-slate-700/60' : 'border-slate-200'}`}>
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={agreedToTerms}
                 onChange={(e) => setAgreedToTerms(e.target.checked)}
-                className="mt-0.5 rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                className="mt-0.5 rounded border-slate-400 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
               />
-              <span className="text-xs text-slate-400">
-                I agree to the <span className="text-indigo-400 font-medium">Enterprise Infrastructure Access Policy</span>. All IP allocation actions, subnet updates, and deletion events are permanently logged in the IPAM audit trail.
+              <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                I agree to the <span className={`font-medium ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>Enterprise Infrastructure Access Policy</span>. All IP allocation actions, subnet updates, and deletion events are permanently logged in the IPAM audit trail.
               </span>
             </label>
           </div>
 
           {/* Submit Actions */}
-          <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-200 dark:border-slate-700/60">
+          <div className={`mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t ${
+            isDark ? 'border-slate-700/60' : 'border-slate-200'
+          }`}>
             <button
               type="button"
               onClick={() => setActiveTab('signin')}
-              className="text-xs text-slate-400 hover:text-slate-200"
+              className={`text-xs cursor-pointer ${isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}
             >
-              Already registered? <span className="text-indigo-400 font-semibold underline">Sign In with your credentials</span>
+              Already registered? <span className={`font-semibold underline ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>Sign In with your credentials</span>
             </button>
 
             <button
               id="btn-submit-signup"
               type="submit"
               disabled={isSubmitting}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-50 active:scale-95"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-50 active:scale-95 cursor-pointer"
             >
               <UserPlus className="w-4 h-4" />
               <span>{isSubmitting ? 'Creating Account...' : 'Create Enterprise Account'}</span>

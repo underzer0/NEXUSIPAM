@@ -72,11 +72,11 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white dark:text-white flex items-center gap-2.5">
+          <h1 className={`text-lg sm:text-xl font-bold tracking-tight flex items-center gap-2.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
             <Building2 className="w-5 h-5 text-indigo-400" />
             Datacenter Infrastructure Sites
           </h1>
-          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 font-mono">
+          <p className={`text-[11px] sm:text-xs mt-0.5 sm:mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
             Physical geographic regions acting as independent routing and VLAN isolation scopes.
           </p>
         </div>
@@ -136,9 +136,9 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
                       <Building2 className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-sm leading-tight text-white dark:text-white">{dc.name}</h3>
-                      <span className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                        <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                      <h3 className={`font-bold text-sm leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>{dc.name}</h3>
+                      <span className={`text-xs flex items-center gap-1 mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <MapPin className={`w-3 h-3 shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
                         <span className="truncate max-w-36">{dc.location}</span>
                       </span>
                     </div>
@@ -231,11 +231,11 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
               isDark ? 'bg-slate-900/40 border-slate-700/50' : 'bg-slate-50 border-slate-200'
             }`}>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-sm text-white dark:text-white flex items-center gap-2">
+                <h3 className={`font-bold text-sm flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   <Layers className="w-4 h-4 text-purple-400" />
                   VLANs Scoped to {activeDc.name} ({activeDcVlans.length})
                 </h3>
-                <span className="text-[11px] font-mono text-slate-400">Unique (DC + VLAN ID)</span>
+                <span className={`text-[11px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Unique (DC + VLAN ID)</span>
               </div>
 
               {activeDcVlans.length === 0 ? (
@@ -278,7 +278,7 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
               isDark ? 'bg-slate-900/40 border-slate-700/50' : 'bg-slate-50 border-slate-200'
             }`}>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-sm text-white dark:text-white flex items-center gap-2">
+                <h3 className={`font-bold text-sm flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   <Network className="w-4 h-4 text-emerald-400" />
                   Subnets in {activeDc.name} ({activeDcSubnets.length})
                 </h3>

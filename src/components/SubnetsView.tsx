@@ -89,11 +89,11 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white dark:text-white flex items-center gap-2.5">
+          <h1 className={`text-lg sm:text-xl font-bold tracking-tight flex items-center gap-2.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
             <Network className="w-5 h-5 text-emerald-400" />
             Dual-Stack Subnet & Prefix Allocations
           </h1>
-          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 font-mono">
+          <p className={`text-[11px] sm:text-xs mt-0.5 sm:mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
             IPv4 and IPv6 address ranges with mathematical CIDR validation, capacity calculators, and VLAN binding.
           </p>
         </div>

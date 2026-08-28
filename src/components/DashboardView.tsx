@@ -199,20 +199,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="p-3.5 sm:p-6 md:p-8 max-w-[1400px] mx-auto space-y-4 sm:space-y-6">
       {/* Top Protocol Switcher & View Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-1 border-b border-slate-800/80">
+      <div className={`flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b ${
+        isDark ? 'border-slate-800/80' : 'border-slate-200'
+      }`}>
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white dark:text-white flex items-center gap-2">
-              <Network className="w-5 h-5 text-indigo-400" />
+            <h1 className={`text-lg sm:text-xl font-bold tracking-tight flex items-center gap-2 ${
+              isDark ? 'text-white' : 'text-slate-900'
+            }`}>
+              <Network className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
               Network Topology & IPAM Dashboard
             </h1>
             <span className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold uppercase tracking-wider border ${
-              isV6 ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
+              isV6 
+                ? (isDark ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30' : 'bg-cyan-50 text-cyan-800 border-cyan-200')
+                : (isDark ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30' : 'bg-indigo-50 text-indigo-800 border-indigo-200')
             }`}>
               {selectedProtocol} Scope Active
             </span>
           </div>
-          <p className="text-[11px] sm:text-xs text-slate-400 mt-1 font-mono">
+          <p className={`text-[11px] sm:text-xs mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
             {isV6 
               ? 'IPv6 128-Bit Prefixes • Global Unicast (GUA) & Unique Local (ULA) • SLAAC Host Pool' 
               : 'IPv4 32-Bit Subnets • RFC 1918 Private & Public BGP • ARP / DHCP Inventory'}
@@ -223,21 +229,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="flex flex-wrap items-center gap-2.5">
           <div 
             id="protocol-dashboard-switcher"
-            className="flex items-center p-1 bg-slate-900 rounded-xl border border-slate-700/80 font-mono shadow-inner"
+            className={`flex items-center p-1 rounded-xl border font-mono shadow-inner ${
+              isDark ? 'bg-slate-900 border-slate-700/80' : 'bg-slate-200 border-slate-300'
+            }`}
           >
             <button
               id="btn-switch-ipv4"
               onClick={() => handleProtocolChange('IPv4')}
-              className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 !isV6
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  : isDark
+                    ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-300/60'
               }`}
             >
               <span className={`w-2 h-2 rounded-full ${!isV6 ? 'bg-white animate-pulse' : 'bg-indigo-400'}`}></span>
               IPv4 Dashboard
               <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-medium ${
-                !isV6 ? 'bg-indigo-950/80 border border-indigo-400/40 text-indigo-200' : 'bg-slate-800 text-slate-400'
+                !isV6 
+                  ? 'bg-indigo-950/80 border border-indigo-400/40 text-indigo-200' 
+                  : isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-300 text-slate-700'
               }`}>
                 {ipv4SubnetList.length} Prefixes
               </span>
@@ -246,16 +258,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <button
               id="btn-switch-ipv6"
               onClick={() => handleProtocolChange('IPv6')}
-              className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 isV6
                   ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  : isDark
+                    ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-300/60'
               }`}
             >
               <span className={`w-2 h-2 rounded-full ${isV6 ? 'bg-white animate-pulse' : 'bg-cyan-400'}`}></span>
               IPv6 Dashboard
               <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-medium ${
-                isV6 ? 'bg-cyan-950/80 border border-cyan-400/40 text-cyan-200' : 'bg-slate-800 text-slate-400'
+                isV6 
+                  ? 'bg-cyan-950/80 border border-cyan-400/40 text-cyan-200' 
+                  : isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-300 text-slate-700'
               }`}>
                 {ipv6SubnetList.length} Prefixes
               </span>
@@ -265,13 +281,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={() => onOpenReserveNextModal()}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 transition-all flex items-center gap-1.5 active:scale-95"
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer ${
+                isDark 
+                  ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20' 
+                  : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+              }`}
             >
               <Zap className="w-3.5 h-3.5" /> Reserve IP
             </button>
             <button
               onClick={onOpenNewSubnetModal}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
             >
               <Network className="w-3.5 h-3.5" /> Allocate Subnet
             </button>
@@ -290,9 +310,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           }}
           title={capacityTooltip}
           className={`lg:col-span-3 p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between group ${
-            isV6 
-              ? 'bg-gradient-to-br from-cyan-950/40 via-slate-900/80 to-slate-900/60 border-cyan-500/30 hover:border-cyan-400/60 shadow-lg shadow-cyan-950/20' 
-              : 'bg-gradient-to-br from-indigo-950/40 via-slate-900/80 to-slate-900/60 border-indigo-500/30 hover:border-indigo-400/60 shadow-lg shadow-indigo-950/20'
+            isDark
+              ? (isV6 
+                  ? 'bg-gradient-to-br from-cyan-950/40 via-slate-900/80 to-slate-900/60 border-cyan-500/30 hover:border-cyan-400/60 shadow-lg shadow-cyan-950/20' 
+                  : 'bg-gradient-to-br from-indigo-950/40 via-slate-900/80 to-slate-900/60 border-indigo-500/30 hover:border-indigo-400/60 shadow-lg shadow-indigo-950/20')
+              : (isV6
+                  ? 'bg-gradient-to-br from-cyan-50 via-white to-slate-50 border-cyan-200 hover:border-cyan-400 shadow-sm'
+                  : 'bg-gradient-to-br from-indigo-50 via-white to-slate-50 border-indigo-200 hover:border-indigo-400 shadow-sm')
           }`}
         >
           {/* Subtle decorative glow */}
@@ -302,36 +326,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <div>
             <div className="flex items-center justify-between gap-2 mb-1.5">
-              <span className="text-slate-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                <Layers className={`w-3.5 h-3.5 ${isV6 ? 'text-cyan-400' : 'text-indigo-400'}`} />
+              <span className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 font-mono ${
+                isDark ? 'text-slate-300' : 'text-slate-700'
+              }`}>
+                <Layers className={`w-3.5 h-3.5 ${isV6 ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : (isDark ? 'text-indigo-400' : 'text-indigo-600')}`} />
                 {selectedProtocol} Capacity
               </span>
               <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border ${
                 isV6 
-                  ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30' 
-                  : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
+                  ? (isDark ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30' : 'bg-cyan-50 text-cyan-800 border-cyan-200')
+                  : (isDark ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30' : 'bg-indigo-50 text-indigo-800 border-indigo-200')
               }`}>
                 {isV6 ? '10¹⁹ Notation' : 'K / M Notation'}
               </span>
             </div>
 
-            {/* Formatted Capacity Value (Guaranteed not to overflow) */}
+            {/* Formatted Capacity Value */}
             <div className="mt-2 min-w-0">
-              <div className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-white dark:text-white truncate" title={capacityTooltip}>
+              <div className={`text-2xl sm:text-3xl font-black font-mono tracking-tight truncate ${
+                isDark ? 'text-white' : 'text-slate-900'
+              }`} title={capacityTooltip}>
                 {formattedCapacity}
               </div>
-              <p className="text-[11px] text-slate-400 mt-1 font-mono leading-tight truncate">
+              <p className={`text-[11px] mt-1 font-mono leading-tight truncate ${
+                isDark ? 'text-slate-400' : 'text-slate-600'
+              }`}>
                 {capacitySubtitle}
               </p>
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-700/40">
-            <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-1">
+          <div className={`mt-4 pt-3 border-t ${isDark ? 'border-slate-700/40' : 'border-slate-200'}`}>
+            <div className={`flex items-center justify-between text-[10px] font-mono mb-1 ${
+              isDark ? 'text-slate-400' : 'text-slate-600'
+            }`}>
               <span>Allocated Load</span>
-              <span className="font-bold text-slate-200">{totalAllocated} Tracked</span>
+              <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{totalAllocated} Tracked</span>
             </div>
-            <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+            <div className={`w-full h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
               <div 
                 className={`h-full rounded-full transition-all duration-500 ${
                   isV6 ? 'bg-cyan-500' : 'bg-indigo-500'
@@ -354,26 +386,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         >
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                <Globe className="w-3.5 h-3.5 text-purple-400" />
+              <span className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 font-mono ${
+                isDark ? 'text-slate-400' : 'text-slate-600'
+              }`}>
+                <Globe className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400" />
                 {selectedProtocol} Public Blocks
               </span>
-              <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 text-[10px] font-bold rounded uppercase font-mono">
+              <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase font-mono border ${
+                isDark ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' : 'bg-purple-50 text-purple-800 border-purple-200'
+              }`}>
                 {isV6 ? 'GUA (2000::/3)' : 'BGP Routable'}
               </span>
             </div>
 
-            <div className="text-3xl font-bold font-mono text-white dark:text-white mt-1">
+            <div className={`text-3xl font-bold font-mono mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {totalPublicSubnets}
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 font-mono">
+            <p className={`text-[11px] mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
               {isV6 ? 'Global Unicast IPv6 prefixes' : 'Internet-facing IPv4 prefixes'}
             </p>
           </div>
 
-          <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono mt-3 pt-2.5 border-t border-slate-700/30">
-            <span>Private: <strong className="text-slate-200">{totalPrivateSubnets}</strong></span>
-            <span className="text-purple-400 font-semibold">{totalPublicSubnets} Public</span>
+          <div className={`flex items-center justify-between text-[11px] font-mono mt-3 pt-2.5 border-t ${
+            isDark ? 'border-slate-700/30 text-slate-400' : 'border-slate-200 text-slate-600'
+          }`}>
+            <span>Private: <strong className={isDark ? 'text-slate-200' : 'text-slate-900'}>{totalPrivateSubnets}</strong></span>
+            <span className="text-purple-600 dark:text-purple-400 font-semibold">{totalPublicSubnets} Public</span>
           </div>
         </div>
 
@@ -388,19 +426,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           }`}
         >
           <div>
-            <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider block mb-1 font-mono flex items-center gap-1.5">
-              <Hash className="w-3.5 h-3.5 text-indigo-400" />
+            <span className={`text-xs font-semibold uppercase tracking-wider block mb-1 font-mono flex items-center gap-1.5 ${
+              isDark ? 'text-slate-400' : 'text-slate-600'
+            }`}>
+              <Hash className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
               Active {selectedProtocol} Hosts
             </span>
             <div className="flex items-baseline justify-between mt-1">
-              <span className="text-3xl font-bold font-mono text-white dark:text-white">
+              <span className={`text-3xl font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 {activeCount}
               </span>
-              <span className="text-slate-400 text-xs font-mono font-medium">
+              <span className={`text-xs font-mono font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                 {reservedCount} Reserved
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 font-mono">
+            <p className={`text-[11px] mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
               {protocolIPs.length} total tracked {selectedProtocol} hosts
             </p>
           </div>
@@ -415,7 +455,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   className={`h-1.5 flex-1 rounded-full transition-colors ${
                     bar <= fillThreshold 
                       ? (isV6 ? 'bg-cyan-500' : 'bg-indigo-500') 
-                      : 'bg-slate-700/60'
+                      : (isDark ? 'bg-slate-700/60' : 'bg-slate-200')
                   }`}
                 />
               );
@@ -432,7 +472,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="absolute -right-4 -bottom-4 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
           <div>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-white/80 text-xs font-semibold uppercase tracking-wider font-mono">
+              <span className="text-white/90 text-xs font-semibold uppercase tracking-wider font-mono">
                 {selectedProtocol} Fabric
               </span>
               <span className="flex h-2 w-2 relative">
@@ -440,10 +480,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
               </span>
             </div>
-            <div className="text-lg sm:text-xl font-bold tracking-tight mt-1">
+            <div className="text-lg sm:text-xl font-bold tracking-tight mt-1 text-white">
               {isV6 ? 'NDP / SLAAC Healthy' : 'ARP & Subnets Green'}
             </div>
-            <p className="text-[11px] text-white/80 mt-1 font-mono">
+            <p className="text-[11px] text-white/90 mt-1 font-mono">
               {isV6 
                 ? 'Zero IPv6 prefix overlap collisions' 
                 : 'All RFC 1918 subnets validated'}
@@ -451,7 +491,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <button 
             onClick={() => onOpenReserveNextModal()}
-            className={`mt-3 w-full py-1.5 bg-white font-semibold text-xs rounded-lg shadow hover:bg-slate-50 transition-colors active:scale-95 text-center ${
+            className={`mt-3 w-full py-1.5 bg-white font-semibold text-xs rounded-lg shadow hover:bg-slate-50 transition-colors active:scale-95 text-center cursor-pointer ${
               isV6 ? 'text-cyan-800' : 'text-indigo-700'
             }`}
           >
@@ -469,11 +509,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <div>
-                <h2 className="text-sm font-bold text-white dark:text-white uppercase tracking-wider flex items-center gap-2">
-                  <Hash className={`w-4 h-4 ${isV6 ? 'text-cyan-400' : 'text-indigo-400'}`} />
+                <h2 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${
+                  isDark ? 'text-white' : 'text-slate-900'
+                }`}>
+                  <Hash className={`w-4 h-4 ${isV6 ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : (isDark ? 'text-indigo-400' : 'text-indigo-600')}`} />
                   Active {selectedProtocol} Leases & Assignments
                 </h2>
-                <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
+                <p className={`text-[11px] mt-0.5 font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                   {isV6 ? 'Dual-stack IPv6 endpoints and SLAAC interface bindings' : 'IPv4 DHCP and static VIP host allocations'}
                 </p>
               </div>
@@ -482,10 +524,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
                 <button
                   onClick={() => setActiveDCFilter('all')}
-                  className={`text-xs px-2.5 py-1 rounded font-medium transition-colors ${
+                  className={`text-xs px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
                     activeDCFilter === 'all'
                       ? (isV6 ? 'bg-cyan-600 text-white font-semibold' : 'bg-indigo-600 text-white font-semibold')
-                      : 'bg-slate-700/60 hover:bg-slate-700 text-slate-300'
+                      : isDark
+                        ? 'bg-slate-700/60 hover:bg-slate-700 text-slate-200'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                   }`}
                 >
                   All Scopes
@@ -494,10 +538,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <button
                     key={dc.id}
                     onClick={() => setActiveDCFilter(dc.id)}
-                    className={`text-xs px-2.5 py-1 rounded font-medium transition-colors truncate max-w-28 ${
+                    className={`text-xs px-2.5 py-1 rounded font-medium transition-colors truncate max-w-28 cursor-pointer ${
                       activeDCFilter === dc.id
                         ? (isV6 ? 'bg-cyan-600 text-white font-semibold' : 'bg-indigo-600 text-white font-semibold')
-                        : 'bg-slate-700/60 hover:bg-slate-700 text-slate-300'
+                        : isDark
+                          ? 'bg-slate-700/60 hover:bg-slate-700 text-slate-200'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                     }`}
                   >
                     {dc.name}
@@ -509,7 +555,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {/* Mobile Card View for Active IP Leases (< sm) */}
             <div className="block sm:hidden space-y-2.5">
               {filteredIPs.length === 0 ? (
-                <div className="py-6 text-center text-slate-500 text-xs font-mono">
+                <div className={`py-6 text-center text-xs font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                   No {selectedProtocol} allocations registered for this scope
                 </div>
               ) : (
@@ -527,22 +573,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className={`font-mono font-bold text-xs break-all ${isV6 ? 'text-cyan-400' : 'text-indigo-400'}`}>
+                        <span className={`font-mono font-bold text-xs break-all ${
+                          isV6 
+                            ? (isDark ? 'text-cyan-400' : 'text-cyan-700') 
+                            : (isDark ? 'text-indigo-400' : 'text-indigo-700')
+                        }`}>
                           {ip.ipAddress}
                         </span>
                         <span className={`px-2 py-0.5 text-[9px] font-bold rounded-full uppercase font-mono ${
                           ip.status === 'Active'
-                            ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                            ? (isDark ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200')
                             : ip.status === 'Reserved'
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                            : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            ? (isDark ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-amber-50 text-amber-700 border border-amber-200')
+                            : (isDark ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border border-emerald-200')
                         }`}>
                           {ip.status}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-300">
-                        <span className="truncate max-w-[180px] font-medium">{ip.assignedDevice || 'Unassigned Host'}</span>
-                        <span className="font-mono text-slate-400">{sub ? sub.cidr : '—'}</span>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className={`truncate max-w-[180px] font-medium ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                          {ip.assignedDevice || 'Unassigned Host'}
+                        </span>
+                        <span className={`font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{sub ? sub.cidr : '—'}</span>
                       </div>
                     </div>
                   );
@@ -554,17 +606,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-700/50 text-slate-400 uppercase text-[10px] font-semibold tracking-wider font-mono">
+                  <tr className={`border-b uppercase text-[10px] font-semibold tracking-wider font-mono ${
+                    isDark ? 'border-slate-700/50 text-slate-400' : 'border-slate-200 text-slate-500'
+                  }`}>
                     <th className="pb-2.5 px-2">{selectedProtocol} Address</th>
                     <th className="pb-2.5 px-2">Subnet / VLAN</th>
                     <th className="pb-2.5 px-2">Assigned Device / Host</th>
                     <th className="pb-2.5 px-2 text-right">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-700/30 font-mono">
+                <tbody className={`divide-y font-mono ${
+                  isDark ? 'divide-slate-700/30' : 'divide-slate-200'
+                }`}>
                   {filteredIPs.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="py-6 text-center text-slate-500 text-xs">
+                      <td colSpan={4} className={`py-6 text-center text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                         No {selectedProtocol} allocations registered for this datacenter scope
                       </td>
                     </tr>
@@ -573,31 +629,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       const sub = subnets.find((s) => s.id === ip.subnetId);
                       const vlan = sub?.vlanId ? vlans.find((v) => v.id === sub.vlanId) : null;
                       return (
-                        <tr key={ip.id} className="hover:bg-slate-700/20 transition-colors">
-                          <td className={`py-2.5 px-2 font-bold break-all ${isV6 ? 'text-cyan-400' : 'text-indigo-400'}`}>
+                        <tr key={ip.id} className={`transition-colors ${
+                          isDark ? 'hover:bg-slate-700/20' : 'hover:bg-slate-50'
+                        }`}>
+                          <td className={`py-2.5 px-2 font-bold break-all ${
+                            isV6 
+                              ? (isDark ? 'text-cyan-400' : 'text-cyan-700') 
+                              : (isDark ? 'text-indigo-400' : 'text-indigo-700')
+                          }`}>
                             {ip.ipAddress}
                           </td>
-                          <td className="py-2.5 px-2 text-slate-300 text-[11px]">
+                          <td className={`py-2.5 px-2 text-[11px] ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                             {sub ? (
                               <span>
                                 {sub.cidr}
-                                {vlan && <span className="text-purple-400 ml-1.5">• VLAN {vlan.vlanId}</span>}
+                                {vlan && <span className={`ml-1.5 font-semibold ${isDark ? 'text-purple-400' : 'text-purple-700'}`}>• VLAN {vlan.vlanId}</span>}
                               </span>
                             ) : '—'}
                           </td>
-                          <td className="py-2.5 px-2 text-slate-300">
-                            <span className="font-sans font-medium text-xs">{ip.assignedDevice || 'Unassigned Host'}</span>
+                          <td className="py-2.5 px-2">
+                            <span className={`font-sans font-medium text-xs ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>
+                              {ip.assignedDevice || 'Unassigned Host'}
+                            </span>
                             {ip.description && (
-                              <span className="block text-[10px] text-slate-500 truncate max-w-xs font-sans">{ip.description}</span>
+                              <span className={`block text-[10px] truncate max-w-xs font-sans ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                {ip.description}
+                              </span>
                             )}
                           </td>
                           <td className="py-2.5 px-2 text-right">
                             <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${
                               ip.status === 'Active'
-                                ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                ? (isDark ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200')
                                 : ip.status === 'Reserved'
-                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                ? (isDark ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-amber-50 text-amber-700 border border-amber-200')
+                                : (isDark ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border border-emerald-200')
                             }`}>
                               {ip.status}
                             </span>
@@ -611,14 +677,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          <div className="pt-3 border-t border-slate-700/40 flex items-center justify-between text-xs text-slate-400 mt-3 font-mono">
+          <div className={`pt-3 border-t flex items-center justify-between text-xs mt-3 font-mono ${
+            isDark ? 'border-slate-700/40 text-slate-400' : 'border-slate-200 text-slate-600'
+          }`}>
             <span>Showing {Math.min(5, filteredIPs.length)} of {filteredIPs.length} {selectedProtocol} host records</span>
             <button
               onClick={() => {
                 setFilters(prev => ({ ...prev, ipVersion: selectedProtocol }));
                 setActiveTab('ips');
               }}
-              className={`${isV6 ? 'text-cyan-400 hover:text-cyan-300' : 'text-indigo-400 hover:text-indigo-300'} font-semibold flex items-center gap-1`}
+              className={`font-semibold flex items-center gap-1 cursor-pointer ${
+                isV6 
+                  ? (isDark ? 'text-cyan-400 hover:text-cyan-300' : 'text-cyan-700 hover:text-cyan-800') 
+                  : (isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-700 hover:text-indigo-800')
+              }`}
             >
               Open {selectedProtocol} Directory <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
@@ -631,11 +703,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         }`}>
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-white dark:text-white uppercase tracking-wider flex items-center gap-2">
-                <Building2 className={`w-4 h-4 ${isV6 ? 'text-cyan-400' : 'text-indigo-400'}`} />
+              <h2 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${
+                isDark ? 'text-white' : 'text-slate-900'
+              }`}>
+                <Building2 className={`w-4 h-4 ${isV6 ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : (isDark ? 'text-indigo-400' : 'text-indigo-600')}`} />
                 {selectedProtocol} Datacenter Scopes
               </h2>
-              <span className={`text-xs font-mono font-semibold ${isV6 ? 'text-cyan-400' : 'text-indigo-400'}`}>
+              <span className={`text-xs font-mono font-semibold ${
+                isV6 
+                  ? (isDark ? 'text-cyan-400' : 'text-cyan-700') 
+                  : (isDark ? 'text-indigo-400' : 'text-indigo-700')
+              }`}>
                 {datacenters.length} Sites
               </span>
             </div>
@@ -652,16 +730,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   }`}
                 >
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-semibold text-white dark:text-white">{dc.name}</span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded border border-slate-700/40">
+                    <span className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{dc.name}</span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                      isDark 
+                        ? 'bg-slate-800 text-slate-300 border-slate-700/40' 
+                        : 'bg-slate-200 text-slate-700 border-slate-300'
+                    }`}>
                       {subnetsCount} {selectedProtocol} blocks
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-[11px] text-slate-400 mt-1">
+                  <div className={`flex justify-between items-center text-[11px] mt-1 ${
+                    isDark ? 'text-slate-400' : 'text-slate-600'
+                  }`}>
                     <span>{dc.location}</span>
-                    <span className="font-mono font-semibold text-slate-300">{activeCount} Active IPs</span>
+                    <span className={`font-mono font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{activeCount} Active IPs</span>
                   </div>
-                  <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                  <div className={`w-full h-1.5 rounded-full mt-2 overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
                     <div 
                       className={`h-full rounded-full ${
                         utilizationPercent > 80 ? 'bg-rose-500' :
@@ -678,7 +762,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <button
             onClick={() => setActiveTab('datacenters')}
-            className="mt-3 w-full py-1.5 rounded-lg border border-slate-700/50 text-xs font-semibold text-slate-300 hover:bg-slate-700/40 transition-colors text-center font-mono"
+            className={`mt-3 w-full py-1.5 rounded-lg border text-xs font-semibold transition-colors text-center font-mono cursor-pointer ${
+              isDark 
+                ? 'border-slate-700/50 text-slate-300 hover:bg-slate-700/40 hover:text-white' 
+                : 'border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+            }`}
           >
             Manage Datacenters
           </button>
@@ -692,8 +780,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'
         }`}>
           <div>
-            <h2 className="text-sm font-bold text-white dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-              <ShieldCheck className={`w-4 h-4 ${isV6 ? 'text-cyan-400' : 'text-indigo-400'}`} />
+            <h2 className={`text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2 ${
+              isDark ? 'text-white' : 'text-slate-900'
+            }`}>
+              <ShieldCheck className={`w-4 h-4 ${isV6 ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : (isDark ? 'text-indigo-400' : 'text-indigo-600')}`} />
               {selectedProtocol} Scope Breakdown
             </h2>
 
@@ -702,7 +792,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="relative w-32 h-32 flex items-center justify-center">
                 <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
                   <path
-                    className="text-slate-700"
+                    className={isDark ? 'text-slate-700' : 'text-slate-200'}
                     strokeWidth="3.5"
                     stroke="currentColor"
                     fill="none"
@@ -719,8 +809,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   />
                 </svg>
                 <div className="absolute flex flex-col items-center justify-center text-center">
-                  <span className="text-2xl font-bold font-mono text-white dark:text-white">{privatePercent}%</span>
-                  <span className="text-[9px] text-slate-400 uppercase font-mono">{isV6 ? 'ULA' : 'Private'}</span>
+                  <span className={`text-2xl font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{privatePercent}%</span>
+                  <span className={`text-[9px] uppercase font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{isV6 ? 'ULA' : 'Private'}</span>
                 </div>
               </div>
             </div>
@@ -728,18 +818,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {/* Legend breakdown */}
             <div className="space-y-2 text-xs font-mono">
               <div className="flex justify-between items-center">
-                <span className="flex items-center gap-2 text-slate-300">
+                <span className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                   <span className={`w-2.5 h-2.5 rounded-full ${isV6 ? 'bg-cyan-500' : 'bg-indigo-500'}`}></span>
                   {isV6 ? 'Unique Local (ULA fc00::/7)' : 'Private (RFC 1918)'}
                 </span>
-                <span className="text-slate-400 font-semibold">{totalPrivateSubnets} Blocks</span>
+                <span className={`font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{totalPrivateSubnets} Blocks</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="flex items-center gap-2 text-slate-300">
+                <span className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                   <span className="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
                   {isV6 ? 'Global Unicast (2000::/3)' : 'Public Routable BGP'}
                 </span>
-                <span className="text-slate-400 font-semibold">{totalPublicSubnets} Blocks</span>
+                <span className={`font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{totalPublicSubnets} Blocks</span>
               </div>
             </div>
           </div>
@@ -751,18 +841,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         }`}>
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold text-white dark:text-white uppercase tracking-wider flex items-center gap-2">
-                <Activity className="w-4 h-4 text-emerald-400" /> Network Alerts & Audit Stream
+              <h2 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${
+                isDark ? 'text-white' : 'text-slate-900'
+              }`}>
+                <Activity className="w-4 h-4 text-emerald-500 dark:text-emerald-400" /> Network Alerts & Audit Stream
               </h2>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className={`text-[10px] font-mono flex items-center gap-1 px-2 py-0.5 rounded border ${
+                  isDark ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30' : 'text-emerald-800 bg-emerald-50 border-emerald-200'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${isDark ? 'bg-emerald-400' : 'bg-emerald-600'}`}></span>
                   Live Synchronized
                 </span>
                 <button
                   type="button"
                   onClick={() => onOpenAuditLogs?.()}
-                  className="text-[10px] font-mono font-semibold text-emerald-400 hover:text-emerald-300 hover:underline px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20"
+                  className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                    isDark ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20' : 'text-emerald-800 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
+                  }`}
                 >
                   View All ({activityLogs.length})
                 </button>
@@ -771,7 +867,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <div className="space-y-2.5">
               {activityLogs.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-500 font-mono">
+                <div className={`py-6 text-center text-xs font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                   No network collision or allocation events logged
                 </div>
               ) : (
@@ -796,11 +892,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           isReserve ? 'bg-amber-400' : isCreate ? 'bg-blue-400' : isDelete ? 'bg-rose-400' : 'bg-emerald-400'
                         }`} />
                         <div className="truncate">
-                          <span className="font-semibold text-white dark:text-white mr-2">{log.title}</span>
-                          <span className="text-slate-400 text-[11px] truncate">{log.detail}</span>
+                          <span className={`font-semibold mr-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>{log.title}</span>
+                          <span className={`text-[11px] truncate ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{log.detail}</span>
                         </div>
                       </div>
-                      <span className="text-[10px] text-slate-500 font-mono shrink-0">
+                      <span className={`text-[10px] font-mono shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                         {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
@@ -810,12 +906,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          <div className="pt-3 border-t border-slate-700/40 flex items-center justify-between text-xs text-slate-400 mt-3 font-mono">
+          <div className={`pt-3 border-t flex items-center justify-between text-xs mt-3 font-mono ${
+            isDark ? 'border-slate-700/40 text-slate-400' : 'border-slate-200 text-slate-600'
+          }`}>
             <span>Dual-Stack Audit log history stored securely</span>
             <button
               type="button"
               onClick={() => onOpenAuditLogs?.()}
-              className={`${isV6 ? 'text-cyan-400 hover:text-cyan-300' : 'text-indigo-400 hover:text-indigo-300'} font-semibold flex items-center gap-1 hover:underline`}
+              className={`font-semibold flex items-center gap-1 hover:underline cursor-pointer ${
+                isV6 
+                  ? (isDark ? 'text-cyan-400 hover:text-cyan-300' : 'text-cyan-700 hover:text-cyan-800') 
+                  : (isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-700 hover:text-indigo-800')
+              }`}
             >
               Full Audit Stream History →
             </button>
@@ -829,11 +931,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       }`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <div>
-            <h2 className="text-sm font-bold text-white dark:text-white uppercase tracking-wider flex items-center gap-2">
-              <Network className={`w-4 h-4 ${isV6 ? 'text-cyan-400' : 'text-indigo-400'}`} />
+            <h2 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${
+              isDark ? 'text-white' : 'text-slate-900'
+            }`}>
+              <Network className={`w-4 h-4 ${isV6 ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : (isDark ? 'text-indigo-400' : 'text-indigo-600')}`} />
               Active {selectedProtocol} Subnet Blocks & Capacity
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5 font-mono">
+            <p className={`text-xs mt-0.5 font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
               {isV6 
                 ? 'IPv6 CIDR prefixes with 10¹⁹ mathematical capacity limits & SLAAC allocation metrics' 
                 : 'IPv4 CIDR network ranges with K-formatted usable hosts & VLAN mappings'}
@@ -844,7 +948,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               setFilters(prev => ({ ...prev, ipVersion: selectedProtocol }));
               setActiveTab('subnets');
             }}
-            className={`text-xs font-semibold ${isV6 ? 'text-cyan-400 hover:text-cyan-300' : 'text-indigo-400 hover:text-indigo-300'} flex items-center gap-1 font-mono`}
+            className={`text-xs font-semibold flex items-center gap-1 font-mono cursor-pointer ${
+              isV6 
+                ? (isDark ? 'text-cyan-400 hover:text-cyan-300' : 'text-cyan-700 hover:text-cyan-800') 
+                : (isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-700 hover:text-indigo-800')
+            }`}
           >
             Manage All {selectedProtocol} Subnets <ArrowUpRight className="w-3.5 h-3.5" />
           </button>
@@ -853,7 +961,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-700/50 text-slate-400 uppercase text-[10px] font-semibold tracking-wider font-mono">
+              <tr className={`border-b uppercase text-[10px] font-semibold tracking-wider font-mono ${
+                isDark ? 'border-slate-700/50 text-slate-400' : 'border-slate-200 text-slate-500'
+              }`}>
                 <th className="py-2.5 px-3">{selectedProtocol} Prefix</th>
                 <th className="py-2.5 px-3">Datacenter</th>
                 <th className="py-2.5 px-3">VLAN</th>
@@ -863,10 +973,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <th className="py-2.5 px-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/30 font-mono">
+            <tbody className={`divide-y font-mono ${isDark ? 'divide-slate-700/30' : 'divide-slate-200'}`}>
               {protocolSubnets.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">
+                  <td colSpan={7} className={`py-8 text-center text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                     No {selectedProtocol} subnets currently allocated. Click "Allocate Subnet" above to create one.
                   </td>
                 </tr>
@@ -898,42 +1008,52 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   return (
                     <tr 
                       key={sub.id}
-                      className="hover:bg-slate-700/20 transition-colors"
+                      className={`transition-colors ${isDark ? 'hover:bg-slate-700/20' : 'hover:bg-slate-50'}`}
                     >
                       <td className="py-3 px-3 font-bold text-sm break-all">
-                        <span className={isV6 ? 'text-cyan-400' : 'text-indigo-400'}>{sub.cidr}</span>
+                        <span className={
+                          isV6 
+                            ? (isDark ? 'text-cyan-400' : 'text-cyan-700') 
+                            : (isDark ? 'text-indigo-400' : 'text-indigo-700')
+                        }>
+                          {sub.cidr}
+                        </span>
                       </td>
-                      <td className="py-3 px-3 font-medium text-slate-200 font-sans">
+                      <td className={`py-3 px-3 font-medium font-sans ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
                         {dc?.name || 'Unknown Datacenter'}
                       </td>
                       <td className="py-3 px-3">
                         {vlan ? (
-                          <span className="px-2 py-0.5 rounded font-semibold text-purple-300 bg-purple-500/10 border border-purple-500/20 text-[11px]">
+                          <span className={`px-2 py-0.5 rounded font-semibold text-[11px] ${
+                            isDark 
+                              ? 'text-purple-300 bg-purple-500/10 border border-purple-500/20' 
+                              : 'text-purple-800 bg-purple-50 border border-purple-200'
+                          }`}>
                             VLAN {vlan.vlanId}
                           </span>
                         ) : (
-                          <span className="text-slate-500 italic text-[11px]">Un-tagged</span>
+                          <span className={`italic text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Un-tagged</span>
                         )}
                       </td>
                       <td className="py-3 px-3">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
                           isPublic 
-                            ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
-                            : 'bg-slate-700/60 text-slate-300 border border-slate-600/40'
+                            ? (isDark ? 'bg-purple-500/10 text-purple-300 border border-purple-500/20' : 'bg-purple-50 text-purple-800 border border-purple-200')
+                            : (isDark ? 'bg-slate-700/60 text-slate-300 border border-slate-600/40' : 'bg-slate-100 text-slate-800 border border-slate-200')
                         }`}>
                           {sub.segmentType}
                         </span>
                       </td>
-                      <td className="py-3 px-3 text-slate-300 whitespace-nowrap" title={calc?.usableHostsFormatted || totalCapDisplay}>
-                        <span className="font-bold text-slate-200">{totalCapDisplay}</span>
+                      <td className="py-3 px-3 whitespace-nowrap" title={calc?.usableHostsFormatted || totalCapDisplay}>
+                        <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{totalCapDisplay}</span>
                       </td>
                       <td className="py-3 px-3">
                         <div className="w-32">
                           <div className="flex justify-between text-[11px] mb-1">
-                            <span className="text-slate-400">{totalSubAlloc} Alloc</span>
-                            <span className="font-bold text-slate-200">{activeSubIPs} Active</span>
+                            <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>{totalSubAlloc} Alloc</span>
+                            <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{activeSubIPs} Active</span>
                           </div>
-                          <div className="w-full bg-slate-700/60 h-1.5 rounded-full overflow-hidden flex">
+                          <div className={`w-full h-1.5 rounded-full overflow-hidden flex ${isDark ? 'bg-slate-700/60' : 'bg-slate-200'}`}>
                             <div 
                               className={isV6 ? 'bg-cyan-500 h-full' : 'bg-indigo-500 h-full'}
                               style={{ width: `${Math.min(100, Math.max(10, utilSubPercent))}%` }}
@@ -944,10 +1064,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <td className="py-3 px-3 text-right">
                         <button
                           onClick={() => onOpenSubnetVisualizer(sub)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors inline-flex items-center gap-1 active:scale-95 ${
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors inline-flex items-center gap-1 active:scale-95 cursor-pointer ${
                             isV6 
-                              ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 hover:bg-cyan-500/20' 
-                              : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 hover:bg-indigo-500/20'
+                              ? (isDark ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/20' : 'bg-cyan-50 text-cyan-800 border-cyan-200 hover:bg-cyan-100')
+                              : (isDark ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/20' : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100')
                           }`}
                           title="Open Interactive IP Matrix"
                         >

@@ -71,11 +71,11 @@ export const VlansView: React.FC<VlansViewProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white dark:text-white flex items-center gap-2.5">
+          <h1 className={`text-lg sm:text-xl font-bold tracking-tight flex items-center gap-2.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
             <Layers className="w-5 h-5 text-purple-400" />
             Virtual LAN (VLAN) Management
           </h1>
-          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 font-mono">
+          <p className={`text-[11px] sm:text-xs mt-0.5 sm:mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
             Layer-2 broadcast domains scoped locally to individual Datacenters (VLAN IDs 1–4094).
           </p>
         </div>
@@ -274,16 +274,16 @@ export const VlansView: React.FC<VlansViewProps> = ({
                         </div>
                       </td>
 
-                      <td className="py-3.5 px-4 font-bold text-xs text-white dark:text-white">
+                      <td className={`py-3.5 px-4 font-bold text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>
                         {vlan.name}
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-1.5 font-medium text-slate-200">
+                        <div className={`flex items-center gap-1.5 font-medium ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
                           <Building2 className="w-3.5 h-3.5 text-indigo-400" />
                           <span>{dc?.name || 'Unknown Datacenter'}</span>
                         </div>
-                        <span className="text-[11px] text-slate-400 font-mono">{dc?.location}</span>
+                        <span className={`text-[11px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{dc?.location}</span>
                       </td>
 
                       <td className="py-3.5 px-4">

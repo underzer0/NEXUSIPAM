@@ -59,13 +59,13 @@ export const SignInView: React.FC = () => {
           <div className="mb-4 transform hover:scale-105 transition-transform duration-200">
             <BeyondIPLogo size="xl" variant="icon" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            BeyondIP
+          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            Beyond<span className={`text-transparent bg-clip-text font-extrabold ${isDark ? 'bg-gradient-to-r from-indigo-400 via-cyan-400 to-teal-300' : 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-600'}`}>IP</span>
           </h1>
-          <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mt-1 uppercase tracking-wider">
+          <p className={`text-xs font-semibold mt-1 uppercase tracking-wider ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
             Enterprise Edition Authentication
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 max-w-xs mx-auto">
+          <p className={`text-xs mt-2 max-w-xs mx-auto ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
             Sign in to manage multi-region datacenters, VLANs, RFC 1918 allocations, and IP directories.
           </p>
         </div>
@@ -73,24 +73,26 @@ export const SignInView: React.FC = () => {
         {/* Authentication Card */}
         <div className={`rounded-2xl border p-6 sm:p-8 shadow-xl backdrop-blur-sm transition-colors ${
           isDark 
-            ? 'bg-[#1E293B]/80 border-slate-700/80 shadow-black/40' 
-            : 'bg-white border-slate-200/80 shadow-slate-200/50'
+            ? 'bg-slate-800/90 border-slate-700 shadow-black/40' 
+            : 'bg-white border-slate-200 shadow-slate-200/50'
         }`}>
           {errorMessage && (
-            <div className="mb-5 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs flex items-start gap-2.5 animate-fadeIn">
+            <div className={`mb-5 p-3.5 rounded-xl border text-xs flex items-start gap-2.5 animate-fadeIn ${
+              isDark ? 'bg-rose-500/15 border-rose-500/30 text-rose-300' : 'bg-rose-50 border-rose-200 text-rose-700'
+            }`}>
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <div className="flex-1 leading-relaxed">{errorMessage}</div>
+              <div className="flex-1 leading-relaxed font-medium">{errorMessage}</div>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email Field */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+              <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                 Work Email Address
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <div className={`absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                   <Mail className="w-4 h-4" />
                 </div>
                 <input
@@ -102,8 +104,8 @@ export const SignInView: React.FC = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-sm border focus:outline-none focus:ring-2 transition-all ${
                     isDark 
-                      ? 'bg-slate-900/80 border-slate-700 text-white placeholder-slate-500 focus:ring-indigo-500 focus:border-indigo-500' 
-                      : 'bg-slate-50/80 border-slate-300 text-slate-900 placeholder-slate-400 focus:ring-indigo-500 focus:border-indigo-500'
+                      ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:ring-indigo-500 focus:border-indigo-500' 
+                      : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400 focus:ring-indigo-500 focus:border-indigo-500'
                   }`}
                 />
               </div>
@@ -112,12 +114,12 @@ export const SignInView: React.FC = () => {
             {/* Password Field */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className={`block text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                   Password
                 </label>
               </div>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <div className={`absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
@@ -129,14 +131,16 @@ export const SignInView: React.FC = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className={`w-full pl-10 pr-11 py-2.5 rounded-xl text-sm border focus:outline-none focus:ring-2 transition-all ${
                     isDark 
-                      ? 'bg-slate-900/80 border-slate-700 text-white placeholder-slate-500 focus:ring-indigo-500 focus:border-indigo-500' 
-                      : 'bg-slate-50/80 border-slate-300 text-slate-900 placeholder-slate-400 focus:ring-indigo-500 focus:border-indigo-500'
+                      ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:ring-indigo-500 focus:border-indigo-500' 
+                      : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400 focus:ring-indigo-500 focus:border-indigo-500'
                   }`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-200 transition-colors"
+                  className={`absolute inset-y-0 right-0 pr-3.5 flex items-center transition-colors cursor-pointer ${
+                    isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
+                  }`}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -145,17 +149,19 @@ export const SignInView: React.FC = () => {
 
             {/* Remember Me & Security Status */}
             <div className="flex items-center justify-between text-xs pt-1">
-              <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600 dark:text-slate-400">
+              <label className={`flex items-center gap-2 cursor-pointer select-none ${
+                isDark ? 'text-slate-300' : 'text-slate-700'
+              }`}>
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="rounded border-slate-600 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+                  className="rounded border-slate-400 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0 cursor-pointer"
                 />
                 <span>Remember this terminal</span>
               </label>
 
-              <div className="flex items-center gap-1 text-[11px] text-emerald-500 font-medium">
+              <div className={`flex items-center gap-1 text-[11px] font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
                 <ShieldCheck className="w-3.5 h-3.5" />
                 <span>256-bit TLS</span>
               </div>
@@ -166,7 +172,7 @@ export const SignInView: React.FC = () => {
               id="btn-submit-signin"
               type="submit"
               disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 shadow-md shadow-indigo-500/20 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-2"
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-2 cursor-pointer shadow-md shadow-indigo-500/20"
             >
               {isLoading ? (
                 <>
@@ -183,14 +189,16 @@ export const SignInView: React.FC = () => {
           </form>
 
           {/* Switch to Sign Up Action */}
-          <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-700/60 text-center">
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+          <div className={`mt-6 pt-5 border-t text-center ${isDark ? 'border-slate-700/60' : 'border-slate-200'}`}>
+            <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
               Need a new engineer account?{' '}
               <button
                 id="btn-goto-signup"
                 type="button"
                 onClick={() => setActiveTab('signup')}
-                className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
+                className={`font-semibold hover:underline inline-flex items-center gap-1 cursor-pointer ${
+                  isDark ? 'text-indigo-400' : 'text-indigo-600'
+                }`}
               >
                 <UserPlus className="w-3.5 h-3.5 inline" />
                 <span>Create an account</span>
@@ -200,14 +208,16 @@ export const SignInView: React.FC = () => {
         </div>
 
         {/* Security & Infrastructure Footer */}
-        <div className="mt-8 flex items-center justify-center gap-4 text-[11px] text-slate-400">
+        <div className={`mt-8 flex items-center justify-center gap-4 text-[11px] font-mono ${
+          isDark ? 'text-slate-400' : 'text-slate-600'
+        }`}>
           <div className="flex items-center gap-1">
-            <Server className="w-3.5 h-3.5 text-indigo-400" />
+            <Server className={`w-3.5 h-3.5 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
             <span>Multi-DC High Availability</span>
           </div>
           <span>•</span>
           <div className="flex items-center gap-1">
-            <Globe2 className="w-3.5 h-3.5 text-emerald-400" />
+            <Globe2 className={`w-3.5 h-3.5 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
             <span>RFC 1918 + Public BGP</span>
           </div>
         </div>

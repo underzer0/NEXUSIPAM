@@ -97,7 +97,11 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center gap-2 md:hidden shrink-0">
         <button
           onClick={onToggleMobileMenu}
-          className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/80 active:bg-slate-700 transition-colors"
+          className={`p-2 rounded-lg transition-colors ${
+            isDark
+              ? 'text-slate-200 hover:text-white hover:bg-slate-800'
+              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+          }`}
           title="Open Menu"
           aria-label="Open Navigation Menu"
         >
@@ -113,9 +117,9 @@ export const Header: React.FC<HeaderProps> = ({
         <div className={`relative flex items-center rounded-lg border transition-all ${
           isDark 
             ? 'bg-slate-800/90 border-slate-700/60 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/30' 
-            : 'bg-slate-100 border-slate-200 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/30'
+            : 'bg-slate-100 border-slate-300 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/30'
         }`}>
-          <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-2.5 sm:ml-3 text-slate-400 shrink-0" />
+          <Search className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ml-2.5 sm:ml-3 shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
           <input
             id="global-search-input"
             type="text"
@@ -125,12 +129,16 @@ export const Header: React.FC<HeaderProps> = ({
             onFocus={() => {
               if (searchQuery.trim()) setShowSearchResults(true);
             }}
-            className="w-full bg-transparent px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none placeholder-slate-500 font-sans"
+            className={`w-full bg-transparent px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none font-sans ${
+              isDark ? 'text-slate-100 placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
+            }`}
           />
           {searchQuery && (
             <button 
               onClick={clearSearch}
-              className="mr-2 sm:mr-3 p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400"
+              className={`mr-2 sm:mr-3 p-1 rounded transition-colors ${
+                isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-500'
+              }`}
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -140,18 +148,18 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Search Results Dropdown */}
         {showSearchResults && (
           <div className={`absolute top-full left-0 right-0 mt-2 p-2 rounded-xl shadow-2xl border max-h-80 sm:max-h-96 overflow-y-auto z-50 ${
-            isDark ? 'bg-[#1E293B] border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+            isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
           }`}>
             {!hasResults ? (
-              <div className="py-6 text-center text-xs sm:text-sm text-slate-400">
+              <div className={`py-6 text-center text-xs sm:text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                 No matching network resources found for "{searchQuery}"
               </div>
             ) : (
               <div className="space-y-3">
                 {matchedIPs.length > 0 && (
                   <div>
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 flex items-center gap-1.5">
-                      <Hash className="w-3 h-3 text-indigo-400" /> IP Addresses
+                    <div className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <Hash className="w-3 h-3 text-indigo-500 dark:text-indigo-400" /> IP Addresses
                     </div>
                     {matchedIPs.map(ip => (
                       <div
@@ -161,18 +169,20 @@ export const Header: React.FC<HeaderProps> = ({
                           setFilters(prev => ({ ...prev, search: ip.ipAddress }));
                           setShowSearchResults(false);
                         }}
-                        className="px-3 py-2 rounded-lg text-xs sm:text-sm hover:bg-indigo-500/10 cursor-pointer flex items-center justify-between transition-colors"
+                        className={`px-3 py-2 rounded-lg text-xs sm:text-sm cursor-pointer flex items-center justify-between transition-colors ${
+                          isDark ? 'hover:bg-indigo-500/10' : 'hover:bg-indigo-50'
+                        }`}
                       >
                         <div className="flex items-center gap-2 font-mono truncate">
-                          <span className="font-semibold text-indigo-400">{ip.ipAddress}</span>
+                          <span className={`font-semibold ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>{ip.ipAddress}</span>
                           {ip.assignedDevice && (
-                            <span className="text-[11px] text-slate-400 truncate max-w-xs font-sans">({ip.assignedDevice})</span>
+                            <span className={`text-[11px] truncate max-w-xs font-sans ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>({ip.assignedDevice})</span>
                           )}
                         </div>
                         <span className={`text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full font-mono uppercase font-semibold shrink-0 ml-2 ${
-                          ip.status === 'Active' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
-                          ip.status === 'Reserved' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                          'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          ip.status === 'Active' ? (isDark ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200') :
+                          ip.status === 'Reserved' ? (isDark ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-amber-50 text-amber-700 border border-amber-200') :
+                          (isDark ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border border-emerald-200')
                         }`}>
                           {ip.status}
                         </span>
@@ -183,8 +193,8 @@ export const Header: React.FC<HeaderProps> = ({
 
                 {matchedSubnets.length > 0 && (
                   <div>
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 flex items-center gap-1.5">
-                      <Network className="w-3 h-3 text-emerald-400" /> Subnets
+                    <div className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <Network className="w-3 h-3 text-emerald-500 dark:text-emerald-400" /> Subnets
                     </div>
                     {matchedSubnets.map(sub => (
                       <div
@@ -194,10 +204,12 @@ export const Header: React.FC<HeaderProps> = ({
                           setFilters(prev => ({ ...prev, search: sub.cidr }));
                           setShowSearchResults(false);
                         }}
-                        className="px-3 py-2 rounded-lg text-xs sm:text-sm hover:bg-emerald-500/10 cursor-pointer flex items-center justify-between transition-colors"
+                        className={`px-3 py-2 rounded-lg text-xs sm:text-sm cursor-pointer flex items-center justify-between transition-colors ${
+                          isDark ? 'hover:bg-emerald-500/10' : 'hover:bg-emerald-50'
+                        }`}
                       >
-                        <span className="font-mono font-semibold text-emerald-400">{sub.cidr}</span>
-                        <span className="text-[11px] text-slate-400 truncate max-w-xs">{sub.description}</span>
+                        <span className={`font-mono font-semibold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>{sub.cidr}</span>
+                        <span className={`text-[11px] truncate max-w-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{sub.description}</span>
                       </div>
                     ))}
                   </div>
@@ -205,8 +217,8 @@ export const Header: React.FC<HeaderProps> = ({
 
                 {matchedVlans.length > 0 && (
                   <div>
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 flex items-center gap-1.5">
-                      <Layers className="w-3 h-3 text-purple-400" /> VLANs
+                    <div className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <Layers className="w-3 h-3 text-purple-500 dark:text-purple-400" /> VLANs
                     </div>
                     {matchedVlans.map(v => (
                       <div
@@ -216,10 +228,12 @@ export const Header: React.FC<HeaderProps> = ({
                           setFilters(prev => ({ ...prev, search: v.name }));
                           setShowSearchResults(false);
                         }}
-                        className="px-3 py-2 rounded-lg text-xs sm:text-sm hover:bg-purple-500/10 cursor-pointer flex items-center justify-between transition-colors"
+                        className={`px-3 py-2 rounded-lg text-xs sm:text-sm cursor-pointer flex items-center justify-between transition-colors ${
+                          isDark ? 'hover:bg-purple-500/10' : 'hover:bg-purple-50'
+                        }`}
                       >
-                        <span className="font-mono font-semibold text-purple-400">VLAN {v.vlanId}: {v.name}</span>
-                        <span className="text-[11px] text-slate-400">{v.description}</span>
+                        <span className={`font-mono font-semibold ${isDark ? 'text-purple-400' : 'text-purple-700'}`}>VLAN {v.vlanId}: {v.name}</span>
+                        <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{v.description}</span>
                       </div>
                     ))}
                   </div>
@@ -227,8 +241,8 @@ export const Header: React.FC<HeaderProps> = ({
 
                 {matchedDCs.length > 0 && (
                   <div>
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 flex items-center gap-1.5">
-                      <Building2 className="w-3 h-3 text-amber-400" /> Datacenters
+                    <div className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <Building2 className="w-3 h-3 text-amber-500 dark:text-amber-400" /> Datacenters
                     </div>
                     {matchedDCs.map(dc => (
                       <div
@@ -238,10 +252,12 @@ export const Header: React.FC<HeaderProps> = ({
                           setFilters(prev => ({ ...prev, search: dc.name }));
                           setShowSearchResults(false);
                         }}
-                        className="px-3 py-2 rounded-lg text-xs sm:text-sm hover:bg-amber-500/10 cursor-pointer flex items-center justify-between transition-colors"
+                        className={`px-3 py-2 rounded-lg text-xs sm:text-sm cursor-pointer flex items-center justify-between transition-colors ${
+                          isDark ? 'hover:bg-amber-500/10' : 'hover:bg-amber-50'
+                        }`}
                       >
-                        <span className="font-semibold text-amber-400">{dc.name}</span>
-                        <span className="text-[11px] text-slate-400">{dc.location}</span>
+                        <span className={`font-semibold ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>{dc.name}</span>
+                        <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{dc.location}</span>
                       </div>
                     ))}
                   </div>
@@ -256,10 +272,14 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
         <button
           onClick={onOpenAuditLogs}
-          className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 hover:border-emerald-500/40 text-[10px] font-bold rounded uppercase tracking-wider font-mono transition-colors cursor-pointer"
+          className={`hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded uppercase tracking-wider font-mono transition-colors cursor-pointer ${
+            isDark
+              ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
+          }`}
           title="Click to view Live Network Alerts & Audit Stream"
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${isDark ? 'bg-emerald-400' : 'bg-emerald-600'}`}></span>
           Websocket Sync
         </button>
 
@@ -267,7 +287,11 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           id="btn-quick-reserve-ip"
           onClick={onOpenReserveNextModal}
-          className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 transition-all shadow-sm active:scale-95"
+          className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-semibold transition-all shadow-sm active:scale-95 cursor-pointer ${
+            isDark
+              ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20'
+              : 'bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100'
+          }`}
           title="Find & Reserve the Next Available IP in any Subnet"
         >
           <BookmarkCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -279,7 +303,7 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           id="btn-quick-new-subnet"
           onClick={onOpenNewSubnetModal}
-          className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all active:scale-95"
+          className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all active:scale-95 cursor-pointer"
           title="Allocate Subnet"
         >
           <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -291,12 +315,12 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           id="header-user-profile-button"
           onClick={() => setActiveTab('profile')}
-          className={`flex items-center gap-2 p-1 sm:pl-2 sm:pr-2.5 sm:py-1 rounded-xl border transition-all ${
+          className={`flex items-center gap-2 p-1 sm:pl-2 sm:pr-2.5 sm:py-1 rounded-xl border transition-all cursor-pointer ${
             activeTab === 'profile'
               ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300 ring-2 ring-indigo-500/20'
               : isDark
                 ? 'bg-slate-800/80 hover:bg-slate-800 border-slate-700/60 text-slate-200'
-                : 'bg-slate-100 hover:bg-slate-200/80 border-slate-200 text-slate-800'
+                : 'bg-slate-100 hover:bg-slate-200/80 border-slate-200 text-slate-900'
           }`}
           title={`Logged in as ${currentUser.email} (${currentUser.name}) - Click to edit profile`}
         >
@@ -307,7 +331,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-xs font-semibold leading-tight truncate max-w-[120px]">
               {currentUser.name}
             </span>
-            <span className="text-[10px] text-slate-400 leading-tight truncate max-w-[120px] font-mono">
+            <span className={`text-[10px] leading-tight truncate max-w-[120px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               {currentUser.email}
             </span>
           </div>

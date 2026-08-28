@@ -1,17 +1,30 @@
 import React from 'react';
-import { Network, Globe2, ShieldCheck, Zap } from 'lucide-react';
+import { Network } from 'lucide-react';
+import { useIPAM } from '../context/IPAMContext';
 
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   variant?: 'full' | 'icon' | 'badge';
   className?: string;
+  isDark?: boolean;
 }
 
 export const BeyondIPLogo: React.FC<LogoProps> = ({ 
   size = 'md', 
   variant = 'full',
-  className = '' 
+  className = '',
+  isDark: explicitIsDark,
 }) => {
+  let contextIsDark: boolean | undefined;
+  try {
+    const context = useIPAM();
+    contextIsDark = context?.isDark;
+  } catch {
+    contextIsDark = undefined;
+  }
+
+  const isDark = explicitIsDark !== undefined ? explicitIsDark : contextIsDark;
+
   const iconSizeClasses = {
     sm: 'w-7 h-7 rounded-lg',
     md: 'w-8 h-8 rounded-xl',
@@ -60,17 +73,33 @@ export const BeyondIPLogo: React.FC<LogoProps> = ({
     return iconElement;
   }
 
+  const beyondTextColor = isDark === true 
+    ? 'text-white' 
+    : isDark === false 
+    ? 'text-slate-900' 
+    : 'text-slate-900 dark:text-white';
+
+  const ipGradient = isDark === false
+    ? 'from-indigo-600 via-indigo-500 to-cyan-600'
+    : 'from-indigo-400 via-cyan-400 to-teal-300';
+
+  const badgeColor = isDark === true
+    ? 'text-slate-400'
+    : isDark === false
+    ? 'text-slate-600 font-semibold'
+    : 'text-slate-600 dark:text-slate-400';
+
   return (
     <div className="flex items-center gap-3 overflow-hidden select-none">
       {iconElement}
       <div className="flex flex-col min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className={`font-bold tracking-tight truncate text-white dark:text-white ${textClasses[size]}`}>
-            Beyond<span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-cyan-400 to-teal-300">IP</span>
+          <span className={`font-bold tracking-tight truncate ${beyondTextColor} ${textClasses[size]}`}>
+            Beyond<span className={`text-transparent bg-clip-text bg-gradient-to-r ${ipGradient} font-extrabold`}>IP</span>
           </span>
         </div>
-        <span className={`text-slate-400 font-mono -mt-1 tracking-wider uppercase flex items-center gap-1 ${badgeTextClasses[size]}`}>
-          <span className="w-1 h-1 rounded-full bg-emerald-400 inline-block" />
+        <span className={`${badgeColor} font-mono -mt-0.5 tracking-wider uppercase flex items-center gap-1.5 ${badgeTextClasses[size]}`}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse shrink-0" />
           Enterprise Edition
         </span>
       </div>
