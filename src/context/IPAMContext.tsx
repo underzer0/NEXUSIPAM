@@ -113,29 +113,9 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [ips, setIps] = useState<IPAddress[]>([]);
   const [stats, setStats] = useState<IPAMStats | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('ipam_current_user');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-    return emptyUser;
-  });
+  const [currentUser, setCurrentUser] = useState<UserProfile>(emptyUser);
   const [users, setUsers] = useState<UserProfile[]>([]);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const authFlag = localStorage.getItem('ipam_is_authenticated');
-      if (authFlag !== null) {
-        return authFlag === 'true';
-      }
-    }
-    return false;
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [wsConnected, setWsConnected] = useState<boolean>(false);
@@ -187,21 +167,12 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const loadedUsers = Array.isArray(json.data.users) ? json.data.users : [];
         setUsers(loadedUsers);
 
-        if (json.data.currentUser) {
+        if (json.data.currentUser && json.data.currentUser.id) {
           setCurrentUser(json.data.currentUser);
           setIsAuthenticated(true);
-          localStorage.setItem('ipam_is_authenticated', 'true');
-          localStorage.setItem('ipam_current_user', JSON.stringify(json.data.currentUser));
-        } else if (loadedUsers.length > 0) {
-          setCurrentUser(loadedUsers[0]);
-          setIsAuthenticated(true);
-          localStorage.setItem('ipam_is_authenticated', 'true');
-          localStorage.setItem('ipam_current_user', JSON.stringify(loadedUsers[0]));
         } else {
           setCurrentUser(emptyUser);
           setIsAuthenticated(false);
-          localStorage.removeItem('ipam_is_authenticated');
-          localStorage.removeItem('ipam_current_user');
         }
         setError(null);
       } else {
@@ -304,10 +275,6 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setIps(msg.payload.ips || []);
             setStats(msg.payload.stats || null);
             setActivityLogs(msg.payload.activityLogs || []);
-            if (msg.payload.currentUser) {
-              setCurrentUser(msg.payload.currentUser);
-              localStorage.setItem('ipam_current_user', JSON.stringify(msg.payload.currentUser));
-            }
             if (msg.payload.users && Array.isArray(msg.payload.users)) {
               setUsers(msg.payload.users);
             }
@@ -320,7 +287,6 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUsers(prev => prev.map(u => u.id === msg.payload.id ? msg.payload : u));
             setCurrentUser(prev => {
               if (prev.id === msg.payload.id) {
-                localStorage.setItem('ipam_current_user', JSON.stringify(msg.payload));
                 return msg.payload;
               }
               return prev;
@@ -334,8 +300,6 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
               if (prev.some(u => u.id === msg.payload.id)) return prev;
               return [...prev, msg.payload];
             });
-            setCurrentUser(msg.payload);
-            localStorage.setItem('ipam_current_user', JSON.stringify(msg.payload));
           }
           break;
 
@@ -629,17 +593,12 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to update profile');
-      setCurrentUser(json.data);
-      setUsers(prev => prev.map(u => u.id === json.data.id ? json.data : u));
-      localStorage.setItem('ipam_current_user', JSON.stringify(json.data));
-      return json.data;
+      const updatedUser = json.data;
+      setCurrentUser(updatedUser);
+      setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+      return updatedUser;
     } catch (err: any) {
-      // Fallback local update if network issue
-      const updated: UserProfile = { ...currentUser, ...data };
-      setCurrentUser(updated);
-      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
-      localStorage.setItem('ipam_current_user', JSON.stringify(updated));
-      return updated;
+      throw err;
     }
   };
 
@@ -651,11 +610,9 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error || 'Failed to authenticate');
-    const user: UserProfile = json.data;
+    const user: UserProfile = json.data?.user || json.data;
     setCurrentUser(user);
     setIsAuthenticated(true);
-    localStorage.setItem('ipam_is_authenticated', 'true');
-    localStorage.setItem('ipam_current_user', JSON.stringify(user));
     setActiveTab('dashboard');
     return user;
   };
@@ -666,8 +623,8 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       // Ignore network error on signout
     }
+    setCurrentUser(emptyUser);
     setIsAuthenticated(false);
-    localStorage.setItem('ipam_is_authenticated', 'false');
     setActiveTab('signin');
   };
 
@@ -690,12 +647,10 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error || 'Failed to create account');
-    const newUser = json.data;
+    const newUser: UserProfile = json.data?.user || json.data;
     setCurrentUser(newUser);
     setIsAuthenticated(true);
-    localStorage.setItem('ipam_is_authenticated', 'true');
     setUsers(prev => [...prev.filter(u => u.id !== newUser.id), newUser]);
-    localStorage.setItem('ipam_current_user', JSON.stringify(newUser));
     setActiveTab('dashboard');
     return newUser;
   };
@@ -708,9 +663,9 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error || 'Failed to switch user');
-    const user = json.data;
+    const user: UserProfile = json.data?.user || json.data;
     setCurrentUser(user);
-    localStorage.setItem('ipam_current_user', JSON.stringify(user));
+    setIsAuthenticated(true);
     return user;
   };
 
@@ -723,7 +678,6 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!json.success) throw new Error(json.error || 'Failed to generate API token');
     if (json.data?.user) {
       setCurrentUser(json.data.user);
-      localStorage.setItem('ipam_current_user', JSON.stringify(json.data.user));
     }
     return json.data.apiKey;
   };

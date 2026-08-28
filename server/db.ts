@@ -3,7 +3,13 @@ import path from 'path';
 import { Datacenter, VLAN, Subnet, IPAddress, ActivityLog, IPAMStats, SegmentType, IPStatus, UserProfile, IPVersion } from '../src/types/ipam';
 import { isIPInCIDR, isValidCIDR, isValidIP, parseCIDR, ipToInt, intToIp, getIPVersion, compressIPv6, generateIPRange } from '../src/utils/ipCalculator';
 import { mysqlEngine } from './mysql';
-import { hashPasswordSync, verifyPasswordSync, generateSecureApiKey, hashSensitiveData } from './crypto';
+import { hashPasswordSync, verifyPasswordSync, generateSecureApiKey, hashSensitiveData, generateSessionToken } from './crypto';
+
+export interface UserSession {
+  token: string;
+  userId: string;
+  expiresAt: number; // epoch ms
+}
 
 class IPAMDatabase {
   private datacenters: Datacenter[] = [];
@@ -14,7 +20,8 @@ class IPAMDatabase {
   private users: UserProfile[] = [];
   // Strictly stores salted BCrypt hashes ($2a$10$...), never plaintext!
   private passwordHashes: Map<string, string> = new Map();
-  private currentUserId: string = '';
+  // Active user sessions (token -> UserSession) for cookie authentication
+  private sessions: Map<string, UserSession> = new Map();
   private dataDir: string;
   private dbFilePath: string;
   private isDbConnected: boolean = false;
@@ -63,7 +70,9 @@ class IPAMDatabase {
         this.activityLogs = mysqlData.activityLogs;
         this.users = mysqlData.users;
         this.passwordHashes = mysqlData.passwords;
-        this.currentUserId = mysqlData.currentUserId;
+        if (mysqlData.sessions) {
+          this.sessions = mysqlData.sessions;
+        }
         console.log(`[IPAM Database] Connected to MySQL: ${this.datacenters.length} Datacenters, ${this.vlans.length} VLANs, ${this.subnets.length} Subnets, ${this.ips.length} IPs, ${this.users.length} Users.`);
         return;
       } else {
@@ -85,7 +94,7 @@ class IPAMDatabase {
     this.activityLogs = [];
     this.users = [];
     this.passwordHashes = new Map();
-    this.currentUserId = '';
+    this.sessions = new Map();
   }
 
   private async seedInitialDataset(): Promise<void> {
@@ -139,7 +148,6 @@ class IPAMDatabase {
 
     this.users = [adminUser];
     this.passwordHashes.set(adminUser.id, defaultPasswordHash);
-    this.currentUserId = adminUser.id;
     this.datacenters = [defaultDc];
     this.vlans = [defaultVlan];
     this.subnets = [defaultSubnet];
@@ -152,7 +160,6 @@ class IPAMDatabase {
       await mysqlEngine.saveVlan(defaultVlan);
       await mysqlEngine.saveSubnet(defaultSubnet);
       await mysqlEngine.saveUser(adminUser, defaultPasswordHash);
-      await mysqlEngine.saveSystemConfig('current_user_id', this.currentUserId);
     } catch (err) {
       console.warn('[MySQL Seed Warning]', err);
     }
@@ -168,7 +175,9 @@ class IPAMDatabase {
       this.activityLogs = mysqlData.activityLogs;
       this.users = mysqlData.users;
       this.passwordHashes = mysqlData.passwords;
-      if (mysqlData.currentUserId) this.currentUserId = mysqlData.currentUserId;
+      if (mysqlData.sessions) {
+        this.sessions = mysqlData.sessions;
+      }
       this.persist();
       return {
         success: true,
@@ -216,8 +225,11 @@ class IPAMDatabase {
         const hash = this.passwordHashes.get(user.id) || hashPasswordSync('password123');
         await mysqlEngine.saveUser(user, hash);
       }
-      if (this.currentUserId) {
-        await mysqlEngine.saveSystemConfig('current_user_id', this.currentUserId);
+      // Sync all valid sessions
+      for (const session of this.sessions.values()) {
+        if (session.expiresAt > Date.now()) {
+          await mysqlEngine.saveSession(session.token, session.userId, new Date(session.expiresAt));
+        }
       }
 
       return {
@@ -271,8 +283,16 @@ class IPAMDatabase {
             }
           }
 
-          this.currentUserId = typeof data.currentUserId === 'string' ? data.currentUserId : (this.users[0]?.id || '');
-          console.log(`[IPAM Storage] Successfully loaded store: ${this.datacenters.length} Datacenters, ${this.vlans.length} VLANs, ${this.subnets.length} Subnets, ${this.ips.length} IPs, ${this.users.length} Users (all user credentials secured with salted BCrypt hashes).`);
+          this.sessions = new Map();
+          if (data.sessions && typeof data.sessions === 'object') {
+            for (const [token, sessionData] of Object.entries(data.sessions)) {
+              if (sessionData && typeof sessionData === 'object' && (sessionData as any).expiresAt > Date.now()) {
+                this.sessions.set(token, sessionData as UserSession);
+              }
+            }
+          }
+
+          console.log(`[IPAM Storage] Successfully loaded store: ${this.datacenters.length} Datacenters, ${this.vlans.length} VLANs, ${this.subnets.length} Subnets, ${this.ips.length} IPs, ${this.users.length} Users.`);
           return true;
         }
       }
@@ -300,7 +320,7 @@ class IPAMDatabase {
         activityLogs: this.activityLogs,
         users: this.users,
         passwordHashes: Object.fromEntries(this.passwordHashes.entries()),
-        currentUserId: this.currentUserId,
+        sessions: Object.fromEntries(this.sessions.entries()),
       };
 
       const tempPath = `${this.dbFilePath}.tmp.${Date.now()}`;
@@ -1142,32 +1162,47 @@ class IPAMDatabase {
     };
   }
 
-  // --- USER PROFILE & AUTHENTICATION CRUD (PASSWORDS HASHED WITH BCRYPT) ---
+  // --- USER PROFILE & AUTHENTICATION CRUD (PASSWORDS HASHED WITH BCRYPT, COOKIE SESSIONS) ---
   public getUsers(): UserProfile[] {
     return [...this.users];
-  }
-
-  public getCurrentUser(): UserProfile | null {
-    if (this.currentUserId) {
-      const user = this.users.find(u => u.id === this.currentUserId);
-      if (user) return user;
-    }
-    if (this.users.length > 0) return this.users[0];
-    return null;
   }
 
   public getUserById(id: string): UserProfile | undefined {
     return this.users.find(u => u.id === id);
   }
 
-  public switchUser(id: string): UserProfile {
-    const user = this.users.find(u => u.id === id);
-    if (!user) throw new Error(`User account ${id} not found`);
-    this.currentUserId = user.id;
-    this.logActivity('UPDATE', 'Datacenter', user.id, `User Switched: ${user.name}`, `Active engineer session updated to ${user.email}`);
+  public createSession(userId: string): { token: string; expiresAt: Date } {
+    const token = generateSessionToken();
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days validity
+    const sessionObj: UserSession = {
+      token,
+      userId,
+      expiresAt: expiresAt.getTime(),
+    };
+    this.sessions.set(token, sessionObj);
     this.persist();
-    mysqlEngine.saveSystemConfig('current_user_id', user.id).catch(() => {});
-    return user;
+    mysqlEngine.saveSession(token, userId, expiresAt).catch(() => {});
+    return { token, expiresAt };
+  }
+
+  public getUserBySession(token?: string): UserProfile | null {
+    if (!token || typeof token !== 'string') return null;
+    const session = this.sessions.get(token);
+    if (!session) return null;
+    if (session.expiresAt <= Date.now()) {
+      this.sessions.delete(token);
+      mysqlEngine.deleteSession(token).catch(() => {});
+      return null;
+    }
+    const user = this.getUserById(session.userId);
+    return user || null;
+  }
+
+  public deleteSession(token?: string): void {
+    if (!token) return;
+    this.sessions.delete(token);
+    this.persist();
+    mysqlEngine.deleteSession(token).catch(() => {});
   }
 
   public updateUserProfile(id: string, data: Partial<UserProfile>): UserProfile {
@@ -1218,7 +1253,7 @@ class IPAMDatabase {
     bio?: string;
     primaryDatacenterId?: string;
     password?: string;
-  }): UserProfile {
+  }): { user: UserProfile; session: { token: string; expiresAt: Date } } {
     if (!data.name?.trim()) throw new Error('Full Name is required');
     if (!data.email?.trim()) throw new Error('Email address is required');
 
@@ -1229,14 +1264,14 @@ class IPAMDatabase {
     }
 
     const id = `user-${email.split('@')[0].replace(/[^a-z0-9]/g, '')}-${Date.now().toString(36)}`;
-    const { rawKey, maskedKey } = generateSecureApiKey();
+    const { rawKey } = generateSecureApiKey();
     
     const newUser: UserProfile = {
       id,
       name: data.name.trim(),
       email,
-      role: data.role?.trim() || 'Principal Network Architect',
-      department: data.department?.trim() || 'Infrastructure & Network Engineering',
+      role: data.role?.trim() || 'Senior Network Engineer',
+      department: data.department?.trim() || 'Infrastructure Engineering',
       organization: data.organization?.trim() || 'BeyondIP Enterprise',
       location: data.location?.trim() || 'Corporate Headquarters',
       phone: data.phone?.trim() || '',
@@ -1257,17 +1292,18 @@ class IPAMDatabase {
     this.passwordHashes.set(newUser.id, bcryptHash);
 
     this.users.push(newUser);
-    this.currentUserId = newUser.id;
     this.logActivity('CREATE', 'Datacenter', newUser.id, `New Account Created: ${newUser.name}`, `Registered ${newUser.email} with ${newUser.role} role`);
     this.persist();
     
     // Save to MySQL with salted hash
     mysqlEngine.saveUser(newUser, bcryptHash).catch(() => {});
-    mysqlEngine.saveSystemConfig('current_user_id', newUser.id).catch(() => {});
-    return newUser;
+    
+    // Create new session
+    const session = this.createSession(newUser.id);
+    return { user: newUser, session };
   }
 
-  public signIn(email: string, password: string): UserProfile {
+  public signIn(email: string, password: string): { user: UserProfile; session: { token: string; expiresAt: Date } } {
     if (!email?.trim()) throw new Error('Email address is required.');
     if (!password?.trim()) throw new Error('Password is required.');
 
@@ -1288,21 +1324,19 @@ class IPAMDatabase {
       throw new Error('Invalid credentials. Please verify your password.');
     }
 
-    this.currentUserId = user.id;
     this.logActivity('UPDATE', 'Datacenter', user.id, `Engineer Authenticated: ${user.name}`, `Logged into IPAM session as ${user.email}`);
-    this.persist();
-    mysqlEngine.saveSystemConfig('current_user_id', user.id).catch(() => {});
-    return user;
+    
+    const session = this.createSession(user.id);
+    return { user, session };
   }
 
-  public signOut(): boolean {
-    const user = this.getCurrentUser();
+  public signOutSession(token?: string): boolean {
+    if (!token) return true;
+    const user = this.getUserBySession(token);
     if (user) {
       this.logActivity('UPDATE', 'Datacenter', user.id, `Engineer Signed Out: ${user.name}`, `Session ended for ${user.email}`);
     }
-    this.currentUserId = '';
-    this.persist();
-    mysqlEngine.saveSystemConfig('current_user_id', '').catch(() => {});
+    this.deleteSession(token);
     return true;
   }
 

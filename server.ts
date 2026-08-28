@@ -2,6 +2,7 @@ import express from 'express';
 import http from 'http';
 import path from 'path';
 import fs from 'fs';
+import cookieParser from 'cookie-parser';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer as createViteServer } from 'vite';
 import { createApiRouter } from './server/routes';
@@ -12,9 +13,10 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // JSON & URL-encoded parser
+  // JSON & URL-encoded parser + cookie parser for session tokens
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  app.use(cookieParser());
 
   // Create HTTP server
   const server = http.createServer(app);
@@ -46,7 +48,7 @@ async function startServer() {
   wss.on('connection', (ws) => {
     clients.add(ws);
 
-    // Send initial bootstrap state immediately to newly connected client
+    // Send initial bootstrap state immediately to newly connected client (shared resource state only)
     const initMessage: WSMessage = {
       type: 'INIT_STATE',
       payload: {
@@ -56,7 +58,6 @@ async function startServer() {
         ips: db.getIPs(),
         stats: db.getStats(),
         activityLogs: db.getActivityLogs(),
-        currentUser: db.getCurrentUser(),
         users: db.getUsers(),
       },
       timestamp: new Date().toISOString(),

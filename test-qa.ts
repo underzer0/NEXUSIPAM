@@ -167,19 +167,22 @@ async function runTestSuite() {
   // TEST SUITE 8: Cryptographic Security & Password Hashing
   // ----------------------------------------------------
   console.log('\n📌 Test Suite 8: Cryptography & Zero-Plaintext Security');
-  const testUser = db.createUser({
+  const userResult = db.createUser({
     name: 'Security QA Engineer',
     email: `security.qa.${Date.now()}@beyondip.net`,
     password: 'superSecretPassword99!',
     role: 'Security Architect',
   });
+  const testUser = userResult.user;
   assert(!!testUser.id, 'User created successfully with unique ID');
   assert(testUser.email.includes('@beyondip.net'), 'User email formatted correctly');
   assert(testUser.apiKey.startsWith('nx_live_'), 'Secure API Key generated with live prefix');
+  assert(!!userResult.session.token, 'Session token generated successfully');
 
   // Verify BCrypt sign in
-  const authed = db.signIn(testUser.email, 'superSecretPassword99!');
-  assert(authed.id === testUser.id, 'BCrypt authentication successfully verifies correct password');
+  const authResult = db.signIn(testUser.email, 'superSecretPassword99!');
+  assert(authResult.user.id === testUser.id, 'BCrypt authentication successfully verifies correct password');
+  assert(!!authResult.session.token, 'BCrypt signin issues a valid session token');
 
   // Verify wrong password rejection
   let wrongPassRejected = false;

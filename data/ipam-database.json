@@ -1,92 +1,92 @@
 {
   "version": 2,
   "securityEngine": "BCrypt-Salted-Hash-v2+AES256GCM",
-  "lastSaved": "2026-08-27T11:00:11.940Z",
+  "lastSaved": "2026-08-28T17:54:43.815Z",
   "datacenters": [],
   "vlans": [],
   "subnets": [],
   "ips": [],
   "activityLogs": [
     {
-      "id": "log-1787828411940-knks",
+      "id": "log-1787939683815-tqji",
       "action": "UPDATE",
       "entityType": "Datacenter",
-      "entityId": "user-securityqa1787828411645-mtbevj7i",
+      "entityId": "user-securityqa1787939683589-mtd94h6t",
       "title": "Engineer Authenticated: Security QA Engineer",
-      "detail": "Logged into IPAM session as security.qa.1787828411645@beyondip.net",
-      "timestamp": "2026-08-27T11:00:11.940Z"
+      "detail": "Logged into IPAM session as security.qa.1787939683589@beyondip.net",
+      "timestamp": "2026-08-28T17:54:43.815Z"
     },
     {
-      "id": "log-1787828411816-0icn",
+      "id": "log-1787939683712-tgys",
       "action": "CREATE",
       "entityType": "Datacenter",
-      "entityId": "user-securityqa1787828411645-mtbevj7i",
+      "entityId": "user-securityqa1787939683589-mtd94h6t",
       "title": "New Account Created: Security QA Engineer",
-      "detail": "Registered security.qa.1787828411645@beyondip.net with Security Architect role",
-      "timestamp": "2026-08-27T11:00:11.816Z"
+      "detail": "Registered security.qa.1787939683589@beyondip.net with Security Architect role",
+      "timestamp": "2026-08-28T17:54:43.712Z"
     },
     {
-      "id": "log-1787828411645-wddb",
+      "id": "log-1787939683588-rxiq",
       "action": "DELETE",
       "entityType": "Datacenter",
-      "entityId": "dc-qa-test-datacenter-zurich--mtbevj7b",
+      "entityId": "dc-qa-test-datacenter-zurich--mtd94h6o",
       "title": "Datacenter Deleted: QA Test Datacenter (Zurich)",
       "detail": "Removed datacenter location Zurich, Switzerland",
-      "timestamp": "2026-08-27T11:00:11.645Z"
+      "timestamp": "2026-08-28T17:54:43.588Z"
     },
     {
-      "id": "log-1787828411644-emft",
+      "id": "log-1787939683588-iv58",
       "action": "DELETE",
       "entityType": "Subnet",
-      "entityId": "sub-10-200-0-0-24-mtbevj7d",
+      "entityId": "sub-10-200-0-0-24-mtd94h6q",
       "title": "Subnet 10.200.0.0/24 Deleted",
       "detail": "Removed subnet and purged 1 child IP assignment(s).",
-      "timestamp": "2026-08-27T11:00:11.644Z"
+      "timestamp": "2026-08-28T17:54:43.588Z"
     },
     {
-      "id": "log-1787828411644-qj75",
+      "id": "log-1787939683587-1mzx",
       "action": "UPDATE",
       "entityType": "IP",
-      "entityId": "ip-10-200-0-1-mtbevj7e",
+      "entityId": "ip-10-200-0-1-mtd94h6r",
       "title": "IP 10.200.0.1 Updated",
       "detail": "Status: Available, Host: None",
-      "timestamp": "2026-08-27T11:00:11.644Z"
+      "timestamp": "2026-08-28T17:54:43.587Z"
     },
     {
-      "id": "log-1787828411643-xsvq",
+      "id": "log-1787939683587-s5jt",
       "action": "RESERVE",
       "entityType": "IP",
-      "entityId": "ip-10-200-0-1-mtbevj7e",
+      "entityId": "ip-10-200-0-1-mtd94h6r",
       "title": "Reserved IP 10.200.0.1",
       "detail": "Assigned to qa-router-01",
-      "timestamp": "2026-08-27T11:00:11.643Z"
+      "timestamp": "2026-08-28T17:54:43.587Z"
     },
     {
-      "id": "log-1787828411641-edqc",
+      "id": "log-1787939683586-uyfa",
       "action": "CREATE",
       "entityType": "Subnet",
-      "entityId": "sub-10-200-0-0-24-mtbevj7d",
+      "entityId": "sub-10-200-0-0-24-mtd94h6q",
       "title": "Subnet 10.200.0.0/24 (IPv4) Created",
       "detail": "Configured as Private in QA Test Datacenter (Zurich)",
-      "timestamp": "2026-08-27T11:00:11.641Z"
+      "timestamp": "2026-08-28T17:54:43.586Z"
     },
     {
-      "id": "log-1787828411640-04mu",
+      "id": "log-1787939683585-a9jp",
       "action": "CREATE",
       "entityType": "Datacenter",
-      "entityId": "dc-qa-test-datacenter-zurich--mtbevj7b",
+      "entityId": "dc-qa-test-datacenter-zurich--mtd94h6o",
       "title": "Datacenter Created: QA Test Datacenter (Zurich)",
       "detail": "Added location Zurich, Switzerland",
-      "timestamp": "2026-08-27T11:00:11.640Z"
+      "timestamp": "2026-08-28T17:54:43.585Z"
     }
   ],
   "users": [
     {
-      "id": "user-securityqa1787828411645-mtbevj7i",
+      "id": "user-securityqa1787939683589-mtd94h6t",
       "name": "Security QA Engineer",
-      "email": "security.qa.1787828411645@beyondip.net",
+      "email": "security.qa.1787939683589@beyondip.net",
       "role": "Security Architect",
-      "department": "Infrastructure & Network Engineering",
+      "department": "Infrastructure Engineering",
       "organization": "BeyondIP Enterprise",
       "location": "Corporate Headquarters",
       "phone": "",
@@ -97,12 +97,23 @@
       "collisionAlerts": true,
       "exhaustionAlerts": true,
       "themePreference": "dark",
-      "apiKey": "nx_live_c8cf3cc2079362bf95569db0de88af66a46373e108aa4785",
-      "createdAt": "2026-08-27T11:00:11.648Z"
+      "apiKey": "nx_live_43abd24e277de0b07d01640e9532d454685b0ecda1f5f869",
+      "createdAt": "2026-08-28T17:54:43.591Z"
     }
   ],
   "passwordHashes": {
-    "user-securityqa1787828411645-mtbevj7i": "$2b$10$QeafLJZLxiuEuNpPbPRH/.B5x/DpFHS7ifcrONqc63ZVVtmcBgeWW"
+    "user-securityqa1787939683589-mtd94h6t": "$2b$10$3YS5wC3Cg.9DhNoP4mSo7.uJBquDWsi4aCg0PQcBuKNtah5tVg1z6"
   },
-  "currentUserId": "user-securityqa1787828411645-mtbevj7i"
+  "sessions": {
+    "66e1f847474194935330715e611495ee875cabfe731a008514ab81f2ddab535f": {
+      "token": "66e1f847474194935330715e611495ee875cabfe731a008514ab81f2ddab535f",
+      "userId": "user-securityqa1787939683589-mtd94h6t",
+      "expiresAt": 1790531683713
+    },
+    "35960fc2ef4e6bea964dfc1211af80406c9068d565dd5b2ee3065e1da595cfb4": {
+      "token": "35960fc2ef4e6bea964dfc1211af80406c9068d565dd5b2ee3065e1da595cfb4",
+      "userId": "user-securityqa1787939683589-mtd94h6t",
+      "expiresAt": 1790531683815
+    }
+  }
 }

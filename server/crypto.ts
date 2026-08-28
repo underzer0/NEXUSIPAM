@@ -122,3 +122,10 @@ export function generateSecureApiKey(): { rawKey: string; keyHash: string; maske
     encryptedKey,
   };
 }
+
+/**
+ * Generates a cryptographically random session token for cookie-based authentication
+ */
+export function generateSessionToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}

@@ -341,8 +341,21 @@ class MySQLEngine {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
 
+      // 8. User Sessions (for cookie-based authentication per-client)
+      await this.pool.query(`
+        CREATE TABLE IF NOT EXISTS user_sessions (
+          token VARCHAR(128) PRIMARY KEY,
+          user_id VARCHAR(64) NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          expires_at TIMESTAMP NOT NULL,
+          INDEX idx_session_user (user_id),
+          INDEX idx_session_expiry (expires_at),
+          CONSTRAINT fk_session_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
+
       this.schemaReady = true;
-      console.log('[MySQL] All 7 relational tables and foreign keys successfully verified.');
+      console.log('[MySQL] All relational tables and session store successfully verified.');
     } catch (err: any) {
       console.error('[MySQL] Error creating schema tables:', err);
       this.lastError = err.message || String(err);
@@ -471,7 +484,7 @@ class MySQLEngine {
     activityLogs: ActivityLog[];
     users: UserProfile[];
     passwords: Map<string, string>;
-    currentUserId: string;
+    sessions: Map<string, { token: string; userId: string; expiresAt: number }>;
   } | null> {
     if (!this.pool || !this.isConnected) return null;
 
@@ -570,12 +583,16 @@ class MySQLEngine {
         };
       });
 
-      // 7. System config for active session
-      let currentUserId = users[0]?.id || '';
+      // 7. Active user sessions
+      const sessions = new Map<string, { token: string; userId: string; expiresAt: number }>();
       try {
-        const [cfgRows] = await this.pool.query<RowDataPacket[]>('SELECT config_value FROM system_config WHERE config_key = ?', ['current_user_id']);
-        if (cfgRows.length > 0 && cfgRows[0].config_value) {
-          currentUserId = cfgRows[0].config_value;
+        const [sessionRows] = await this.pool.query<RowDataPacket[]>('SELECT * FROM user_sessions WHERE expires_at > NOW()');
+        for (const s of sessionRows) {
+          sessions.set(s.token, {
+            token: s.token,
+            userId: s.user_id,
+            expiresAt: new Date(s.expires_at).getTime(),
+          });
         }
       } catch {}
 
@@ -588,7 +605,7 @@ class MySQLEngine {
         activityLogs,
         users,
         passwords,
-        currentUserId,
+        sessions,
       };
     } catch (err: any) {
       console.error('[MySQL] Error loading data from MySQL database:', err);
@@ -779,6 +796,29 @@ class MySQLEngine {
       );
     } catch (err) {
       console.error('[MySQL Error] saveSystemConfig:', err);
+    }
+  }
+
+  public async saveSession(token: string, userId: string, expiresAt: Date): Promise<void> {
+    if (!this.pool || !this.isConnected) return;
+    try {
+      await this.pool.query(
+        `INSERT INTO user_sessions (token, user_id, expires_at)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE expires_at = VALUES(expires_at)`,
+        [token, userId, expiresAt]
+      );
+    } catch (err) {
+      console.error('[MySQL Error] saveSession:', err);
+    }
+  }
+
+  public async deleteSession(token: string): Promise<void> {
+    if (!this.pool || !this.isConnected) return;
+    try {
+      await this.pool.query('DELETE FROM user_sessions WHERE token = ?', [token]);
+    } catch (err) {
+      console.error('[MySQL Error] deleteSession:', err);
     }
   }
 }

@@ -117,16 +117,12 @@ export const SignUpView: React.FC = () => {
   };
 
   const roleOptions = [
-    'Principal Network Architect',
-    'Senior Network Engineer',
-    'Cloud Infrastructure Lead',
-    'SecOps Administrator',
-    'Site Reliability Engineer (SRE)',
-    'DevOps Automation Engineer',
-    'Datacenter Operations Specialist',
-    'Network Operations Center (NOC) Analyst',
-    'Systems & Network Administrator',
-    'Infrastructure Security Lead'
+    'IT Engineer',
+    'Junior Network Admin',
+    'Senior Network Admin',
+    'Expert Network Architect',
+    'IT Manager',
+    'Director',
   ];
 
   return (

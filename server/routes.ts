@@ -1,7 +1,26 @@
 import { Router, Request, Response } from 'express';
 import { db } from './db';
 import { mysqlEngine } from './mysql';
-import { WSAction } from '../src/types/ipam';
+import { WSAction, UserProfile } from '../src/types/ipam';
+
+const SESSION_COOKIE_NAME = 'ipam_session_token';
+const SESSION_COOKIE_OPTIONS = {
+  httpOnly: false,
+  sameSite: 'lax' as const,
+  path: '/',
+  maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+};
+
+function getSessionUser(req: Request): UserProfile | null {
+  const token = req.cookies?.[SESSION_COOKIE_NAME] || 
+    (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : undefined);
+  return db.getUserBySession(token);
+}
+
+function getSessionToken(req: Request): string | undefined {
+  return req.cookies?.[SESSION_COOKIE_NAME] || 
+    (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : undefined);
+}
 
 export function createApiRouter(broadcast: (type: WSAction, payload: any) => void): Router {
   const router = Router();
@@ -101,7 +120,7 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
       const ips = db.getIPs();
       const stats = db.getStats();
       const activityLogs = db.getActivityLogs();
-      const currentUser = db.getCurrentUser();
+      const currentUser = getSessionUser(req);
       const users = db.getUsers();
 
       res.json({
@@ -404,11 +423,26 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
     }
   });
 
-  // --- USER PROFILE & AUTHENTICATION ROUTES ---
+  // --- USER PROFILE & AUTHENTICATION ROUTES (COOKIE-BASED SESSIONS) ---
   router.get('/user/current', (req: Request, res: Response) => {
     try {
-      const user = db.getCurrentUser();
-      res.json({ success: true, data: user });
+      const user = getSessionUser(req);
+      if (!user) {
+        return res.status(401).json({ success: false, authenticated: false, error: 'No active session' });
+      }
+      res.json({ success: true, authenticated: true, data: user });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  router.get('/auth/me', (req: Request, res: Response) => {
+    try {
+      const user = getSessionUser(req);
+      if (!user) {
+        return res.json({ success: false, authenticated: false, user: null });
+      }
+      res.json({ success: true, authenticated: true, user });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
@@ -416,7 +450,7 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
 
   router.put('/user/profile', (req: Request, res: Response) => {
     try {
-      const currentUser = db.getCurrentUser();
+      const currentUser = getSessionUser(req);
       if (!currentUser) return res.status(401).json({ success: false, error: 'No authenticated user session found' });
       const updated = db.updateUserProfile(currentUser.id, req.body);
       broadcast('USER_UPDATED', updated);
@@ -438,9 +472,9 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
   router.post('/auth/signin', (req: Request, res: Response) => {
     try {
       const { email, password } = req.body;
-      const user = db.signIn(email, password);
-      broadcast('USER_UPDATED', user);
-      res.json({ success: true, data: user });
+      const { user, session } = db.signIn(email, password);
+      res.cookie(SESSION_COOKIE_NAME, session.token, SESSION_COOKIE_OPTIONS);
+      res.json({ success: true, data: { user, sessionToken: session.token } });
     } catch (err: any) {
       res.status(401).json({ success: false, error: err.message });
     }
@@ -448,7 +482,9 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
 
   router.post('/auth/signout', (req: Request, res: Response) => {
     try {
-      db.signOut();
+      const token = getSessionToken(req);
+      db.signOutSession(token);
+      res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
       res.json({ success: true, message: 'Signed out successfully' });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -458,7 +494,7 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
   router.post('/auth/signup', (req: Request, res: Response) => {
     try {
       const { name, email, password, role, department, organization, location, phone, bio, primaryDatacenterId } = req.body;
-      const newUser = db.createUser({
+      const { user, session } = db.createUser({
         name,
         email,
         password,
@@ -470,8 +506,9 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
         bio,
         primaryDatacenterId,
       });
-      broadcast('USER_CREATED', newUser);
-      res.status(201).json({ success: true, data: newUser });
+      res.cookie(SESSION_COOKIE_NAME, session.token, SESSION_COOKIE_OPTIONS);
+      broadcast('USER_CREATED', user);
+      res.status(201).json({ success: true, data: { user, sessionToken: session.token } });
     } catch (err: any) {
       res.status(400).json({ success: false, error: err.message });
     }
@@ -481,9 +518,12 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
     try {
       const { userId } = req.body;
       if (!userId) return res.status(400).json({ success: false, error: 'User ID is required' });
-      const user = db.switchUser(userId);
-      broadcast('USER_UPDATED', user);
-      res.json({ success: true, data: user });
+      const user = db.getUserById(userId);
+      if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+      
+      const session = db.createSession(user.id);
+      res.cookie(SESSION_COOKIE_NAME, session.token, SESSION_COOKIE_OPTIONS);
+      res.json({ success: true, data: { user, sessionToken: session.token } });
     } catch (err: any) {
       res.status(400).json({ success: false, error: err.message });
     }
@@ -491,10 +531,10 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
 
   router.post('/user/generate-api-key', (req: Request, res: Response) => {
     try {
-      const currentUser = db.getCurrentUser();
+      const currentUser = getSessionUser(req);
       if (!currentUser) return res.status(401).json({ success: false, error: 'No authenticated user session found' });
       const apiKey = db.generateApiKey(currentUser.id);
-      const updated = db.getCurrentUser();
+      const updated = db.getUserById(currentUser.id);
       broadcast('USER_UPDATED', updated);
       res.json({ success: true, data: { apiKey, user: updated } });
     } catch (err: any) {
