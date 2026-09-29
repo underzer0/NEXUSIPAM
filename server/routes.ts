@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { db } from './db';
 import { mysqlEngine } from './mysql';
 import { WSAction, UserProfile } from '../src/types/ipam';
+import { parseCIDR } from '../src/utils/ipCalculator';
 
 const SESSION_COOKIE_NAME = 'ipam_session_token';
 const SESSION_COOKIE_OPTIONS = {
@@ -225,6 +226,15 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
   });
 
   // --- VLAN ROUTES ---
+  router.get('/vlans/options', (req: Request, res: Response) => {
+    try {
+      const options = db.getVlanOptions();
+      res.json({ success: true, data: options });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   router.get('/vlans', (req: Request, res: Response) => {
     try {
       const datacenterId = req.query.datacenterId as string | undefined;
@@ -247,10 +257,17 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
 
   router.post('/vlans', (req: Request, res: Response) => {
     try {
-      const { vlanId, name, description, datacenterId } = req.body;
-      const created = db.createVlan({ vlanId, name, description, datacenterId });
+      const created = db.createVlan(req.body);
+      const dc = db.getDatacenterById(created.datacenterId);
       broadcast('VLAN_CREATED', created);
-      res.status(201).json({ success: true, data: created });
+      res.status(201).json({
+        success: true,
+        message: `VLAN ${created.vlanId} ("${created.name}") created successfully in Datacenter "${dc?.name || created.datacenterId}".`,
+        data: {
+          ...created,
+          datacenter: dc ? { id: dc.id, name: dc.name, location: dc.location } : undefined,
+        },
+      });
     } catch (err: any) {
       res.status(400).json({ success: false, error: err.message });
     }
@@ -277,6 +294,15 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
   });
 
   // --- SUBNET ROUTES ---
+  router.get('/subnets/options', (req: Request, res: Response) => {
+    try {
+      const options = db.getSubnetOptions();
+      res.json({ success: true, data: options });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   router.get('/subnets', (req: Request, res: Response) => {
     try {
       const { datacenterId, vlanId, segmentType } = req.query;
@@ -303,10 +329,40 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
 
   router.post('/subnets', (req: Request, res: Response) => {
     try {
-      const { cidr, segmentType, datacenterId, vlanId, description } = req.body;
-      const created = db.createSubnet({ cidr, segmentType, datacenterId, vlanId, description });
+      const created = db.createSubnet(req.body);
+      const dc = db.getDatacenterById(created.datacenterId);
+      const vlan = created.vlanId ? db.getVlanById(created.vlanId) : null;
+      let calculation: any = null;
+      try {
+        const calc = parseCIDR(created.cidr);
+        calculation = {
+          cidr: calc.cidr,
+          ipVersion: calc.ipVersion,
+          netmask: calc.netmask,
+          networkAddress: calc.networkAddress,
+          broadcastAddress: calc.broadcastAddress,
+          firstUsableHost: calc.firstUsableHost,
+          lastUsableHost: calc.lastUsableHost,
+          totalHosts: calc.totalHosts,
+          usableHosts: calc.usableHosts,
+          usableHostsFormatted: calc.usableHostsFormatted,
+          isPrivate: calc.isPrivate,
+        };
+      } catch {
+        // Fallback
+      }
+
       broadcast('SUBNET_CREATED', created);
-      res.status(201).json({ success: true, data: created });
+      res.status(201).json({
+        success: true,
+        message: `Subnet ${created.cidr} (${created.segmentType}) allocated successfully in Datacenter "${dc?.name || created.datacenterId}".`,
+        data: {
+          ...created,
+          datacenter: dc ? { id: dc.id, name: dc.name, location: dc.location } : undefined,
+          vlan: vlan ? { id: vlan.id, vlanId: vlan.vlanId, name: vlan.name } : null,
+          calculation,
+        },
+      });
     } catch (err: any) {
       res.status(400).json({ success: false, error: err.message });
     }

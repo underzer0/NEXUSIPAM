@@ -157,6 +157,59 @@ async function runTestSuite() {
   const released = db.updateIP(nextAllocated!.id, { status: 'Available', assignedDevice: '' });
   assert(released?.status === 'Available', 'IP released back to Available');
 
+  // ----------------------------------------------------
+  // TEST SUITE 8: API GUI Feature Parity (VLAN & Subnet Creation)
+  // ----------------------------------------------------
+  console.log('\n📌 Test Suite 8: API & GUI Parity: VLAN & Subnet Allocation Options');
+
+  // Test VLAN creation with exact GUI fields
+  const vlan1 = db.createVlan({
+    datacenterId: newDC.id,
+    vlanId: 350,
+    name: 'QA-Storage-SAN',
+    description: 'iSCSI and NVMe-oF low-latency SAN segment',
+  });
+  assert(!!vlan1.id, 'VLAN created with exact GUI fields');
+  assert(vlan1.vlanId === 350, 'VLAN 802.1Q VID tag assigned correctly');
+  assert(vlan1.name === 'QA-Storage-SAN', 'VLAN Name persisted');
+
+  // Test Subnet prefix allocation with exact GUI options
+  const sub2 = db.createSubnet({
+    datacenterId: newDC.id,
+    cidr: '10.200.50.0/24',
+    vlanId: 350, // Specified by 802.1Q VID tag!
+    segmentType: 'Private',
+    description: 'Storage nodes private prefix',
+  });
+  assert(!!sub2.id, 'Subnet prefix created with exact GUI options');
+  assert(sub2.vlanId === vlan1.id, 'VLAN resolved from tag 350 to VLAN UUID');
+  assert(sub2.segmentType === 'Private', 'Private segment routing classification preserved');
+
+  // Test IPv6 Subnet prefix allocation with auto-detected segmentType
+  const sub6 = db.createSubnet({
+    datacenterId: newDC.id,
+    cidr: '2001:db8:7700::/64',
+    vlanId: null, // Un-tagged L3 routed subnet
+    description: 'Public WAN IPv6 uplink prefix',
+  });
+  assert(sub6.segmentType === 'Public', 'Auto-detected Public classification for 2001:db8::/64');
+  assert(sub6.ipVersion === 'IPv6', 'Detected IPv6 version');
+  assert(sub6.vlanId === null, 'Un-tagged L3 routed subnet preserved');
+
+  // Test Options endpoints schema
+  const vlanOpts = db.getVlanOptions();
+  assert(vlanOpts.datacenters.length > 0, 'VLAN options returns datacenters');
+  assert(vlanOpts.vlanIdRange.max === 4094, 'VLAN options specifies 802.1Q 1-4094 tag limit');
+
+  const subnetOpts = db.getSubnetOptions();
+  assert(subnetOpts.presets.length >= 4, 'Subnet options includes GUI presets (/24, /26, IPv6)');
+  assert(subnetOpts.segmentTypes.some(s => s.value === 'Private'), 'Subnet options includes Private type');
+
+  // Cleanup subnets and VLAN
+  db.deleteSubnet(sub2.id);
+  db.deleteSubnet(sub6.id);
+  db.deleteVlan(vlan1.id);
+
   // Cleanup QA Datacenter & Subnet
   db.deleteSubnet(sub1.id);
   db.deleteDatacenter(newDC.id);
@@ -164,9 +217,9 @@ async function runTestSuite() {
   assert(db.getDatacenters().length === initialDcCount, 'Datacenter count restored');
 
   // ----------------------------------------------------
-  // TEST SUITE 8: Cryptographic Security & Password Hashing
+  // TEST SUITE 9: Cryptographic Security & Password Hashing
   // ----------------------------------------------------
-  console.log('\n📌 Test Suite 8: Cryptography & Zero-Plaintext Security');
+  console.log('\n📌 Test Suite 9: Cryptography & Zero-Plaintext Security');
   const userResult = db.createUser({
     name: 'Security QA Engineer',
     email: `security.qa.${Date.now()}@beyondip.net`,

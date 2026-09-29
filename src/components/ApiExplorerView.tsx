@@ -25,10 +25,55 @@ interface ApiEndpoint {
 }
 
 export const ApiExplorerView: React.FC = () => {
-  const { subnets, datacenters, isDark } = useIPAM();
+  const { subnets, datacenters, vlans, isDark } = useIPAM();
   const sampleSubnetId = subnets[0]?.id || 'sub-east-app';
+  const sampleDcId = datacenters[0]?.id || 'dc-us-east-1';
+  const sampleVlan = vlans[0];
+  const sampleVlanId = sampleVlan?.id || '';
+  const sampleVlanTag = sampleVlan?.vlanId || 100;
 
   const endpoints: ApiEndpoint[] = [
+    {
+      id: 'create-vlan',
+      method: 'POST',
+      path: '/api/vlans',
+      title: 'Create Virtual LAN (VLAN)',
+      description: 'Provision a new 802.1Q VLAN with the same exact fields as GUI (Datacenter Location, VLAN Tag 1-4094, Name, Description).',
+      defaultBody: {
+        datacenterId: sampleDcId,
+        vlanId: 210,
+        name: 'Database-Cluster-VLAN',
+        description: 'Layer-2 isolated segment for PostgreSQL and Redis nodes',
+      },
+    },
+    {
+      id: 'create-subnet',
+      method: 'POST',
+      path: '/api/subnets',
+      title: 'Allocate Subnet Prefix',
+      description: 'Allocate a new subnet prefix with the same exact options as GUI (Datacenter Scope, CIDR prefix, Associated VLAN, Private/Public classification, Description).',
+      defaultBody: {
+        datacenterId: sampleDcId,
+        cidr: '10.210.0.0/24',
+        vlanId: sampleVlanTag,
+        segmentType: 'Private',
+        description: 'Application tier container workload subnet with private RFC1918 addressing',
+      },
+    },
+    {
+      id: 'vlan-options',
+      method: 'GET',
+      path: '/api/vlans/options',
+      title: 'VLAN GUI Fields & Datacenters',
+      description: 'Returns available datacenters, 802.1Q tag limits (1-4094), and field schemas matching GUI Add VLAN.',
+    },
+    {
+      id: 'subnet-options',
+      method: 'GET',
+      path: '/api/subnets/options',
+      title: 'Subnet GUI Options & Presets',
+      description: 'Returns datacenters, available VLANs, routing segment types (Private/Public), and CIDR presets matching GUI Add Subnet.',
+    },
     {
       id: 'subnets-list',
       method: 'GET',
@@ -180,7 +225,9 @@ export const ApiExplorerView: React.FC = () => {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2.5">
+        <h1 className={`text-xl font-bold tracking-tight flex items-center gap-2.5 ${
+          isDark ? 'text-white' : 'text-slate-900'
+        }`}>
           <Code2 className="w-5 h-5 text-indigo-400" />
           Interactive REST API & Automation Explorer
         </h1>
@@ -245,7 +292,7 @@ export const ApiExplorerView: React.FC = () => {
           }`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-4 border-slate-700/50">
               <div>
-                <h3 className="font-bold text-sm text-white">{selectedEndpoint.title}</h3>
+                <h3 className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedEndpoint.title}</h3>
                 <p className="text-xs text-slate-400 mt-0.5 font-mono">{selectedEndpoint.description}</p>
               </div>
 

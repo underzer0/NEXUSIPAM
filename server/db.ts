@@ -11,6 +11,83 @@ export interface UserSession {
   expiresAt: number; // epoch ms
 }
 
+export interface CreateVlanParams {
+  vlanId?: number | string;
+  tag?: number | string;
+  vid?: number | string;
+  id?: number | string;
+  name?: string;
+  vlanName?: string;
+  vlan_name?: string;
+  description?: string;
+  notes?: string;
+  datacenterId?: string;
+  datacenter_id?: string;
+  datacenter?: string;
+  datacenterName?: string;
+}
+
+export interface UpdateVlanParams {
+  vlanId?: number | string;
+  tag?: number | string;
+  vid?: number | string;
+  name?: string;
+  vlanName?: string;
+  vlan_name?: string;
+  description?: string;
+  notes?: string;
+  datacenterId?: string;
+  datacenter_id?: string;
+  datacenter?: string;
+  datacenterName?: string;
+}
+
+export interface CreateSubnetParams {
+  cidr?: string;
+  prefix?: string;
+  subnetCidr?: string;
+  network?: string;
+  segmentType?: SegmentType | string;
+  segment_type?: SegmentType | string;
+  type?: SegmentType | string;
+  routingClassification?: SegmentType | string;
+  datacenterId?: string;
+  datacenter_id?: string;
+  datacenter?: string;
+  datacenterName?: string;
+  vlanId?: string | number | null;
+  vlan_id?: string | number | null;
+  vlan?: string | number | null;
+  vlanTag?: string | number | null;
+  vlanName?: string;
+  description?: string;
+  purpose?: string;
+  notes?: string;
+}
+
+export interface UpdateSubnetParams {
+  cidr?: string;
+  prefix?: string;
+  subnetCidr?: string;
+  network?: string;
+  segmentType?: SegmentType | string;
+  segment_type?: SegmentType | string;
+  type?: SegmentType | string;
+  routingClassification?: SegmentType | string;
+  datacenterId?: string;
+  datacenter_id?: string;
+  datacenter?: string;
+  datacenterName?: string;
+  vlanId?: string | number | null;
+  vlan_id?: string | number | null;
+  vlan?: string | number | null;
+  vlanTag?: string | number | null;
+  vlanName?: string;
+  description?: string;
+  purpose?: string;
+  notes?: string;
+}
+
 class IPAMDatabase {
   private datacenters: Datacenter[] = [];
   private vlans: VLAN[] = [];
@@ -426,6 +503,166 @@ class IPAMDatabase {
     return { success: true, deletedId: id };
   }
 
+  public resolveDatacenter(datacenterInput?: string): Datacenter {
+    if (!this.datacenters.length) {
+      throw new Error('No Datacenters configured. Please create a Datacenter first.');
+    }
+    if (!datacenterInput || !datacenterInput.trim()) {
+      return this.datacenters[0];
+    }
+    const trimmed = datacenterInput.trim();
+    // 1. Direct ID match
+    let found = this.datacenters.find(d => d.id === trimmed);
+    if (found) return found;
+
+    // 2. Case-insensitive exact name match
+    found = this.datacenters.find(d => d.name.toLowerCase() === trimmed.toLowerCase());
+    if (found) return found;
+
+    // 3. Case-insensitive partial name or location match
+    found = this.datacenters.find(d => 
+      d.name.toLowerCase().includes(trimmed.toLowerCase()) || 
+      d.location.toLowerCase().includes(trimmed.toLowerCase())
+    );
+    if (found) return found;
+
+    throw new Error(`Datacenter "${datacenterInput}" not found. Available datacenters: ${this.datacenters.map(d => `${d.name} (${d.id})`).join(', ')}`);
+  }
+
+  public resolveVlan(vlanInput: string | number | null | undefined, datacenterId: string): VLAN | null {
+    if (vlanInput === undefined || vlanInput === null || vlanInput === '' || vlanInput === 0) {
+      return null;
+    }
+    const trimmed = typeof vlanInput === 'string' ? vlanInput.trim() : String(vlanInput);
+    if (trimmed.toLowerCase() === 'none' || trimmed === '' || trimmed === 'null' || trimmed === 'undefined') {
+      return null;
+    }
+
+    const dc = this.datacenters.find(d => d.id === datacenterId);
+    const dcName = dc?.name || datacenterId;
+
+    // 1. Direct ID match
+    let found = this.vlans.find(v => v.id === trimmed);
+    if (found) {
+      if (found.datacenterId !== datacenterId) {
+        throw new Error(`Selected VLAN (ID: ${found.vlanId}) belongs to a different Datacenter! VLANs must match the Subnet's Datacenter.`);
+      }
+      return found;
+    }
+
+    // 2. 802.1Q Tag (number) match within the specified Datacenter
+    const numericTag = Number(trimmed);
+    if (!isNaN(numericTag) && numericTag >= 1 && numericTag <= 4094) {
+      found = this.vlans.find(v => v.datacenterId === datacenterId && v.vlanId === numericTag);
+      if (found) return found;
+
+      // Check if tag exists in another Datacenter for clear error message
+      const otherDcVlan = this.vlans.find(v => v.vlanId === numericTag);
+      if (otherDcVlan) {
+        throw new Error(`Selected VLAN (Tag: ${numericTag}) belongs to a different Datacenter! VLANs must match the Subnet's Datacenter.`);
+      }
+    }
+
+    // 3. Name match within the specified Datacenter
+    found = this.vlans.find(v => v.datacenterId === datacenterId && v.name.toLowerCase() === trimmed.toLowerCase());
+    if (found) return found;
+
+    throw new Error(`VLAN "${vlanInput}" not found in Datacenter "${dcName}". Specify a valid VLAN Tag (1-4094), VLAN ID, or "none".`);
+  }
+
+  public getVlanOptions() {
+    return {
+      datacenters: this.datacenters.map(d => ({ id: d.id, name: d.name, location: d.location })),
+      vlanIdRange: { min: 1, max: 4094, standard: 'IEEE 802.1Q VID' },
+      fields: [
+        {
+          name: 'datacenterId',
+          aliases: ['datacenter', 'datacenterName'],
+          type: 'string',
+          required: true,
+          description: 'Datacenter Location ID or Name (defaults to primary datacenter if omitted)',
+          guiDefault: this.datacenters[0]?.id || ''
+        },
+        {
+          name: 'vlanId',
+          aliases: ['tag', 'vid', 'vlan_id'],
+          type: 'number',
+          required: true,
+          description: 'VLAN ID (802.1Q Tag between 1 and 4094). Unique per Datacenter.'
+        },
+        {
+          name: 'name',
+          aliases: ['vlanName', 'vlan_name'],
+          type: 'string',
+          required: true,
+          description: 'VLAN Name (e.g. DMZ-Edge-Traffic, App-Tier, DB-Cluster)'
+        },
+        {
+          name: 'description',
+          aliases: ['notes'],
+          type: 'string',
+          required: false,
+          description: 'Optional layer-2 routing or security segment notes'
+        }
+      ]
+    };
+  }
+
+  public getSubnetOptions() {
+    return {
+      datacenters: this.datacenters.map(d => ({ id: d.id, name: d.name, location: d.location })),
+      vlans: this.vlans.map(v => ({ id: v.id, vlanId: v.vlanId, name: v.name, datacenterId: v.datacenterId })),
+      segmentTypes: [
+        { value: 'Private', description: 'Private (RFC1918 / IPv6 ULA fd00::/8)' },
+        { value: 'Public', description: 'Publicly Routed (Global)' }
+      ],
+      presets: [
+        { label: 'IPv4 /24', cidr: '10.10.100.0/24' },
+        { label: 'IPv4 /26', cidr: '172.16.50.0/26' },
+        { label: 'IPv6 ULA /64', cidr: 'fd00:10:10::/64' },
+        { label: 'IPv6 Public /64', cidr: '2001:db8:1000::/64' }
+      ],
+      fields: [
+        {
+          name: 'datacenterId',
+          aliases: ['datacenter', 'datacenterName'],
+          type: 'string',
+          required: true,
+          description: 'Datacenter Scope ID or Name (defaults to primary datacenter if omitted)',
+          guiDefault: this.datacenters[0]?.id || ''
+        },
+        {
+          name: 'cidr',
+          aliases: ['prefix', 'subnetCidr', 'network'],
+          type: 'string',
+          required: true,
+          description: 'Subnet CIDR Prefix (IPv4 e.g. 10.10.100.0/24 or IPv6 e.g. fd00:10:10::/64, 2001:db8::/64)'
+        },
+        {
+          name: 'vlanId',
+          aliases: ['vlan', 'vlanTag', 'vlanName'],
+          type: 'string | number | null',
+          required: false,
+          description: 'Associated VLAN in target Datacenter (UUID, 802.1Q tag number like 100, or "none" for un-tagged L3)'
+        },
+        {
+          name: 'segmentType',
+          aliases: ['segment_type', 'type', 'routingClassification'],
+          type: 'string ("Private" | "Public")',
+          required: false,
+          description: 'Routing classification. Auto-detected from CIDR if omitted (RFC1918/ULA -> Private, else Public)'
+        },
+        {
+          name: 'description',
+          aliases: ['purpose', 'notes'],
+          type: 'string',
+          required: false,
+          description: 'Subnet purpose or workload description'
+        }
+      ]
+    };
+  }
+
   // --- VLAN CRUD ---
   public getVlans(datacenterId?: string): VLAN[] {
     if (datacenterId) {
@@ -438,30 +675,34 @@ class IPAMDatabase {
     return this.vlans.find(v => v.id === id);
   }
 
-  public createVlan(data: { vlanId: number; name: string; description: string; datacenterId: string }): VLAN {
-    const vlanNum = Number(data.vlanId);
-    if (isNaN(vlanNum) || vlanNum < 1 || vlanNum > 4094) {
-      throw new Error('VLAN ID must be an integer between 1 and 4094');
+  public createVlan(data: CreateVlanParams): VLAN {
+    const rawVlanId = data.vlanId ?? data.tag ?? data.vid ?? data.id;
+    const vlanNum = Number(rawVlanId);
+    if (rawVlanId === undefined || isNaN(vlanNum) || vlanNum < 1 || vlanNum > 4094) {
+      throw new Error('VLAN ID must be a valid 802.1Q tag between 1 and 4094');
     }
-    if (!data.name?.trim()) throw new Error('VLAN name is required');
-    if (!data.datacenterId) throw new Error('Target Datacenter is required');
 
-    const dc = this.datacenters.find(d => d.id === data.datacenterId);
-    if (!dc) throw new Error(`Datacenter with ID ${data.datacenterId} does not exist`);
+    const name = (data.name ?? data.vlanName ?? data.vlan_name)?.trim();
+    if (!name) {
+      throw new Error('VLAN Name is required.');
+    }
+
+    const dc = this.resolveDatacenter(data.datacenterId ?? data.datacenter_id ?? data.datacenter ?? data.datacenterName);
 
     // Uniqueness constraint: (datacenterId + vlanId) must be unique
-    const existing = this.vlans.find(v => v.datacenterId === data.datacenterId && v.vlanId === vlanNum);
+    const existing = this.vlans.find(v => v.datacenterId === dc.id && v.vlanId === vlanNum);
     if (existing) {
       throw new Error(`VLAN ID ${vlanNum} already exists in Datacenter "${dc.name}". VLAN IDs must be unique within the same Datacenter.`);
     }
 
-    const id = `vlan-${data.datacenterId}-${vlanNum}-${Date.now().toString(36)}`;
+    const desc = (data.description ?? data.notes ?? '').trim();
+    const id = `vlan-${dc.id}-${vlanNum}-${Date.now().toString(36)}`;
     const newVlan: VLAN = {
       id,
       vlanId: vlanNum,
-      name: data.name.trim(),
-      description: data.description?.trim() || '',
-      datacenterId: data.datacenterId,
+      name,
+      description: desc,
+      datacenterId: dc.id,
       createdAt: new Date().toISOString(),
     };
     this.vlans.push(newVlan);
@@ -471,34 +712,38 @@ class IPAMDatabase {
     return newVlan;
   }
 
-  public updateVlan(id: string, data: { vlanId?: number; name?: string; description?: string; datacenterId?: string }): VLAN {
+  public updateVlan(id: string, data: UpdateVlanParams): VLAN {
     const index = this.vlans.findIndex(v => v.id === id);
     if (index === -1) throw new Error(`VLAN ${id} not found`);
 
     const current = this.vlans[index];
-    const targetDcId = data.datacenterId || current.datacenterId;
-    const targetVlanId = data.vlanId !== undefined ? Number(data.vlanId) : current.vlanId;
+    const targetDc = (data.datacenterId || data.datacenter_id || data.datacenter || data.datacenterName)
+      ? this.resolveDatacenter(data.datacenterId || data.datacenter_id || data.datacenter || data.datacenterName)
+      : this.resolveDatacenter(current.datacenterId);
+
+    const rawVlanId = data.vlanId ?? data.tag ?? data.vid;
+    const targetVlanId = rawVlanId !== undefined ? Number(rawVlanId) : current.vlanId;
 
     if (isNaN(targetVlanId) || targetVlanId < 1 || targetVlanId > 4094) {
-      throw new Error('VLAN ID must be an integer between 1 and 4094');
+      throw new Error('VLAN ID must be a valid 802.1Q tag between 1 and 4094');
     }
-
-    // Verify Datacenter exists
-    const dc = this.datacenters.find(d => d.id === targetDcId);
-    if (!dc) throw new Error(`Datacenter ${targetDcId} does not exist`);
 
     // Check duplicate in same DC
-    const duplicate = this.vlans.find(v => v.id !== id && v.datacenterId === targetDcId && v.vlanId === targetVlanId);
+    const duplicate = this.vlans.find(v => v.id !== id && v.datacenterId === targetDc.id && v.vlanId === targetVlanId);
     if (duplicate) {
-      throw new Error(`VLAN ID ${targetVlanId} already exists in Datacenter "${dc.name}".`);
+      throw new Error(`VLAN ID ${targetVlanId} already exists in Datacenter "${targetDc.name}".`);
     }
 
-    if (data.name) current.name = data.name.trim();
-    if (data.description !== undefined) current.description = data.description.trim();
-    current.datacenterId = targetDcId;
+    const name = (data.name ?? data.vlanName ?? data.vlan_name)?.trim();
+    if (name) current.name = name;
+
+    const desc = data.description ?? data.notes;
+    if (desc !== undefined) current.description = desc.trim();
+
+    current.datacenterId = targetDc.id;
     current.vlanId = targetVlanId;
 
-    this.logActivity('UPDATE', 'VLAN', current.id, `VLAN ${current.vlanId} Updated`, `Updated "${current.name}" in ${dc.name}`);
+    this.logActivity('UPDATE', 'VLAN', current.id, `VLAN ${current.vlanId} Updated`, `Updated "${current.name}" in ${targetDc.name}`);
     this.persist();
     mysqlEngine.saveVlan(current).catch(() => {});
     return current;
@@ -540,36 +785,49 @@ class IPAMDatabase {
     return this.subnets.find(s => s.id === id);
   }
 
-  public createSubnet(data: { cidr: string; segmentType?: SegmentType; datacenterId: string; vlanId?: string | null; description?: string }): Subnet {
-    if (!data.cidr?.trim()) throw new Error('CIDR notation is required');
-    if (!isValidCIDR(data.cidr.trim())) {
-      throw new Error(`Invalid CIDR format: "${data.cidr}". Expected IPv4 (e.g. 10.10.10.0/24) or IPv6 (e.g. 2001:db8::/64, fd00:10::/64)`);
+  public createSubnet(data: CreateSubnetParams): Subnet {
+    const rawCidr = (data.cidr ?? data.prefix ?? data.subnetCidr ?? data.network)?.trim();
+    if (!rawCidr) {
+      throw new Error('CIDR Prefix is required (e.g. 10.10.100.0/24 or 2001:db8:10::/64).');
+    }
+    if (!isValidCIDR(rawCidr)) {
+      throw new Error(`Invalid CIDR format: "${rawCidr}". Please provide a valid IPv4 (e.g. 10.10.100.0/24) or IPv6 (e.g. fd00:10::/64, 2001:db8::/64).`);
     }
 
-    const calc = parseCIDR(data.cidr.trim());
+    const calc = parseCIDR(rawCidr);
     const normalizedCidr = calc.cidr;
 
-    if (!data.datacenterId) throw new Error('Datacenter is required for Subnet');
-    const dc = this.datacenters.find(d => d.id === data.datacenterId);
-    if (!dc) throw new Error(`Datacenter with ID ${data.datacenterId} not found`);
+    // Resolve Datacenter
+    const dc = this.resolveDatacenter(data.datacenterId ?? data.datacenter_id ?? data.datacenter ?? data.datacenterName);
 
-    if (data.vlanId) {
-      const vlan = this.vlans.find(v => v.id === data.vlanId);
-      if (!vlan) throw new Error(`VLAN with ID ${data.vlanId} not found`);
-      if (vlan.datacenterId !== data.datacenterId) {
-        throw new Error(`Selected VLAN (ID: ${vlan.vlanId}) belongs to a different Datacenter! VLANs must match the Subnet's Datacenter.`);
-      }
-    }
+    // Resolve VLAN (if specified)
+    const rawVlan = data.vlanId ?? data.vlan_id ?? data.vlan ?? data.vlanTag ?? data.vlanName;
+    const vlan = this.resolveVlan(rawVlan, dc.id);
 
     // Check duplicate CIDR in same Datacenter
-    const duplicate = this.subnets.find(s => s.datacenterId === data.datacenterId && s.cidr === normalizedCidr);
+    const duplicate = this.subnets.find(s => s.datacenterId === dc.id && s.cidr === normalizedCidr);
     if (duplicate) {
       throw new Error(`Subnet CIDR ${normalizedCidr} is already assigned in Datacenter "${dc.name}".`);
     }
 
-    // Determine segment type (auto-detect if not provided, or respect user selection)
-    const inferredType: SegmentType = calc.isPrivate ? 'Private' : 'Public';
-    const segmentType: SegmentType = data.segmentType || inferredType;
+    // Determine segment type (auto-detect RFC1918 / ULA if omitted, or validate user choice)
+    let segmentType: SegmentType;
+    const rawSegment = data.segmentType ?? data.segment_type ?? data.type ?? data.routingClassification;
+    if (rawSegment) {
+      const lower = String(rawSegment).trim().toLowerCase();
+      if (lower === 'private') {
+        segmentType = 'Private';
+      } else if (lower === 'public') {
+        segmentType = 'Public';
+      } else {
+        throw new Error(`Invalid segment routing classification: "${rawSegment}". Options are "Private" (RFC1918 / ULA) or "Public".`);
+      }
+    } else {
+      segmentType = calc.isPrivate ? 'Private' : 'Public';
+    }
+
+    const rawDesc = data.description ?? data.purpose ?? data.notes;
+    const description = rawDesc?.trim() || `${calc.ipVersion} ${segmentType} Subnet ${normalizedCidr}`;
 
     const id = `sub-${normalizedCidr.replace(/[\.\:\/]/g, '-')}-${Date.now().toString(36)}`;
     const newSubnet: Subnet = {
@@ -577,9 +835,9 @@ class IPAMDatabase {
       cidr: normalizedCidr,
       ipVersion: calc.ipVersion,
       segmentType,
-      datacenterId: data.datacenterId,
-      vlanId: data.vlanId || null,
-      description: data.description?.trim() || `${calc.ipVersion} ${segmentType} Subnet ${normalizedCidr}`,
+      datacenterId: dc.id,
+      vlanId: vlan ? vlan.id : null,
+      description,
       createdAt: new Date().toISOString(),
     };
     this.subnets.push(newSubnet);
@@ -589,13 +847,17 @@ class IPAMDatabase {
     return newSubnet;
   }
 
-  public updateSubnet(id: string, data: { cidr?: string; segmentType?: SegmentType; datacenterId?: string; vlanId?: string | null; description?: string }): Subnet {
+  public updateSubnet(id: string, data: UpdateSubnetParams): Subnet {
     const index = this.subnets.findIndex(s => s.id === id);
     if (index === -1) throw new Error(`Subnet ${id} not found`);
 
     const current = this.subnets[index];
-    const targetDcId = data.datacenterId || current.datacenterId;
-    const targetCidr = data.cidr ? data.cidr.trim() : current.cidr;
+    const targetDc = (data.datacenterId || data.datacenter_id || data.datacenter || data.datacenterName)
+      ? this.resolveDatacenter(data.datacenterId || data.datacenter_id || data.datacenter || data.datacenterName)
+      : this.resolveDatacenter(current.datacenterId);
+
+    const rawCidr = (data.cidr ?? data.prefix ?? data.subnetCidr ?? data.network)?.trim();
+    const targetCidr = rawCidr || current.cidr;
 
     if (!isValidCIDR(targetCidr)) {
       throw new Error(`Invalid CIDR format: "${targetCidr}". Expected IPv4 or IPv6 CIDR (e.g. 10.10.10.0/24 or 2001:db8::/64)`);
@@ -605,7 +867,7 @@ class IPAMDatabase {
     const normalizedCidr = calc.cidr;
 
     // Check duplicate in same DC
-    const duplicate = this.subnets.find(s => s.id !== id && s.datacenterId === targetDcId && s.cidr === normalizedCidr);
+    const duplicate = this.subnets.find(s => s.id !== id && s.datacenterId === targetDc.id && s.cidr === normalizedCidr);
     if (duplicate) {
       throw new Error(`Subnet CIDR ${normalizedCidr} already exists in this Datacenter.`);
     }
@@ -619,26 +881,36 @@ class IPAMDatabase {
       }
     }
 
-    if (data.vlanId !== undefined) {
-      if (data.vlanId) {
-        const vlan = this.vlans.find(v => v.id === data.vlanId);
-        if (!vlan) throw new Error(`VLAN ${data.vlanId} not found`);
-        if (vlan.datacenterId !== targetDcId) {
-          throw new Error(`Selected VLAN belongs to a different Datacenter.`);
-        }
-        current.vlanId = data.vlanId;
+    // Resolve VLAN if passed
+    const rawVlan = data.vlanId ?? data.vlan_id ?? data.vlan ?? data.vlanTag ?? data.vlanName;
+    if (rawVlan !== undefined) {
+      const vlan = this.resolveVlan(rawVlan, targetDc.id);
+      current.vlanId = vlan ? vlan.id : null;
+    }
+
+    // Resolve segmentType if passed
+    const rawSegment = data.segmentType ?? data.segment_type ?? data.type ?? data.routingClassification;
+    if (rawSegment !== undefined) {
+      const lower = String(rawSegment).trim().toLowerCase();
+      if (lower === 'private') {
+        current.segmentType = 'Private';
+      } else if (lower === 'public') {
+        current.segmentType = 'Public';
       } else {
-        current.vlanId = null;
+        throw new Error(`Invalid segment routing classification: "${rawSegment}". Options are "Private" or "Public".`);
       }
+    }
+
+    const rawDesc = data.description ?? data.purpose ?? data.notes;
+    if (rawDesc !== undefined) {
+      current.description = rawDesc.trim();
     }
 
     current.cidr = normalizedCidr;
     current.ipVersion = calc.ipVersion;
-    current.datacenterId = targetDcId;
-    if (data.segmentType) current.segmentType = data.segmentType;
-    if (data.description !== undefined) current.description = data.description.trim();
+    current.datacenterId = targetDc.id;
 
-    this.logActivity('UPDATE', 'Subnet', current.id, `Subnet ${current.cidr} Updated`, `Updated settings for subnet in DC.`);
+    this.logActivity('UPDATE', 'Subnet', current.id, `Subnet ${current.cidr} Updated`, `Updated configuration in ${targetDc.name}`);
     this.persist();
     mysqlEngine.saveSubnet(current).catch(() => {});
     return current;
