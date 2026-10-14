@@ -19,7 +19,7 @@ function getSessionUser(req: Request): UserProfile | null {
 }
 
 // Only what other engineers need to see; never API keys or contact details.
-export const publicUser = (u: UserProfile) => ({ id: u.id, name: u.name, email: u.email, role: u.role, department: u.department });
+const publicUser = (u: UserProfile) => ({ id: u.id, name: u.name, email: u.email, role: u.role, department: u.department });
 
 const PUBLIC_PATHS = new Set(['/health', '/db/retry', '/bootstrap', '/auth/me', '/auth/signin', '/auth/signout', '/auth/signup']);
 
@@ -137,8 +137,6 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
       const ips = db.getIPs();
       const stats = db.getStats();
       const activityLogs = db.getActivityLogs();
-      const users = db.getUsers().map(publicUser);
-
       res.json({
         success: true,
         dbConnected: true,
@@ -150,7 +148,6 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
           stats,
           activityLogs,
           currentUser,
-          users,
         },
       });
     } catch (err: any) {
@@ -578,7 +575,6 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
         primaryDatacenterId,
       });
       res.cookie(SESSION_COOKIE_NAME, session.token, SESSION_COOKIE_OPTIONS);
-      broadcast('USER_CREATED', publicUser(user));
       res.status(201).json({ success: true, data: { user } });
     } catch (err: any) {
       res.status(400).json({ success: false, error: err.message });

@@ -31,17 +31,12 @@ interface IPAMContextType {
   stats: IPAMStats | null;
   activityLogs: ActivityLog[];
   currentUser: UserProfile;
-  users: UserProfile[];
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
   wsConnected: boolean;
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
-  selectedDatacenterId: string | null;
-  setSelectedDatacenterId: (id: string | null) => void;
-  selectedSubnetForVisualizer: Subnet | null;
-  setSelectedSubnetForVisualizer: (subnet: Subnet | null) => void;
   
   // Filtering
   filters: FilterState;
@@ -70,7 +65,6 @@ interface IPAMContextType {
     primaryDatacenterId?: string;
     password?: string;
   }) => Promise<UserProfile>;
-  generateNewApiKey: () => Promise<string>;
 
   createDatacenter: (data: { name: string; location: string; description: string }) => Promise<Datacenter>;
   updateDatacenter: (id: string, data: { name?: string; location?: string; description?: string }) => Promise<Datacenter>;
@@ -90,7 +84,6 @@ interface IPAMContextType {
 
   reserveNextIP: (subnetId: string, data: { assignedDevice?: string; description?: string }) => Promise<IPAddress>;
   bulkGenerateIPs: (subnetId: string, options: { count: number; startingOffset?: number; status?: IPStatus }) => Promise<IPAddress[]>;
-  fetchNextAvailableIP: (subnetId: string) => Promise<{ availableIP: string | null; subnetCidr: string; totalUsable: number; allocatedCount: number }>;
   getNextAvailableIP: (subnetId: string) => Promise<{ availableIP: string | null; subnetCidr: string; totalUsable: number; allocatedCount: number }>;
 }
 
@@ -113,14 +106,11 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [stats, setStats] = useState<IPAMStats | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [currentUser, setCurrentUser] = useState<UserProfile>(emptyUser);
-  const [users, setUsers] = useState<UserProfile[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [wsConnected, setWsConnected] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
-  const [selectedDatacenterId, setSelectedDatacenterId] = useState<string | null>(null);
-  const [selectedSubnetForVisualizer, setSelectedSubnetForVisualizer] = useState<Subnet | null>(null);
 
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -163,8 +153,6 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIps(json.data.ips || []);
         setStats(json.data.stats || null);
         setActivityLogs(json.data.activityLogs || []);
-        const loadedUsers = Array.isArray(json.data.users) ? json.data.users : [];
-        setUsers(loadedUsers);
 
         if (json.data.currentUser && json.data.currentUser.id) {
           setCurrentUser(json.data.currentUser);
@@ -274,27 +262,14 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setIps(msg.payload.ips || []);
             setStats(msg.payload.stats || null);
             setActivityLogs(msg.payload.activityLogs || []);
-            if (msg.payload.users && Array.isArray(msg.payload.users)) {
-              setUsers(msg.payload.users);
-            }
             setLoading(false);
           }
           break;
 
         case 'USER_UPDATED':
           if (msg.payload) {
-            setUsers(prev => prev.map(u => u.id === msg.payload.id ? msg.payload : u));
             // Broadcasts carry public fields only; keep our own private ones.
             setCurrentUser(prev => prev.id === msg.payload.id ? { ...prev, ...msg.payload } : prev);
-          }
-          break;
-
-        case 'USER_CREATED':
-          if (msg.payload) {
-            setUsers(prev => {
-              if (prev.some(u => u.id === msg.payload.id)) return prev;
-              return [...prev, msg.payload];
-            });
           }
           break;
 
@@ -593,7 +568,6 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!json.success) throw new Error(json.error || 'Failed to update profile');
       const updatedUser = json.data;
       setCurrentUser(updatedUser);
-      setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
       return updatedUser;
     } catch (err: any) {
       throw err;
@@ -648,22 +622,8 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newUser: UserProfile = json.data?.user || json.data;
     setCurrentUser(newUser);
     setIsAuthenticated(true);
-    setUsers(prev => [...prev.filter(u => u.id !== newUser.id), newUser]);
     setActiveTab('dashboard');
     return newUser;
-  };
-
-  const generateNewApiKey = async (): Promise<string> => {
-    const res = await fetch('/api/user/generate-api-key', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    const json = await res.json();
-    if (!json.success) throw new Error(json.error || 'Failed to generate API token');
-    if (json.data?.user) {
-      setCurrentUser(json.data.user);
-    }
-    return json.data.apiKey;
   };
 
   return (
@@ -676,17 +636,12 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         stats,
         activityLogs,
         currentUser,
-        users,
         isAuthenticated,
         loading,
         error,
         wsConnected,
         activeTab,
         setActiveTab,
-        selectedDatacenterId,
-        setSelectedDatacenterId,
-        selectedSubnetForVisualizer,
-        setSelectedSubnetForVisualizer,
         filters,
         setFilters,
         resetFilters,
@@ -698,7 +653,6 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signIn,
         signOut,
         signUpUser,
-        generateNewApiKey,
         createDatacenter,
         updateDatacenter,
         deleteDatacenter,
@@ -713,7 +667,6 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteIP,
         reserveNextIP,
         bulkGenerateIPs,
-        fetchNextAvailableIP,
         getNextAvailableIP: fetchNextAvailableIP,
       }}
     >

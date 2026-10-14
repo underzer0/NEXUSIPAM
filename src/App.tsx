@@ -22,7 +22,8 @@ import { BulkGenerateModal } from './components/modals/BulkGenerateModal';
 import { AuditLogModal } from './components/modals/AuditLogModal';
 import { Datacenter, VLAN, Subnet, IPAddress } from './types/ipam';
 import { BeyondIPLogo } from './components/BeyondIPLogo';
-import { Sun, Moon, AlertTriangle, Database, RefreshCw, FileCode } from 'lucide-react';
+import { Sun, Moon, AlertTriangle, RefreshCw } from 'lucide-react';
+import { card, iconButton, muted, primaryButton } from './components/ui';
 
 const MainAppContent: React.FC = () => {
   const { activeTab, isDark, loading, error, isAuthenticated, toggleTheme, retryDatabaseConnection } = useIPAM();
@@ -129,133 +130,59 @@ const MainAppContent: React.FC = () => {
     }
   };
 
+  const themeButton = (
+    <button type="button" onClick={toggleTheme} className={`${iconButton} border border-slate-200 dark:border-slate-800`} aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
+      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
+  );
+
   if (loading) {
     return (
-      <div className={`flex items-center justify-center min-h-screen ${isDark ? 'bg-[#0F172A] text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500"></div>
-          <span className="text-sm font-medium text-slate-400 font-mono">Connecting to MySQL Database...</span>
-        </div>
+      <div className="flex min-h-screen items-center justify-center" role="status">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+        <span className="sr-only">Loading</span>
       </div>
     );
   }
 
-  // Dedicated Database Error Screen if MySQL failed to connect
+  // Shared frame for the screens shown before the main app is available.
+  const bare = (children: React.ReactNode) => (
+    <div className="flex min-h-screen flex-col p-4 sm:p-6">
+      <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
+        <BeyondIPLogo size="md" variant="full" />
+        {themeButton}
+      </div>
+      <div className="flex flex-1 items-center justify-center py-6">{children}</div>
+    </div>
+  );
+
   if (error) {
-    return (
-      <div className={`min-h-screen w-full flex flex-col justify-between p-4 sm:p-6 transition-colors font-sans antialiased ${
-        isDark ? 'bg-[#0F172A] text-slate-100' : 'bg-slate-50 text-slate-900'
-      }`}>
-        <div className="flex items-center justify-between max-w-4xl w-full mx-auto">
-          <BeyondIPLogo size="md" variant="full" />
-          <button
-            id="btn-error-theme-toggle"
-            onClick={toggleTheme}
-            className={`px-3 py-1.5 rounded-xl border text-xs flex items-center gap-1.5 transition-all ${
-              isDark ? 'border-slate-700 bg-slate-800 text-amber-400 hover:bg-slate-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-            <span className="font-medium">{isDark ? 'Light' : 'Dark'}</span>
+    return bare(
+      <div className={`${card} w-full max-w-lg space-y-5 p-6`}>
+        <div className="flex items-center gap-3">
+          <AlertTriangle className="h-6 w-6 shrink-0 text-rose-500" />
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Can’t reach the database</h1>
+        </div>
+        <p className="break-words rounded-xl bg-rose-500/10 p-3 font-mono text-sm text-rose-700 dark:text-rose-300">{error}</p>
+        <p className={`text-sm ${muted}`}>
+          Check the host, port, user and password in <code className="font-mono">config/mysql.config.json</code>, then try again.
+        </p>
+        <div className="flex justify-end">
+          <button id="btn-retry-db-connection" type="button" onClick={handleRetryConnection} disabled={isRetryingDb} className={`${primaryButton} disabled:opacity-50`}>
+            <RefreshCw className={`h-4 w-4 ${isRetryingDb ? 'animate-spin' : ''}`} />
+            {isRetryingDb ? 'Retrying…' : 'Try again'}
           </button>
-        </div>
-
-        <div className="max-w-2xl w-full mx-auto my-8">
-          <div className={`rounded-2xl border p-6 sm:p-8 shadow-2xl space-y-6 ${
-            isDark ? 'bg-slate-900/90 border-rose-500/30' : 'bg-white border-rose-200 shadow-rose-100'
-          }`}>
-            <div className="flex items-center gap-4 pb-4 border-b border-rose-500/20">
-              <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-500 shrink-0">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-slate-900 dark:text-white">
-                  Database Connection Error
-                </h1>
-                <p className="text-xs text-rose-400 font-medium">
-                  Failed to establish connection with MySQL server
-                </p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 space-y-1.5">
-              <span className="text-xs font-semibold text-rose-300 uppercase tracking-wider font-mono">
-                Error Details
-              </span>
-              <p className="text-sm font-mono text-rose-400 break-all">
-                {error}
-              </p>
-            </div>
-
-            <div className={`p-4 rounded-xl border space-y-2 text-xs ${
-              isDark ? 'bg-slate-950 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
-            }`}>
-              <div className="flex items-center gap-2 font-semibold text-indigo-400">
-                <FileCode className="w-4 h-4" />
-                <span>Configuration File: <code>config/mysql.config.json</code></span>
-              </div>
-              <p className="text-slate-400 leading-relaxed">
-                Please verify or update your host, port, credentials, and database name in <strong><code>/config/mysql.config.json</code></strong>. Once saved, click below to retry the connection.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                id="btn-retry-db-connection"
-                onClick={handleRetryConnection}
-                disabled={isRetryingDb}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <RefreshCw className={`w-4 h-4 ${isRetryingDb ? 'animate-spin' : ''}`} />
-                <span>{isRetryingDb ? 'Retrying Connection...' : 'Retry Connection'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="text-center text-xs text-slate-400 dark:text-slate-500 py-3 border-t border-slate-200 dark:border-slate-800/60 max-w-4xl w-full mx-auto">
-          <span>BeyondIP Enterprise &bull; Strict MySQL Storage Mode</span>
         </div>
       </div>
     );
   }
 
-  // Standalone Auth Layout when logged out
   if (!isAuthenticated) {
-    return (
-      <div className={`min-h-screen w-full flex flex-col justify-between p-4 sm:p-6 transition-colors font-sans antialiased ${
-        isDark ? 'bg-[#0F172A] text-slate-100 dark' : 'bg-slate-50 text-slate-900'
-      }`}>
-        {/* Top Bar with Brand & Theme Toggle */}
-        <div className="flex items-center justify-between max-w-5xl w-full mx-auto">
-          <BeyondIPLogo size="md" variant="full" />
-
-          <button
-            id="btn-auth-theme-toggle"
-            onClick={toggleTheme}
-            className={`px-3 py-1.5 rounded-xl border text-xs flex items-center gap-1.5 transition-all ${
-              isDark ? 'border-slate-700 bg-slate-800 text-amber-400 hover:bg-slate-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
-            }`}
-            title={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-          >
-            {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-            <span className="font-medium">{isDark ? 'Light' : 'Dark'}</span>
-          </button>
-        </div>
-
-        {/* Auth View (Sign In or Sign Up) */}
-        <div className="w-full flex-1 flex items-center justify-center py-6">
-          {activeTab === 'signup' ? <SignUpView /> : <SignInView />}
-        </div>
-
-      </div>
-    );
+    return bare(activeTab === 'signup' ? <SignUpView /> : <SignInView />);
   }
 
   return (
-    <div className={`flex h-screen w-full overflow-hidden font-sans antialiased ${
-      isDark ? 'bg-[#0F172A] text-slate-300 dark' : 'bg-slate-100 text-slate-900'
-    }`}>
+    <div className="flex h-screen w-full overflow-hidden">
       {/* Navigation Sidebar */}
       <Sidebar 
         collapsed={sidebarCollapsed} 

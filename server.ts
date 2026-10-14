@@ -5,7 +5,7 @@ import fs from 'fs';
 import cookieParser from 'cookie-parser';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer as createViteServer } from 'vite';
-import { createApiRouter, publicUser } from './server/routes';
+import { createApiRouter } from './server/routes';
 import { db } from './server/db';
 import { WSAction, WSMessage } from './src/types/ipam';
 
@@ -64,7 +64,6 @@ async function startServer() {
         ips: db.getIPs(),
         stats: db.getStats(),
         activityLogs: db.getActivityLogs(),
-        users: db.getUsers().map(publicUser),
       },
       timestamp: new Date().toISOString(),
     };

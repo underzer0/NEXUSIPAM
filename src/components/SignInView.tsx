@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useIPAM } from '../context/IPAMContext';
-import { BeyondIPLogo } from './BeyondIPLogo';
 import { card, input, linkButton, muted, primaryButton } from './ui';
 
 // Shared frame for the sign-in and sign-up pages.
@@ -11,12 +10,9 @@ export const AuthShell: React.FC<{ title: string; error: string | null; footer: 
   footer,
   children,
 }) => (
-  <div className="flex min-h-[85vh] items-center justify-center px-4 py-10">
+  <div className="flex w-full items-center justify-center">
     <div className="w-full max-w-sm space-y-6">
-      <div className="flex flex-col items-center gap-3 text-center">
-        <BeyondIPLogo size="xl" variant="icon" />
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{title}</h1>
-      </div>
+      <h1 className="text-center text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{title}</h1>
       <div className={`${card} space-y-5 p-6`}>
         {error && (
           <p role="alert" className="rounded-xl bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">
