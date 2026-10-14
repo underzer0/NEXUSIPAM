@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { useIPAM } from '../context/IPAMContext';
-import { BookmarkCheck, Check, Copy, Database, Edit, Hash, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { Check, Copy, Database, Edit, Hash, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { IPAddress, IPStatus, Subnet } from '../types/ipam';
 import { Segmented, card, chipNeutral, iconButton, input, linkButton, muted, percentOf, primaryButton, secondaryButton } from './ui';
 
 interface IPDirectoryViewProps {
   onOpenNewIPModal: () => void;
   onOpenEditIPModal: (ip: IPAddress) => void;
-  onOpenReserveNextModal: (subnetId?: string) => void;
   onOpenBulkGenerateModal: () => void;
 }
 
@@ -27,7 +26,6 @@ const versionOf = (ip: IPAddress) => ip.ipVersion || (ip.ipAddress.includes(':')
 export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
   onOpenNewIPModal,
   onOpenEditIPModal,
-  onOpenReserveNextModal,
   onOpenBulkGenerateModal,
 }) => {
   const { ips, subnets, datacenters, vlans, deleteIP, filters, setFilters, resetFilters } = useIPAM();
@@ -94,9 +92,6 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
           IP addresses <span className={`font-mono text-base font-medium ${muted}`}>{filteredIPs.length}</span>
         </h1>
         <div className="flex flex-wrap gap-2">
-          <button id="btn-reserve-next-ip" type="button" onClick={() => onOpenReserveNextModal()} className={secondaryButton}>
-            <BookmarkCheck className="h-4 w-4" /> Reserve next
-          </button>
           <button id="btn-bulk-generate-ips" type="button" onClick={onOpenBulkGenerateModal} className={secondaryButton}>
             <Database className="h-4 w-4" /> Bulk add
           </button>

@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
 import { useIPAM } from '../context/IPAMContext';
-import { ArrowUpRight, Building2, Hash, Layers, Network, Plus, Zap } from 'lucide-react';
+import { ArrowUpRight, Building2, Hash, Layers, Network } from 'lucide-react';
 import { Subnet, IPVersion, IPAddress } from '../types/ipam';
 import { getIPVersion } from '../utils/ipCalculator';
-import { Bar, Ring, Segmented, card, formatCount, linkButton, muted, percentLabel, percentOf, primaryButton, secondaryButton, usableOf } from './ui';
+import { Bar, Ring, Segmented, card, formatCount, linkButton, muted, percentLabel, percentOf, primaryButton, usableOf } from './ui';
 
 interface DashboardViewProps {
   onOpenSubnetVisualizer: (subnet: Subnet) => void;
   onOpenNewDatacenterModal: () => void;
   onOpenNewSubnetModal: () => void;
-  onOpenReserveNextModal: (subnetId?: string) => void;
   onOpenAuditLogs?: (entityFilter?: string) => void;
 }
 
@@ -55,7 +54,6 @@ const Legend: React.FC<{ items: [string, string][] }> = ({ items }) => (
 export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenSubnetVisualizer,
   onOpenNewSubnetModal,
-  onOpenReserveNextModal,
   onOpenAuditLogs,
 }) => {
   const { stats, datacenters, subnets, ips, vlans, activityLogs, setActiveTab, setFilters } = useIPAM();
@@ -139,14 +137,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </span>
             )}
           />
-        </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={() => onOpenReserveNextModal()} className={secondaryButton}>
-            <Zap className="h-4 w-4" /> Reserve IP
-          </button>
-          <button type="button" onClick={onOpenNewSubnetModal} className={primaryButton}>
-            <Plus className="h-4 w-4" /> New subnet
-          </button>
         </div>
       </div>
 
