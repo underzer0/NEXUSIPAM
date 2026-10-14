@@ -67,7 +67,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenRese
   };
 
   return (
-    <header id="ipam-header" className="z-10 flex h-16 shrink-0 items-center gap-3 border-b border-zinc-200 bg-white/80 px-4 backdrop-blur sm:px-6 md:px-8 dark:border-zinc-800 dark:bg-zinc-950/80">
+    <header id="ipam-header" className="z-10 flex h-16 shrink-0 items-center gap-3 border-b border-zinc-200 bg-white/80 px-4 backdrop-blur sm:px-6 md:px-8 dark:border-zinc-800/80 dark:bg-zinc-950/80">
       <div className="flex shrink-0 items-center gap-2 md:hidden">
         <button type="button" onClick={onToggleMobileMenu} className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800" aria-label="Open menu">
           <Menu className="h-5 w-5" />
@@ -96,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenRese
               if (e.key === 'Escape') setOpen(false);
               if (e.key === 'Enter' && results[0]) openResult(results[0]);
             }}
-            className="w-full rounded-xl border border-transparent bg-zinc-100 py-2 pl-9 pr-9 text-sm text-zinc-900 placeholder-zinc-400 focus:border-cyan-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:bg-zinc-900"
+            className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 pl-9 pr-9 text-sm text-zinc-900 placeholder-zinc-400 focus:border-cyan-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-100 dark:focus:bg-zinc-950"
           />
           {query && (
             <button type="button" onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200" aria-label="Clear search">
@@ -109,7 +109,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenRese
           <div
             id="global-search-results"
             role="listbox"
-            className="absolute left-0 right-0 top-full z-50 mt-2 max-h-96 overflow-y-auto rounded-xl border border-zinc-200 bg-white p-1.5 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
+            className="absolute left-0 right-0 top-full z-50 mt-2 max-h-96 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-1.5 shadow-xl dark:border-zinc-800 dark:bg-zinc-950"
           >
             {results.length === 0 ? (
               <p className={`py-6 text-center text-sm ${muted}`}>Nothing matches “{query}”.</p>
