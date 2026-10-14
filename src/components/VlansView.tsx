@@ -10,10 +10,11 @@ interface VlansViewProps {
 }
 
 export const VlansView: React.FC<VlansViewProps> = ({ onOpenNewVlanModal, onOpenEditVlanModal }) => {
-  const { vlans, datacenters, subnets, deleteVlan } = useIPAM();
+  const { vlans, datacenters, subnets, deleteVlan, filters } = useIPAM();
 
   const [dcFilter, setDcFilter] = useState('All');
-  const [searchFilter, setSearchFilter] = useState('');
+  // Header search results open this page with filters.search pre-set.
+  const [searchFilter, setSearchFilter] = useState(filters.search);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const dcName = new Map(datacenters.map((d) => [d.id, d.name]));

@@ -248,11 +248,6 @@ const MainAppContent: React.FC = () => {
           {activeTab === 'signup' ? <SignUpView /> : <SignInView />}
         </div>
 
-        {/* Footer */}
-        <div className="text-center text-xs text-slate-400 dark:text-slate-500 py-3 border-t border-slate-200 dark:border-slate-800/60 max-w-5xl w-full mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Nexus IPAM &bull; Enterprise Network Grid & Subnet Orchestration</span>
-          <span className="font-mono text-[11px]">TLS 1.3 &bull; Encrypted Session</span>
-        </div>
       </div>
     );
   }

@@ -35,7 +35,7 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
   const [segmentFilter, setSegmentFilter] = useState('All');
   // The dashboard tiles set the global IP version before opening this page.
   const [versionFilter, setVersionFilter] = useState(filters.ipVersion || 'All');
-  const [searchFilter, setSearchFilter] = useState('');
+  const [searchFilter, setSearchFilter] = useState(filters.search);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const ipsBySubnet = new Map<string, IPAddress[]>();
