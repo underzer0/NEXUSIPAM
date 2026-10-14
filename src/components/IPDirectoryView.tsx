@@ -87,13 +87,13 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
 
   const segmented = (active: boolean) =>
     `flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition cursor-pointer ${
-      active ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+      active ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-950 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
     }`;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 md:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
           IP addresses <span className={`text-lg font-medium ${muted}`}>{filteredIPs.length}</span>
         </h1>
         <div className="flex flex-wrap gap-2">
@@ -114,7 +114,7 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <label className="relative flex-1">
             <span className="sr-only">Search IP addresses</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <input
               type="search"
               placeholder="Search IP, device, description or subnet"
@@ -123,7 +123,7 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
               className={`${input} w-full pl-9`}
             />
           </label>
-          <div role="group" aria-label="IP version" className="flex rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
+          <div role="group" aria-label="IP version" className="flex rounded-xl bg-zinc-200/70 p-1 dark:bg-zinc-800">
             {['All', 'IPv4', 'IPv6'].map((ver) => (
               <button key={ver} type="button" aria-pressed={(filters.ipVersion || 'All') === ver} onClick={() => setFilter({ ipVersion: ver })} className={segmented((filters.ipVersion || 'All') === ver)}>
                 {ver}
@@ -145,7 +145,7 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div role="group" aria-label="Status" className="flex flex-wrap rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
+          <div role="group" aria-label="Status" className="flex flex-wrap rounded-xl bg-zinc-200/70 p-1 dark:bg-zinc-800">
             <button type="button" aria-pressed={filters.status === 'All'} onClick={() => setFilter({ status: 'All' })} className={segmented(filters.status === 'All')}>
               All <span className={`text-xs ${muted}`}>{scopedIPs.length}</span>
             </button>
@@ -167,7 +167,7 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
       {/* List: one markup, a table-like grid on wide screens and stacked rows on phones */}
       {filteredIPs.length === 0 ? (
         <div className={`${card} flex flex-col items-center gap-3 p-12 text-center`}>
-          <Hash className="h-8 w-8 text-slate-300 dark:text-slate-600" />
+          <Hash className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
           <p className={`text-sm ${muted}`}>{ips.length === 0 ? 'No IP addresses yet.' : 'No IP addresses match these filters.'}</p>
           {ips.length === 0 && (
             <button type="button" onClick={onOpenNewIPModal} className={primaryButton}>
@@ -177,24 +177,24 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
         </div>
       ) : (
         <div className={`${card} overflow-hidden`}>
-          <div className={`hidden grid-cols-[minmax(12rem,1.2fr)_7rem_1fr_1fr_6rem] gap-4 border-b border-slate-100 px-5 py-3 text-xs font-semibold uppercase tracking-wide md:grid dark:border-slate-800 ${muted}`}>
+          <div className={`hidden grid-cols-[minmax(12rem,1.2fr)_7rem_1fr_1fr_6rem] gap-4 border-b border-zinc-100 px-5 py-3 text-xs font-semibold uppercase tracking-wide md:grid dark:border-zinc-800 ${muted}`}>
             <span>Address</span>
             <span>Status</span>
             <span>Device</span>
             <span>Subnet</span>
             <span className="sr-only">Actions</span>
           </div>
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+          <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
             {filteredIPs.slice(0, limit).map((ip) => {
               const subnet = subnetById.get(ip.subnetId)!;
               const vlan = subnet.vlanId ? vlanTag.get(subnet.vlanId) : undefined;
               return (
                 <li
                   key={ip.id}
-                  className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 px-5 py-3 transition hover:bg-slate-50 md:grid-cols-[minmax(12rem,1.2fr)_7rem_1fr_1fr_6rem] dark:hover:bg-slate-800/40"
+                  className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 px-5 py-3 transition hover:bg-zinc-50 md:grid-cols-[minmax(12rem,1.2fr)_7rem_1fr_1fr_6rem] dark:hover:bg-zinc-800/40"
                 >
                   <div className="flex min-w-0 items-center gap-2">
-                    <span className="break-all font-mono text-sm font-semibold text-slate-900 dark:text-white">{ip.ipAddress}</span>
+                    <span className="break-all font-mono text-sm font-semibold text-zinc-900 dark:text-white">{ip.ipAddress}</span>
                     {versionOf(ip) === 'IPv6' && <span className={chipNeutral}>v6</span>}
                     <button
                       type="button"
@@ -208,13 +208,13 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
                   </div>
                   <span className={`${chip} w-fit ${STATUS_STYLE[ip.status]}`}>{ip.status}</span>
                   <div className="col-span-2 min-w-0 md:col-span-1">
-                    <p className={`truncate text-sm ${ip.assignedDevice ? 'font-medium text-slate-800 dark:text-slate-100' : `italic ${muted}`}`}>
+                    <p className={`truncate text-sm ${ip.assignedDevice ? 'font-medium text-zinc-800 dark:text-zinc-100' : `italic ${muted}`}`}>
                       {ip.assignedDevice || 'Unassigned'}
                     </p>
                     {ip.description && <p className={`truncate text-xs ${muted}`}>{ip.description}</p>}
                   </div>
                   <div className={`col-span-2 min-w-0 text-xs md:col-span-1 ${muted}`}>
-                    <p className="truncate font-mono text-slate-700 dark:text-slate-300">{subnet.cidr}</p>
+                    <p className="truncate font-mono text-zinc-700 dark:text-zinc-300">{subnet.cidr}</p>
                     <p className="truncate">
                       {dcName.get(subnet.datacenterId) ?? 'Unknown site'}
                       {vlan !== undefined && ` · VLAN ${vlan}`}
@@ -239,7 +239,7 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
             })}
           </ul>
           {filteredIPs.length > limit && (
-            <div className="border-t border-slate-100 p-4 text-center dark:border-slate-800">
+            <div className="border-t border-zinc-100 p-4 text-center dark:border-zinc-800">
               <button type="button" onClick={() => setLimit((l) => l + PAGE)} className={linkButton}>
                 Show {Math.min(PAGE, filteredIPs.length - limit)} more of {filteredIPs.length - limit} remaining
               </button>

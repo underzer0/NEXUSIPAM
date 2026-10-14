@@ -61,7 +61,7 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 md:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
           Datacenters <span className={`text-lg font-medium ${muted}`}>{datacenters.length}</span>
         </h1>
         <button id="btn-add-datacenter" type="button" onClick={onOpenNewDatacenterModal} className={primaryButton}>
@@ -77,7 +77,7 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
 
       {datacenters.length === 0 ? (
         <div className={`${card} flex flex-col items-center gap-3 p-12 text-center`}>
-          <Building2 className="h-8 w-8 text-slate-300 dark:text-slate-600" />
+          <Building2 className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
           <p className={`text-sm ${muted}`}>No datacenters yet.</p>
           <button type="button" onClick={onOpenNewDatacenterModal} className={primaryButton}>
             Create the first one
@@ -91,7 +91,7 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
             return (
               <div
                 key={dc.id}
-                className={`${card} relative transition ${isSelected ? 'border-indigo-500! ring-2 ring-indigo-500/30' : 'hover:border-slate-300 dark:hover:border-slate-700'}`}
+                className={`${card} relative transition ${isSelected ? 'border-cyan-500! ring-2 ring-cyan-500/30' : 'hover:border-zinc-300 dark:hover:border-zinc-700'}`}
               >
                 <button
                   type="button"
@@ -100,7 +100,7 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
                   className="flex w-full flex-col gap-3 p-5 text-left cursor-pointer"
                 >
                   <span className="pr-16">
-                    <span className="block truncate font-semibold text-slate-900 dark:text-white">{dc.name}</span>
+                    <span className="block truncate font-semibold text-zinc-900 dark:text-white">{dc.name}</span>
                     <span className={`flex items-center gap-1 text-xs ${muted}`}>
                       <MapPin className="h-3 w-3 shrink-0" />
                       <span className="truncate">{dc.location}</span>
@@ -109,7 +109,7 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
                   <Bar percent={percent} label={`${dc.name} utilization`} />
                   <span className={`flex justify-between text-xs tabular-nums ${muted}`}>
                     <span>{vlanCount} VLANs · {rows.length} subnets · {used} IPs</span>
-                    <span className="font-semibold text-slate-700 dark:text-slate-200">{percentLabel(percent)}</span>
+                    <span className="font-semibold text-zinc-700 dark:text-zinc-200">{percentLabel(percent)}</span>
                   </span>
                 </button>
                 <div className="absolute right-3 top-3 flex">
@@ -137,7 +137,7 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
         <section className={`${card} space-y-6 p-5 sm:p-6`}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">{activeDc.name}</h2>
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-white">{activeDc.name}</h2>
               <p className={`text-sm ${muted}`}>{activeDc.description || activeDc.location}</p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -166,17 +166,17 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div>
-              <h3 className="mb-3 flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
+              <h3 className="mb-3 flex items-center gap-2 font-semibold text-zinc-900 dark:text-white">
                 <Layers className="h-4 w-4 text-purple-500" /> VLANs <span className={`text-sm font-medium ${muted}`}>{activeVlans.length}</span>
               </h3>
               {activeVlans.length === 0 ? (
                 <p className={`py-6 text-center text-sm ${muted}`}>No VLANs here yet.</p>
               ) : (
-                <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
                   {activeVlans.map((vlan) => (
                     <li key={vlan.id} className="flex items-center gap-3 py-2.5 text-sm">
                       <span className={`${chip} bg-purple-500/10 font-mono text-purple-700 dark:text-purple-300`}>{vlan.vlanId}</span>
-                      <span className="truncate font-medium text-slate-800 dark:text-slate-100">{vlan.name}</span>
+                      <span className="truncate font-medium text-zinc-800 dark:text-zinc-100">{vlan.name}</span>
                       <span className={`ml-auto shrink-0 text-xs ${muted}`}>
                         {active.rows.filter((r) => r.sub.vlanId === vlan.id).length} subnets
                       </span>
@@ -187,8 +187,8 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
             </div>
 
             <div>
-              <h3 className="mb-3 flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-                <Network className="h-4 w-4 text-indigo-500" /> Subnets <span className={`text-sm font-medium ${muted}`}>{active.rows.length}</span>
+              <h3 className="mb-3 flex items-center gap-2 font-semibold text-zinc-900 dark:text-white">
+                <Network className="h-4 w-4 text-cyan-500" /> Subnets <span className={`text-sm font-medium ${muted}`}>{active.rows.length}</span>
               </h3>
               {active.rows.length === 0 ? (
                 <p className={`py-6 text-center text-sm ${muted}`}>No subnets here yet.</p>
@@ -199,9 +199,9 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
                       <button
                         type="button"
                         onClick={() => onOpenSubnetVisualizer(sub)}
-                        className="grid w-full grid-cols-[1fr_6rem] items-center gap-x-4 gap-y-1 rounded-lg px-2 py-2 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+                        className="grid w-full grid-cols-[1fr_6rem] items-center gap-x-4 gap-y-1 rounded-lg px-2 py-2 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-800/60 cursor-pointer"
                       >
-                        <span className="truncate font-mono text-sm font-semibold text-slate-900 dark:text-white">{sub.cidr}</span>
+                        <span className="truncate font-mono text-sm font-semibold text-zinc-900 dark:text-white">{sub.cidr}</span>
                         <span className={`text-right text-xs tabular-nums ${muted}`}>
                           {used} / {formatCount(usable)}
                         </span>

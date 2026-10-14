@@ -71,7 +71,7 @@ export const ReserveNextIPModal: React.FC<ReserveNextIPModalProps> = ({ isOpen, 
           <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-500" />
           <div>
             <p className={`text-sm ${muted}`}>Reserved</p>
-            <p className="font-mono text-2xl font-bold text-slate-900 dark:text-white">{reserved.ipAddress}</p>
+            <p className="font-mono text-2xl font-bold text-zinc-900 dark:text-white">{reserved.ipAddress}</p>
           </div>
           <div className="flex justify-center gap-2">
             <button type="button" onClick={copy} className={secondaryButton}>
@@ -92,9 +92,9 @@ export const ReserveNextIPModal: React.FC<ReserveNextIPModalProps> = ({ isOpen, 
               ))}
             </select>
           </Field>
-          <div className="rounded-xl bg-slate-100 p-4 text-center dark:bg-slate-800">
+          <div className="rounded-xl bg-zinc-100 p-4 text-center dark:bg-zinc-800">
             <p className={`text-xs ${muted}`}>Next free address</p>
-            <p className="font-mono text-lg font-bold text-slate-900 dark:text-white">
+            <p className="font-mono text-lg font-bold text-zinc-900 dark:text-white">
               {previewIP === undefined ? 'Looking…' : previewIP ?? 'This subnet is full'}
             </p>
           </div>

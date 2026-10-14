@@ -74,7 +74,7 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 md:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
           Subnets <span className={`text-lg font-medium ${muted}`}>{filteredSubnets.length}</span>
         </h1>
         <button id="btn-add-subnet" type="button" onClick={onOpenNewSubnetModal} className={primaryButton}>
@@ -92,7 +92,7 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <label className="relative flex-1">
           <span className="sr-only">Search subnets</span>
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
           <input
             type="search"
             placeholder="Search CIDR or description"
@@ -101,7 +101,7 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
             className={`${input} w-full pl-9`}
           />
         </label>
-        <div role="group" aria-label="IP version" className="flex rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
+        <div role="group" aria-label="IP version" className="flex rounded-xl bg-zinc-200/70 p-1 dark:bg-zinc-800">
           {['All', 'IPv4', 'IPv6'].map((ver) => (
             <button
               key={ver}
@@ -110,8 +110,8 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
               onClick={() => setVersionFilter(ver)}
               className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition cursor-pointer ${
                 versionFilter === ver
-                  ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950 dark:text-white'
-                  : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                  ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-950 dark:text-white'
+                  : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
               }`}
             >
               {ver}
@@ -134,7 +134,7 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
       {/* List */}
       {filteredSubnets.length === 0 ? (
         <div className={`${card} flex flex-col items-center gap-3 p-12 text-center`}>
-          <Network className="h-8 w-8 text-slate-300 dark:text-slate-600" />
+          <Network className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
           <p className={`text-sm ${muted}`}>{subnets.length === 0 ? 'No subnets yet.' : 'No subnets match these filters.'}</p>
           {subnets.length === 0 && (
             <button type="button" onClick={onOpenNewSubnetModal} className={primaryButton}>
@@ -159,12 +159,12 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => onOpenSubnetVisualizer(subnet)}
-                      className="break-all font-mono text-base font-bold text-slate-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400 cursor-pointer"
+                      className="break-all font-mono text-base font-bold text-zinc-900 hover:text-cyan-600 dark:text-white dark:hover:text-cyan-400 cursor-pointer"
                     >
                       {subnet.cidr}
                     </button>
                     <span className={chipNeutral}>{ver}</span>
-                    <span className={`${chip} ${subnet.segmentType === 'Public' ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300' : 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300'}`}>
+                    <span className={`${chip} ${subnet.segmentType === 'Public' ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300' : 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300'}`}>
                       {subnet.segmentType}
                     </span>
                     <span className={chipNeutral}>{dcName.get(subnet.datacenterId) ?? 'Unknown site'}</span>
@@ -180,11 +180,11 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
                   <Bar percent={percent} label={`${subnet.cidr} utilization`} />
                   <div className={`flex justify-between text-xs tabular-nums ${muted}`}>
                     <span>{used} / {formatCount(usable)} used</span>
-                    <span className="font-semibold text-slate-700 dark:text-slate-200">{percentLabel(percent)}</span>
+                    <span className="font-semibold text-zinc-700 dark:text-zinc-200">{percentLabel(percent)}</span>
                   </div>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-0.5 border-t border-slate-100 pt-3 dark:border-slate-800 lg:border-0 lg:pt-0">
+                <div className="flex shrink-0 items-center gap-0.5 border-t border-zinc-100 pt-3 dark:border-zinc-800 lg:border-0 lg:pt-0">
                   <button type="button" onClick={() => onOpenSubnetVisualizer(subnet)} className={iconButton} title="Address map" aria-label="Address map">
                     <Eye className="h-4 w-4" />
                   </button>

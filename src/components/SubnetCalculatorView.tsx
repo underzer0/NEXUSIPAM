@@ -69,7 +69,7 @@ export const SubnetCalculatorView: React.FC = () => {
       <div className={`${card} space-y-5 p-5`}>
         <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_1.4fr]">
           <label className="space-y-1.5">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Address</span>
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Address</span>
             <input
               type="text"
               value={ipInput}
@@ -80,8 +80,8 @@ export const SubnetCalculatorView: React.FC = () => {
             />
           </label>
           <label className="space-y-1.5">
-            <span className="flex justify-between text-sm font-medium text-slate-700 dark:text-slate-300">
-              Prefix length <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">/{safePrefix}</span>
+            <span className="flex justify-between text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Prefix length <span className="font-mono font-bold text-cyan-600 dark:text-cyan-400">/{safePrefix}</span>
             </span>
             <input
               type="range"
@@ -89,7 +89,7 @@ export const SubnetCalculatorView: React.FC = () => {
               max={maxPrefix}
               value={safePrefix}
               onChange={(e) => setPrefix(parseInt(e.target.value, 10))}
-              className="w-full cursor-pointer accent-indigo-600"
+              className="w-full cursor-pointer accent-cyan-600"
             />
           </label>
         </div>
@@ -103,7 +103,7 @@ export const SubnetCalculatorView: React.FC = () => {
                 setIpInput(p.ip);
                 setPrefix(p.prefix);
               }}
-              className={`${chip} bg-slate-100 font-mono text-slate-700 transition hover:bg-indigo-500/10 hover:text-indigo-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-indigo-300 cursor-pointer`}
+              className={`${chip} bg-zinc-100 font-mono text-zinc-700 transition hover:bg-cyan-500/10 hover:text-cyan-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:text-cyan-300 cursor-pointer`}
             >
               {p.ip}/{p.prefix}
             </button>
@@ -122,22 +122,22 @@ export const SubnetCalculatorView: React.FC = () => {
           <div className={`${card} space-y-5 p-5`}>
             <div>
               <p className={`text-sm ${muted}`}>Usable addresses</p>
-              <p className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">{result.usableHostsFormatted ?? result.usableHosts.toLocaleString()}</p>
+              <p className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">{result.usableHostsFormatted ?? result.usableHosts.toLocaleString()}</p>
             </div>
             <div className="space-y-1.5">
               <div className="flex h-3 overflow-hidden rounded-full" aria-hidden>
-                <div className="bg-indigo-500" style={{ width: `${(safePrefix / maxPrefix) * 100}%` }} />
+                <div className="bg-cyan-500" style={{ width: `${(safePrefix / maxPrefix) * 100}%` }} />
                 <div className="flex-1 bg-emerald-500" />
               </div>
               <p className={`flex justify-between text-xs ${muted}`}>
-                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-indigo-500" />{safePrefix} network bits</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-cyan-500" />{safePrefix} network bits</span>
                 <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500" />{maxPrefix - safePrefix} host bits</span>
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <span className={`${chip} bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300`}>{result.ipVersion}</span>
+              <span className={`${chip} bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300`}>{result.ipVersion}</span>
               <span
-                className={`${chip} ${result.isPrivate ? 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300' : 'bg-purple-500/10 text-purple-700 dark:text-purple-300'}`}
+                className={`${chip} ${result.isPrivate ? 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300' : 'bg-purple-500/10 text-purple-700 dark:text-purple-300'}`}
               >
                 {result.isPrivate ? 'Private' : 'Public'}
               </span>
@@ -145,11 +145,11 @@ export const SubnetCalculatorView: React.FC = () => {
           </div>
 
           {/* Details */}
-          <dl className={`${card} divide-y divide-slate-100 p-2 dark:divide-slate-800`}>
+          <dl className={`${card} divide-y divide-zinc-100 p-2 dark:divide-zinc-800`}>
             {rows.map(({ label, value, copy }) => (
               <div key={label} className="flex items-center gap-4 px-3 py-2.5">
                 <dt className={`w-28 shrink-0 text-sm ${muted}`}>{label}</dt>
-                <dd className="min-w-0 flex-1 break-all font-mono text-sm font-semibold text-slate-900 dark:text-white">{value}</dd>
+                <dd className="min-w-0 flex-1 break-all font-mono text-sm font-semibold text-zinc-900 dark:text-white">{value}</dd>
                 {copy && (
                   <button type="button" onClick={() => handleCopy(value, label)} className={`${iconButton} p-1.5`} aria-label={`Copy ${label.toLowerCase()}`}>
                     {copiedKey === label ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}

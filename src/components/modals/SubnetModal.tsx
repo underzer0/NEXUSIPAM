@@ -93,7 +93,7 @@ export const SubnetModal: React.FC<SubnetModalProps> = ({ isOpen, onClose, subne
                 key={p}
                 type="button"
                 onClick={() => changeCidr(p)}
-                className={`${chip} bg-slate-100 font-mono text-slate-700 hover:bg-indigo-500/10 hover:text-indigo-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-indigo-300 cursor-pointer`}
+                className={`${chip} bg-zinc-100 font-mono text-zinc-700 hover:bg-cyan-500/10 hover:text-cyan-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:text-cyan-300 cursor-pointer`}
               >
                 {p}
               </button>
@@ -128,8 +128,8 @@ export const SubnetModal: React.FC<SubnetModalProps> = ({ isOpen, onClose, subne
         </div>
 
         <div className="space-y-1.5">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Segment</span>
-          <div role="radiogroup" aria-label="Segment" className="grid grid-cols-2 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
+          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Segment</span>
+          <div role="radiogroup" aria-label="Segment" className="grid grid-cols-2 rounded-xl bg-zinc-200/70 p-1 dark:bg-zinc-800">
             {(['Private', 'Public'] as SegmentType[]).map((s) => (
               <button
                 key={s}
@@ -138,7 +138,7 @@ export const SubnetModal: React.FC<SubnetModalProps> = ({ isOpen, onClose, subne
                 aria-checked={segmentType === s}
                 onClick={() => setSegmentType(s)}
                 className={`rounded-lg py-1.5 text-sm font-semibold transition cursor-pointer ${
-                  segmentType === s ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950 dark:text-white' : `${muted} hover:text-slate-900 dark:hover:text-white`
+                  segmentType === s ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-950 dark:text-white' : `${muted} hover:text-zinc-900 dark:hover:text-white`
                 }`}
               >
                 {s}

@@ -131,7 +131,7 @@ const MainAppContent: React.FC = () => {
   };
 
   const themeButton = (
-    <button type="button" onClick={toggleTheme} className={`${iconButton} border border-slate-200 dark:border-slate-800`} aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
+    <button type="button" onClick={toggleTheme} className={`${iconButton} border border-zinc-200 dark:border-zinc-800`} aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
       {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </button>
   );
@@ -139,7 +139,7 @@ const MainAppContent: React.FC = () => {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center" role="status">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
         <span className="sr-only">Loading</span>
       </div>
     );
@@ -161,7 +161,7 @@ const MainAppContent: React.FC = () => {
       <div className={`${card} w-full max-w-lg space-y-5 p-6`}>
         <div className="flex items-center gap-3">
           <AlertTriangle className="h-6 w-6 shrink-0 text-rose-500" />
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Can’t reach the database</h1>
+          <h1 className="text-xl font-semibold text-zinc-900 dark:text-white">Can’t reach the database</h1>
         </div>
         <p className="break-words rounded-xl bg-rose-500/10 p-3 font-mono text-sm text-rose-700 dark:text-rose-300">{error}</p>
         <p className={`text-sm ${muted}`}>

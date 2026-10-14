@@ -69,7 +69,7 @@ export const VlanModal: React.FC<VlanModalProps> = ({ isOpen, onClose, vlanToEdi
             <input required autoFocus placeholder="App servers" value={name} onChange={(e) => setName(e.target.value)} className={fieldInput} />
           </Field>
         </div>
-        <p className="-mt-2 text-xs text-slate-500 dark:text-slate-400">IDs only need to be unique within a datacenter.</p>
+        <p className="-mt-2 text-xs text-zinc-500 dark:text-zinc-400">IDs only need to be unique within a datacenter.</p>
         <Field label="Description (optional)">
           <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} className={`${fieldInput} resize-none`} />
         </Field>

@@ -103,7 +103,7 @@ export const SubnetVisualizerModal: React.FC<SubnetVisualizerModalProps> = ({ su
           {counts.map(([s, n]) => (
             <span key={s} className="flex items-center gap-1.5">
               <span className={`h-3 w-3 rounded ${CELL[s].split(' ')[0]}`} aria-hidden />
-              {s} {s !== 'Available' && <strong className="text-slate-700 dark:text-slate-200">{n}</strong>}
+              {s} {s !== 'Available' && <strong className="text-zinc-700 dark:text-zinc-200">{n}</strong>}
             </span>
           ))}
         </div>
@@ -124,7 +124,7 @@ export const SubnetVisualizerModal: React.FC<SubnetVisualizerModalProps> = ({ su
                     aria-label={`${ipStr}, ${status}${record?.assignedDevice ? `, ${record.assignedDevice}` : ''}`}
                     title={`${ipStr} · ${status}${record?.assignedDevice ? ` · ${record.assignedDevice}` : ''}`}
                     className={`h-8 truncate rounded-md px-0.5 font-mono text-[10px] font-semibold transition cursor-pointer ${CELL[status]} ${
-                      selectedIP === ipStr ? 'ring-2 ring-indigo-500 ring-offset-1 ring-offset-white dark:ring-offset-slate-900' : ''
+                      selectedIP === ipStr ? 'ring-2 ring-cyan-500 ring-offset-1 ring-offset-white dark:ring-offset-zinc-900' : ''
                     }`}
                   >
                     {label}
@@ -135,11 +135,11 @@ export const SubnetVisualizerModal: React.FC<SubnetVisualizerModalProps> = ({ su
             {rangeIps.length === MAX_CELLS && <p className={`mt-2 text-xs ${muted}`}>Showing the first {MAX_CELLS} addresses.</p>}
           </div>
 
-          <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-800/50">
+          <div className="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-800/50">
             {selectedIP ? (
               <form onSubmit={handleSave} className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="break-all font-mono text-sm font-bold text-slate-900 dark:text-white">{selectedIP}</span>
+                  <span className="break-all font-mono text-sm font-bold text-zinc-900 dark:text-white">{selectedIP}</span>
                   <button type="button" onClick={copy} className={`${iconButton} p-1.5`} aria-label="Copy address">
                     {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
                   </button>

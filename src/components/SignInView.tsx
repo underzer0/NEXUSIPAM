@@ -12,7 +12,7 @@ export const AuthShell: React.FC<{ title: string; error: string | null; footer: 
 }) => (
   <div className="flex w-full items-center justify-center">
     <div className="w-full max-w-sm space-y-6">
-      <h1 className="text-center text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{title}</h1>
+      <h1 className="text-center text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">{title}</h1>
       <div className={`${card} space-y-5 p-6`}>
         {error && (
           <p role="alert" className="rounded-xl bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">
@@ -35,7 +35,7 @@ export const PasswordInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>
         type="button"
         onClick={() => setVisible((v) => !v)}
         aria-label={visible ? 'Hide password' : 'Show password'}
-        className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+        className="absolute inset-y-0 right-0 flex items-center px-3 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer"
       >
         {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
       </button>
@@ -43,7 +43,7 @@ export const PasswordInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>
   );
 };
 
-export const fieldLabel = 'text-sm font-medium text-slate-700 dark:text-slate-300';
+export const fieldLabel = 'text-sm font-medium text-zinc-700 dark:text-zinc-300';
 
 export const SignInView: React.FC = () => {
   const { signIn, setActiveTab } = useIPAM();

@@ -14,7 +14,7 @@ const ACTIONS = ['ALL', 'CREATE', 'UPDATE', 'DELETE', 'RESERVE'] as const;
 const ENTITIES = ['ALL', 'Datacenter', 'VLAN', 'Subnet', 'IP', 'User'] as const;
 const ACTION_STYLE: Record<string, string> = {
   CREATE: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
-  UPDATE: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300',
+  UPDATE: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300',
   DELETE: 'bg-rose-500/10 text-rose-700 dark:text-rose-300',
   RESERVE: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
 };
@@ -89,7 +89,7 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({ isOpen, onClose, i
 
   const pill = (active: boolean) =>
     `rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
-      active ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+      active ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-950 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
     }`;
 
   return (
@@ -98,7 +98,7 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({ isOpen, onClose, i
         <div className="flex flex-col gap-3 sm:flex-row">
           <label className="relative flex-1">
             <span className="sr-only">Search activity</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <input type="search" placeholder="Search activity" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`${input} w-full pl-9`} />
           </label>
           <div className="flex gap-2">
@@ -112,14 +112,14 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({ isOpen, onClose, i
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <div role="group" aria-label="Action" className="flex flex-wrap rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
+          <div role="group" aria-label="Action" className="flex flex-wrap rounded-xl bg-zinc-200/70 p-1 dark:bg-zinc-800">
             {ACTIONS.map((a) => (
               <button key={a} type="button" aria-pressed={actionFilter === a} onClick={() => setActionFilter(a)} className={pill(actionFilter === a)}>
                 {a === 'ALL' ? 'All actions' : a.charAt(0) + a.slice(1).toLowerCase()}
               </button>
             ))}
           </div>
-          <div role="group" aria-label="Type" className="flex flex-wrap rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
+          <div role="group" aria-label="Type" className="flex flex-wrap rounded-xl bg-zinc-200/70 p-1 dark:bg-zinc-800">
             {ENTITIES.map((t) => (
               <button key={t} type="button" aria-pressed={entityFilter === t} onClick={() => setEntityFilter(t)} className={pill(entityFilter === t)}>
                 {t === 'ALL' ? 'All types' : t}
@@ -131,7 +131,7 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({ isOpen, onClose, i
         {filteredLogs.length === 0 ? (
           <p className={`py-12 text-center text-sm ${muted}`}>{activityLogs.length === 0 ? 'Nothing has happened yet.' : 'No activity matches these filters.'}</p>
         ) : (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+          <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
             {filteredLogs.map((log) => (
               <li key={log.id} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-start sm:gap-4">
                 <div className="flex shrink-0 items-center gap-1.5 sm:w-44">
@@ -139,7 +139,7 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({ isOpen, onClose, i
                   <span className={chipNeutral}>{log.entityType}</span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-slate-900 dark:text-white">{log.title}</p>
+                  <p className="font-medium text-zinc-900 dark:text-white">{log.title}</p>
                   {log.detail && <p className={`text-sm ${muted}`}>{log.detail}</p>}
                 </div>
                 <div className="flex shrink-0 items-center gap-3 text-xs sm:flex-col sm:items-end sm:gap-1">

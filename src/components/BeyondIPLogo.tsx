@@ -54,7 +54,7 @@ export const BeyondIPLogo: React.FC<LogoProps> = ({
   };
 
   const iconElement = (
-    <div className={`relative flex items-center justify-center bg-gradient-to-tr from-indigo-700 via-indigo-600 to-cyan-500 shadow-md shadow-indigo-500/25 border border-indigo-400/30 shrink-0 overflow-hidden group ${iconSizeClasses[size]} ${className}`}>
+    <div className={`relative flex items-center justify-center bg-gradient-to-tr from-cyan-700 via-cyan-600 to-cyan-500 shadow-md shadow-cyan-500/25 border border-cyan-400/30 shrink-0 overflow-hidden group ${iconSizeClasses[size]} ${className}`}>
       {/* Background network grid lines */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff12_1px,transparent_1px),linear-gradient(to_bottom,#ffffff12_1px,transparent_1px)] bg-[size:6px_6px] opacity-60" />
       
@@ -76,18 +76,18 @@ export const BeyondIPLogo: React.FC<LogoProps> = ({
   const beyondTextColor = isDark === true 
     ? 'text-white' 
     : isDark === false 
-    ? 'text-slate-900' 
-    : 'text-slate-900 dark:text-white';
+    ? 'text-zinc-900' 
+    : 'text-zinc-900 dark:text-white';
 
   const ipGradient = isDark === false
-    ? 'from-indigo-600 via-indigo-500 to-cyan-600'
-    : 'from-indigo-400 via-cyan-400 to-teal-300';
+    ? 'from-cyan-600 via-cyan-500 to-cyan-600'
+    : 'from-cyan-400 via-cyan-400 to-teal-300';
 
   const badgeColor = isDark === true
-    ? 'text-slate-400'
+    ? 'text-zinc-400'
     : isDark === false
-    ? 'text-slate-600 font-semibold'
-    : 'text-slate-600 dark:text-slate-400';
+    ? 'text-zinc-600 font-semibold'
+    : 'text-zinc-600 dark:text-zinc-400';
 
   return (
     <div className="flex items-center gap-3 overflow-hidden select-none">

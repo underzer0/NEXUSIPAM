@@ -60,9 +60,9 @@ const ApiKeyCard: React.FC<{ masked: string }> = ({ masked: initialMasked }) => 
   return (
     <section className={`${card} space-y-4 p-6`}>
       <div className="flex flex-wrap items-center gap-3">
-        <KeyRound className="h-5 w-5 text-indigo-500" aria-hidden />
+        <KeyRound className="h-5 w-5 text-cyan-500" aria-hidden />
         <div className="min-w-0 flex-1">
-          <h2 className="font-semibold text-slate-900 dark:text-white">API key</h2>
+          <h2 className="font-semibold text-zinc-900 dark:text-white">API key</h2>
           <p className={`text-sm ${muted}`}>Lets scripts call the API as you.</p>
         </div>
         <button id="btn-generate-api-key" type="button" onClick={generate} disabled={busy} className={`${secondaryButton} disabled:opacity-50`}>
@@ -76,7 +76,7 @@ const ApiKeyCard: React.FC<{ masked: string }> = ({ masked: initialMasked }) => 
         <div className="space-y-2 rounded-xl bg-amber-500/10 p-4">
           <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Copy it now. It won't be shown again.</p>
           <div className="flex items-center gap-2">
-            <code className="min-w-0 flex-1 break-all rounded-lg bg-white px-3 py-2 font-mono text-sm text-slate-900 dark:bg-slate-950 dark:text-white">{newKey}</code>
+            <code className="min-w-0 flex-1 break-all rounded-lg bg-white px-3 py-2 font-mono text-sm text-zinc-900 dark:bg-zinc-950 dark:text-white">{newKey}</code>
             <button type="button" onClick={copy} className={secondaryButton} aria-label="Copy API key">
               {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
             </button>
@@ -87,7 +87,7 @@ const ApiKeyCard: React.FC<{ masked: string }> = ({ masked: initialMasked }) => 
       )}
 
       {masked && (
-        <pre className="overflow-x-auto rounded-xl bg-slate-900 p-4 font-mono text-xs text-slate-200">
+        <pre className="overflow-x-auto rounded-xl bg-zinc-900 p-4 font-mono text-xs text-zinc-200">
           {`curl -H "Authorization: Bearer ${newKey ?? '<your key>'}" \\\n  ${window.location.origin}/api/subnets`}
         </pre>
       )}
@@ -134,7 +134,7 @@ export const UserProfileView: React.FC = () => {
 
   const field = (label: string, key: keyof Form, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
     <label className="space-y-1.5">
-      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
+      <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{label}</span>
       <input id={`profile-input-${key}`} value={form[key] ?? ''} onChange={set(key)} className={`${input} w-full`} {...props} />
     </label>
   );
@@ -143,13 +143,13 @@ export const UserProfileView: React.FC = () => {
     <div id="user-profile-page" className="mx-auto max-w-4xl space-y-6 p-4 pb-24 sm:p-6 md:p-8 md:pb-12">
       {/* Identity */}
       <div className={`${card} flex flex-col gap-5 p-6 sm:flex-row sm:items-center`}>
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-xl font-bold text-white" aria-hidden>
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-cyan-600 text-xl font-bold text-white" aria-hidden>
           {initials(currentUser.name)}
         </div>
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="truncate text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{currentUser.name}</h1>
-            <span className={`${chip} bg-indigo-500/10 text-indigo-700 dark:text-indigo-300`}>{currentUser.role}</span>
+            <h1 className="truncate text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">{currentUser.name}</h1>
+            <span className={`${chip} bg-cyan-500/10 text-cyan-700 dark:text-cyan-300`}>{currentUser.role}</span>
           </div>
           <p className={`truncate text-sm ${muted}`}>
             {currentUser.email}
@@ -163,13 +163,13 @@ export const UserProfileView: React.FC = () => {
 
       {/* Details */}
       <form onSubmit={handleSave} className={`${card} space-y-6 p-6`}>
-        <h2 className="font-semibold text-slate-900 dark:text-white">Your details</h2>
+        <h2 className="font-semibold text-zinc-900 dark:text-white">Your details</h2>
 
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           {field('Name', 'name', { required: true, autoComplete: 'name' })}
           {field('Email', 'email', { type: 'email', required: true, autoComplete: 'email' })}
           <label className="space-y-1.5">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Role</span>
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Role</span>
             <select id="profile-select-role" value={form.role} onChange={set('role')} className={`${input} w-full`}>
               {roles.map((r) => (
                 <option key={r} value={r}>{r}</option>
@@ -181,7 +181,7 @@ export const UserProfileView: React.FC = () => {
           {field('Organization', 'organization', { autoComplete: 'organization' })}
           {field('Location', 'location')}
           <label className="space-y-1.5">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Main datacenter</span>
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Main datacenter</span>
             <select id="profile-select-dc" value={form.primaryDatacenterId} onChange={set('primaryDatacenterId')} className={`${input} w-full`}>
               <option value="">None</option>
               {datacenters.map((dc) => (
@@ -192,7 +192,7 @@ export const UserProfileView: React.FC = () => {
         </div>
 
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">About you</span>
+          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">About you</span>
           <textarea id="profile-input-bio" rows={3} value={form.bio} onChange={set('bio')} className={`${input} w-full`} />
         </label>
 
@@ -200,7 +200,7 @@ export const UserProfileView: React.FC = () => {
           <p role="alert" className="text-sm text-rose-600 dark:text-rose-400">{errorMessage}</p>
         )}
 
-        <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">
+        <div className="flex items-center justify-end gap-3 border-t border-zinc-100 pt-5 dark:border-zinc-800">
           <span role="status" className="mr-auto text-sm text-emerald-600 dark:text-emerald-400">
             {saved && 'Saved.'}
           </span>

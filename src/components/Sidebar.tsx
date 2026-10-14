@@ -41,13 +41,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, isMob
 
       <aside
         id="ipam-sidebar"
-        className={`fixed inset-y-0 left-0 z-50 flex shrink-0 flex-col border-r border-slate-200 bg-white transition-all duration-300 md:relative dark:border-slate-800 dark:bg-slate-900 ${
+        className={`fixed inset-y-0 left-0 z-50 flex shrink-0 flex-col border-r border-zinc-200 bg-white transition-all duration-300 md:relative dark:border-zinc-800 dark:bg-zinc-900 ${
           isMobileOpen ? 'w-72 translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
         } ${collapsed ? 'md:w-[4.5rem]' : 'md:w-60'}`}
       >
         <div className="flex h-16 shrink-0 items-center justify-between px-4">
           <BeyondIPLogo size="md" variant={expanded ? 'full' : 'icon'} />
-          <button type="button" onClick={onMobileClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 md:hidden dark:hover:bg-slate-800" aria-label="Close menu">
+          <button type="button" onClick={onMobileClose} className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 md:hidden dark:hover:bg-zinc-800" aria-label="Close menu">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -65,8 +65,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, isMob
                 title={expanded ? undefined : label}
                 className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition cursor-pointer ${
                   isActive
-                    ? 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
+                    ? 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300'
+                    : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white'
                 }`}
               >
                 <Icon className="h-5 w-5 shrink-0" />
@@ -77,7 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, isMob
           })}
         </nav>
 
-        <div className="shrink-0 space-y-1 border-t border-slate-100 p-3 dark:border-slate-800">
+        <div className="shrink-0 space-y-1 border-t border-zinc-100 p-3 dark:border-zinc-800">
           <button
             id="sidebar-user-profile-button"
             type="button"
@@ -85,19 +85,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, isMob
             title={expanded ? undefined : currentUser.name}
             aria-current={activeTab === 'profile' ? 'page' : undefined}
             className={`flex w-full items-center gap-3 rounded-xl p-2 text-left transition cursor-pointer ${
-              activeTab === 'profile' ? 'bg-indigo-500/10' : 'hover:bg-slate-100 dark:hover:bg-slate-800'
+              activeTab === 'profile' ? 'bg-cyan-500/10' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
             }`}
           >
-            <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
+            <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white">
               {initials(currentUser.name)}
               <span
-                className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-slate-900 ${wsConnected ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-zinc-900 ${wsConnected ? 'bg-emerald-500' : 'bg-amber-500'}`}
                 title={wsConnected ? 'Live updates on' : 'Reconnecting…'}
               />
             </span>
             {expanded && (
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-slate-900 dark:text-white">{currentUser.name}</span>
+                <span className="block truncate text-sm font-medium text-zinc-900 dark:text-white">{currentUser.name}</span>
                 <span className={`block truncate text-xs ${muted}`}>{wsConnected ? 'Live updates on' : 'Reconnecting…'}</span>
               </span>
             )}
@@ -110,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, isMob
               onClick={toggleTheme}
               aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               title={isDark ? 'Light mode' : 'Dark mode'}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg p-2 text-sm text-slate-600 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 cursor-pointer"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg p-2 text-sm text-zinc-600 transition hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer"
             >
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               {expanded && (isDark ? 'Light' : 'Dark')}
@@ -121,7 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, isMob
               onClick={() => setCollapsed(!collapsed)}
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               title={collapsed ? 'Expand' : 'Collapse'}
-              className="hidden rounded-lg p-2 text-slate-600 transition hover:bg-slate-100 md:block dark:text-slate-400 dark:hover:bg-slate-800 cursor-pointer"
+              className="hidden rounded-lg p-2 text-zinc-600 transition hover:bg-zinc-100 md:block dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer"
             >
               {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
             </button>

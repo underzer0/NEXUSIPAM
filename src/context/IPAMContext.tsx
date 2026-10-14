@@ -116,10 +116,10 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isDark, setIsDark] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('ipam_theme');
-      if (saved) return saved === 'dark';
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+      // Dark is the default look; light is opt-in.
+      return saved !== 'light';
     }
-    return false;
+    return true;
   });
 
   const toggleTheme = () => {

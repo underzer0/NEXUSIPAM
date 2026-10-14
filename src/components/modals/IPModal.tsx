@@ -92,8 +92,8 @@ export const IPModal: React.FC<IPModalProps> = ({ isOpen, onClose, ipToEdit, def
         )}
 
         <div className="space-y-1.5">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Status</span>
-          <div role="radiogroup" aria-label="Status" className="grid grid-cols-3 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
+          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Status</span>
+          <div role="radiogroup" aria-label="Status" className="grid grid-cols-3 rounded-xl bg-zinc-200/70 p-1 dark:bg-zinc-800">
             {STATUSES.map((s) => (
               <button
                 key={s}
@@ -102,7 +102,7 @@ export const IPModal: React.FC<IPModalProps> = ({ isOpen, onClose, ipToEdit, def
                 aria-checked={status === s}
                 onClick={() => setStatus(s)}
                 className={`rounded-lg py-1.5 text-sm font-semibold transition cursor-pointer ${
-                  status === s ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                  status === s ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-950 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
                 }`}
               >
                 {s}

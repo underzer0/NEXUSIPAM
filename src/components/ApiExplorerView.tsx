@@ -14,7 +14,7 @@ interface ApiEndpoint {
 
 const METHOD_STYLE: Record<Method, string> = {
   GET: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-  POST: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300',
+  POST: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300',
 };
 
 export const ApiExplorerView: React.FC = () => {
@@ -129,8 +129,8 @@ export const ApiExplorerView: React.FC = () => {
                 onClick={() => select(i)}
                 className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition cursor-pointer ${
                   i === selected
-                    ? 'bg-indigo-500/10 font-semibold text-indigo-700 dark:text-indigo-300'
-                    : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                    ? 'bg-cyan-500/10 font-semibold text-cyan-700 dark:text-cyan-300'
+                    : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
                 }`}
               >
                 <span className={`${chip} w-12 justify-center font-mono text-[10px] font-bold ${METHOD_STYLE[ep.method]}`}>{ep.method}</span>
@@ -174,26 +174,26 @@ export const ApiExplorerView: React.FC = () => {
 
         <div className={`${card} space-y-3 p-5`}>
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-slate-900 dark:text-white">Response</h2>
+            <h2 className="font-semibold text-zinc-900 dark:text-white">Response</h2>
             {response && (
               <span className={`${chip} font-mono ${ok ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-rose-500/10 text-rose-700 dark:text-rose-300'}`}>
                 {response.status || 'Network error'}
               </span>
             )}
           </div>
-          <pre className="max-h-96 overflow-auto rounded-xl bg-slate-950 p-4 font-mono text-xs text-emerald-300">
-            {loading ? 'Sending…' : response ? response.body : <span className="text-slate-500">Press Send to see the response.</span>}
+          <pre className="max-h-96 overflow-auto rounded-xl bg-zinc-950 p-4 font-mono text-xs text-emerald-300">
+            {loading ? 'Sending…' : response ? response.body : <span className="text-zinc-500">Press Send to see the response.</span>}
           </pre>
         </div>
 
         <div className={`${card} space-y-3 p-5`}>
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-slate-900 dark:text-white">cURL</h2>
+            <h2 className="font-semibold text-zinc-900 dark:text-white">cURL</h2>
             <button type="button" onClick={copyCurl} className={secondaryButton}>
               {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />} Copy
             </button>
           </div>
-          <pre className="overflow-auto rounded-xl bg-slate-950 p-4 font-mono text-xs text-slate-300">{curl}</pre>
+          <pre className="overflow-auto rounded-xl bg-zinc-950 p-4 font-mono text-xs text-zinc-300">{curl}</pre>
           <p className={`text-xs ${muted}`}>Every request needs a signed-in session. Signing requests with API keys isn't supported yet.</p>
         </div>
       </div>

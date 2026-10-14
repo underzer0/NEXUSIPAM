@@ -50,7 +50,7 @@ export const VlansView: React.FC<VlansViewProps> = ({ onOpenNewVlanModal, onOpen
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 md:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
           VLANs <span className={`text-lg font-medium ${muted}`}>{filteredVlans.length}</span>
         </h1>
         <button id="btn-add-vlan" type="button" onClick={onOpenNewVlanModal} className={primaryButton}>
@@ -67,7 +67,7 @@ export const VlansView: React.FC<VlansViewProps> = ({ onOpenNewVlanModal, onOpen
       <div className="flex flex-col gap-3 sm:flex-row">
         <label className="relative flex-1">
           <span className="sr-only">Search VLANs</span>
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
           <input
             type="search"
             placeholder="Search name, ID or description"
@@ -86,7 +86,7 @@ export const VlansView: React.FC<VlansViewProps> = ({ onOpenNewVlanModal, onOpen
 
       {filteredVlans.length === 0 ? (
         <div className={`${card} flex flex-col items-center gap-3 p-12 text-center`}>
-          <Layers className="h-8 w-8 text-slate-300 dark:text-slate-600" />
+          <Layers className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
           <p className={`text-sm ${muted}`}>{vlans.length === 0 ? 'No VLANs yet.' : 'No VLANs match these filters.'}</p>
           {vlans.length === 0 && (
             <button type="button" onClick={onOpenNewVlanModal} className={primaryButton}>
@@ -95,14 +95,14 @@ export const VlansView: React.FC<VlansViewProps> = ({ onOpenNewVlanModal, onOpen
           )}
         </div>
       ) : (
-        <ul className={`${card} divide-y divide-slate-100 overflow-hidden dark:divide-slate-800`}>
+        <ul className={`${card} divide-y divide-zinc-100 overflow-hidden dark:divide-zinc-800`}>
           {filteredVlans.map((vlan) => {
             const linked = subnetsByVlan.get(vlan.id) ?? [];
             const shared = (tagCount.get(vlan.vlanId) ?? 0) > 1;
             return (
               <li
                 key={vlan.id}
-                className="grid grid-cols-[auto_1fr_auto] items-center gap-x-4 gap-y-2 px-5 py-3.5 transition hover:bg-slate-50 md:grid-cols-[5rem_1.2fr_1fr_1.5fr_auto] dark:hover:bg-slate-800/40"
+                className="grid grid-cols-[auto_1fr_auto] items-center gap-x-4 gap-y-2 px-5 py-3.5 transition hover:bg-zinc-50 md:grid-cols-[5rem_1.2fr_1fr_1.5fr_auto] dark:hover:bg-zinc-800/40"
               >
                 <span className="flex flex-col items-start gap-1">
                   <span className={`${chip} bg-purple-500/10 font-mono text-sm font-bold text-purple-700 dark:text-purple-300`}>{vlan.vlanId}</span>
@@ -113,7 +113,7 @@ export const VlansView: React.FC<VlansViewProps> = ({ onOpenNewVlanModal, onOpen
                   )}
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-slate-900 dark:text-white">{vlan.name}</p>
+                  <p className="truncate font-medium text-zinc-900 dark:text-white">{vlan.name}</p>
                   {vlan.description && <p className={`truncate text-xs ${muted}`}>{vlan.description}</p>}
                 </div>
                 <div className="flex justify-end gap-0.5 md:order-last">
