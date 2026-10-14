@@ -44,7 +44,7 @@ export interface IPAddress {
 export interface ActivityLog {
   id: string;
   action: 'CREATE' | 'UPDATE' | 'DELETE' | 'RESERVE';
-  entityType: 'Datacenter' | 'VLAN' | 'Subnet' | 'IP';
+  entityType: 'Datacenter' | 'VLAN' | 'Subnet' | 'IP' | 'User';
   entityId: string;
   title: string;
   detail: string;

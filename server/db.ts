@@ -1509,7 +1509,7 @@ class IPAMDatabase {
     if (data.exhaustionAlerts !== undefined) current.exhaustionAlerts = Boolean(data.exhaustionAlerts);
     if (data.themePreference !== undefined) current.themePreference = data.themePreference;
 
-    this.logActivity('UPDATE', 'Datacenter', current.id, `Profile Updated: ${current.name}`, `Updated contact & preferences for ${current.email}`);
+    this.logActivity('UPDATE', 'User', current.id, `Profile Updated: ${current.name}`, `Updated contact & preferences for ${current.email}`);
     this.persist();
     const hash = this.passwordHashes.get(current.id) ?? '';
     mysqlEngine.saveUser(current, hash).catch(() => {});
@@ -1566,7 +1566,7 @@ class IPAMDatabase {
     this.passwordHashes.set(newUser.id, bcryptHash);
 
     this.users.push(newUser);
-    this.logActivity('CREATE', 'Datacenter', newUser.id, `New Account Created: ${newUser.name}`, `Registered ${newUser.email} with ${newUser.role} role`);
+    this.logActivity('CREATE', 'User', newUser.id, `New Account Created: ${newUser.name}`, `Registered ${newUser.email} with ${newUser.role} role`);
     this.persist();
     
     // Save to MySQL with salted hash
@@ -1598,7 +1598,7 @@ class IPAMDatabase {
       throw new Error('Invalid email or password.');
     }
 
-    this.logActivity('UPDATE', 'Datacenter', user.id, `Engineer Authenticated: ${user.name}`, `Logged into IPAM session as ${user.email}`);
+    this.logActivity('UPDATE', 'User', user.id, `Engineer Authenticated: ${user.name}`, `Logged into IPAM session as ${user.email}`);
     
     const session = this.createSession(user.id);
     return { user, session };
@@ -1608,7 +1608,7 @@ class IPAMDatabase {
     if (!token) return true;
     const user = this.getUserBySession(token);
     if (user) {
-      this.logActivity('UPDATE', 'Datacenter', user.id, `Engineer Signed Out: ${user.name}`, `Session ended for ${user.email}`);
+      this.logActivity('UPDATE', 'User', user.id, `Engineer Signed Out: ${user.name}`, `Session ended for ${user.email}`);
     }
     this.deleteSession(token);
     return true;
@@ -1620,7 +1620,7 @@ class IPAMDatabase {
     
     const { rawKey } = generateSecureApiKey();
     user.apiKey = rawKey;
-    this.logActivity('UPDATE', 'Datacenter', user.id, `API Key Regenerated`, `New token issued for ${user.email}`);
+    this.logActivity('UPDATE', 'User', user.id, `API Key Regenerated`, `New token issued for ${user.email}`);
     this.persist();
 
     const hash = this.passwordHashes.get(user.id) ?? '';

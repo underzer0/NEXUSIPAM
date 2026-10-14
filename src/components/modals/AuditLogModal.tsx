@@ -11,7 +11,7 @@ interface AuditLogModalProps {
 }
 
 const ACTIONS = ['ALL', 'CREATE', 'UPDATE', 'DELETE', 'RESERVE'] as const;
-const ENTITIES = ['ALL', 'Datacenter', 'VLAN', 'Subnet', 'IP'] as const;
+const ENTITIES = ['ALL', 'Datacenter', 'VLAN', 'Subnet', 'IP', 'User'] as const;
 const ACTION_STYLE: Record<string, string> = {
   CREATE: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
   UPDATE: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300',
