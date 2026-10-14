@@ -7,6 +7,8 @@ import { parseCIDR } from '../src/utils/ipCalculator';
 const SESSION_COOKIE_NAME = 'ipam_session_token';
 const SESSION_COOKIE_OPTIONS = {
   httpOnly: true,
+  // Production is served over HTTPS; local dev runs on plain http://localhost.
+  secure: process.env.NODE_ENV === 'production',
   sameSite: 'lax' as const,
   path: '/',
   maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
