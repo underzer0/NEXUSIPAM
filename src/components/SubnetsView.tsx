@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useIPAM } from '../context/IPAMContext';
 import { BookmarkCheck, Database, Edit, Eye, Network, Plus, Search, Trash2 } from 'lucide-react';
-import { Subnet, IPAddress } from '../types/ipam';
+import { Subnet, IPAddress, VLAN } from '../types/ipam';
 import { getIPVersion, parseCIDR } from '../utils/ipCalculator';
 import { Bar, card, chip, chipNeutral, formatCount, iconButton, input, muted, percentLabel, percentOf, primaryButton, usableOf } from './ui';
 
@@ -45,7 +45,7 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
     else ipsBySubnet.set(ip.subnetId, [ip]);
   }
   const dcName = new Map(datacenters.map((d) => [d.id, d.name]));
-  const vlanById = new Map(vlans.map((v) => [v.id, v]));
+  const vlanById = new Map<string, VLAN>(vlans.map((v) => [v.id, v]));
 
   const q = searchFilter.trim().toLowerCase();
   const filteredSubnets = subnets.filter((s) => {
