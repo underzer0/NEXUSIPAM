@@ -614,9 +614,10 @@ class MySQLEngine {
   }
 
   // --- WRITE OPERATORS ---
+  // Each write throws on failure so callers can tell the user instead of showing unsaved data as saved.
 
   public async saveDatacenter(dc: Datacenter): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query(
         `INSERT INTO datacenters (id, name, location, description, created_at)
@@ -626,20 +627,22 @@ class MySQLEngine {
       );
     } catch (err) {
       console.error('[MySQL Error] saveDatacenter:', err);
+      throw err;
     }
   }
 
   public async deleteDatacenter(id: string): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query('DELETE FROM datacenters WHERE id = ?', [id]);
     } catch (err) {
       console.error('[MySQL Error] deleteDatacenter:', err);
+      throw err;
     }
   }
 
   public async saveVlan(vlan: VLAN): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query(
         `INSERT INTO vlans (id, vlan_id, name, description, datacenter_id, created_at)
@@ -649,20 +652,22 @@ class MySQLEngine {
       );
     } catch (err) {
       console.error('[MySQL Error] saveVlan:', err);
+      throw err;
     }
   }
 
   public async deleteVlan(id: string): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query('DELETE FROM vlans WHERE id = ?', [id]);
     } catch (err) {
       console.error('[MySQL Error] deleteVlan:', err);
+      throw err;
     }
   }
 
   public async saveSubnet(subnet: Subnet): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query(
         `INSERT INTO subnets (id, cidr, ip_version, segment_type, datacenter_id, vlan_id, description, created_at)
@@ -672,20 +677,22 @@ class MySQLEngine {
       );
     } catch (err) {
       console.error('[MySQL Error] saveSubnet:', err);
+      throw err;
     }
   }
 
   public async deleteSubnet(id: string): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query('DELETE FROM subnets WHERE id = ?', [id]);
     } catch (err) {
       console.error('[MySQL Error] deleteSubnet:', err);
+      throw err;
     }
   }
 
   public async saveIP(ip: IPAddress): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query(
         `INSERT INTO ip_addresses (id, ip_address, ip_version, subnet_id, status, assigned_device, description, last_updated)
@@ -695,20 +702,22 @@ class MySQLEngine {
       );
     } catch (err) {
       console.error('[MySQL Error] saveIP:', err);
+      throw err;
     }
   }
 
   public async deleteIP(id: string): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query('DELETE FROM ip_addresses WHERE id = ?', [id]);
     } catch (err) {
       console.error('[MySQL Error] deleteIP:', err);
+      throw err;
     }
   }
 
   public async saveActivityLog(log: ActivityLog): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query(
         `INSERT INTO activity_logs (id, action, entity_type, entity_id, title, detail, timestamp)
@@ -717,11 +726,12 @@ class MySQLEngine {
       );
     } catch (err) {
       console.error('[MySQL Error] saveActivityLog:', err);
+      throw err;
     }
   }
 
   public async saveUser(user: UserProfile, passwordHashOrPlain: string, apiKeyHash: string | null): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       // Ensure password is safe bcrypt hash
       let passwordHash = passwordHashOrPlain;
@@ -770,11 +780,12 @@ class MySQLEngine {
       );
     } catch (err) {
       console.error('[MySQL Error] saveUser:', err);
+      throw err;
     }
   }
 
   public async saveSystemConfig(key: string, value: string): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query(
         `INSERT INTO system_config (config_key, config_value)
@@ -784,11 +795,12 @@ class MySQLEngine {
       );
     } catch (err) {
       console.error('[MySQL Error] saveSystemConfig:', err);
+      throw err;
     }
   }
 
   public async saveSession(token: string, userId: string, expiresAt: Date): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query(
         `INSERT INTO user_sessions (token, user_id, expires_at)
@@ -798,15 +810,17 @@ class MySQLEngine {
       );
     } catch (err) {
       console.error('[MySQL Error] saveSession:', err);
+      throw err;
     }
   }
 
   public async deleteSession(token: string): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query('DELETE FROM user_sessions WHERE token = ?', [token]);
     } catch (err) {
       console.error('[MySQL Error] deleteSession:', err);
+      throw err;
     }
   }
 }

@@ -236,6 +236,18 @@ async function runTestSuite() {
   assert(db.getUserByApiKey(testUser.apiKey) === null, 'Masked API key is rejected');
   const secondKey = db.generateApiKey(testUser.id);
   assert(db.getUserByApiKey(firstKey) === null && db.getUserByApiKey(secondKey)?.id === testUser.id, 'Regenerating revokes the previous API key');
+
+  // Without MySQL, a persisted change must be refused instead of reported as saved.
+  if (!db.isDatabaseConnected()) {
+    let refused: any = null;
+    try {
+      await db.persisted(() => db.createDatacenter({ name: 'Unsaved DC', location: 'Nowhere', description: '' }));
+    } catch (err) {
+      refused = err;
+    }
+    assert(refused?.status === 503, 'Changes are refused with 503 while the database is disconnected');
+    assert(!db.getDatacenters().some((d) => d.name === 'Unsaved DC'), 'A refused change never reaches memory');
+  }
   assert(!!userResult.session.token, 'Session token generated successfully');
 
   // Verify BCrypt sign in

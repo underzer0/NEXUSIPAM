@@ -112,6 +112,47 @@ class IPAMDatabase {
     this.initializeStore();
   }
 
+  // MySQL writes started by the current persisted() call; null when none is running.
+  private pendingWrites: Promise<void>[] | null = null;
+
+  private track(write: Promise<void>): void {
+    const tracked = write.catch((err) => {
+      if (this.isDbConnected) console.error('[IPAM Database] Write failed:', err);
+      throw err;
+    });
+    if (this.pendingWrites) this.pendingWrites.push(tracked);
+    // Writes outside a request (session expiry cleanup) have nobody to report to.
+    else tracked.catch(() => {});
+  }
+
+  /**
+   * Runs a change and waits until MySQL has stored it. If any write fails, memory is reloaded
+   * from MySQL so the failed change is not shown as saved, and the caller gets a 503 error.
+   */
+  public async persisted<T>(change: () => T): Promise<T> {
+    if (!this.isDbConnected) throw new DatabaseWriteError('The database is not connected, so nothing was saved.');
+    // change() is synchronous, so no other request can add writes to this list meanwhile.
+    this.pendingWrites = [];
+    let result: T;
+    let writes: Promise<void>[];
+    try {
+      result = change();
+    } finally {
+      writes = this.pendingWrites;
+      this.pendingWrites = null;
+    }
+    const failed = (await Promise.allSettled(writes)).some((r) => r.status === 'rejected');
+    if (failed) {
+      const reload = await this.reloadFromMySQL().catch(() => null);
+      if (!reload?.success) {
+        this.isDbConnected = false;
+        this.dbError = 'Lost the connection to MySQL while saving.';
+      }
+      throw new DatabaseWriteError('The database did not save this change. Please try again.');
+    }
+    return result;
+  }
+
   public isDatabaseConnected(): boolean {
     return this.isDbConnected;
   }
@@ -244,7 +285,9 @@ class IPAMDatabase {
       await mysqlEngine.saveSubnet(defaultSubnet);
       await mysqlEngine.saveUser(adminUser, defaultPasswordHash, null);
     } catch (err) {
-      console.warn('[MySQL Seed Warning]', err);
+      console.error('[MySQL Seed Error]', err);
+      this.isDbConnected = false;
+      this.dbError = 'Could not write the starting data to MySQL.';
     }
   }
 
@@ -431,7 +474,7 @@ class IPAMDatabase {
     }
     this.persist();
     // Asynchronously write through to MySQL
-    mysqlEngine.saveActivityLog(log).catch(() => {});
+    this.track(mysqlEngine.saveActivityLog(log));
     return log;
   }
 
@@ -468,7 +511,7 @@ class IPAMDatabase {
     this.datacenters.push(newDc);
     this.logActivity('CREATE', 'Datacenter', newDc.id, `Datacenter Created: ${newDc.name}`, `Added location ${newDc.location}`);
     this.persist();
-    mysqlEngine.saveDatacenter(newDc).catch(() => {});
+    this.track(mysqlEngine.saveDatacenter(newDc));
     return newDc;
   }
 
@@ -487,7 +530,7 @@ class IPAMDatabase {
     const updated = this.datacenters[index];
     this.logActivity('UPDATE', 'Datacenter', updated.id, `Datacenter Updated: ${updated.name}`, `Modified configuration for ${updated.name}`);
     this.persist();
-    mysqlEngine.saveDatacenter(updated).catch(() => {});
+    this.track(mysqlEngine.saveDatacenter(updated));
     return updated;
   }
 
@@ -506,7 +549,7 @@ class IPAMDatabase {
     this.datacenters = this.datacenters.filter(d => d.id !== id);
     this.logActivity('DELETE', 'Datacenter', id, `Datacenter Deleted: ${dc.name}`, `Removed datacenter location ${dc.location}`);
     this.persist();
-    mysqlEngine.deleteDatacenter(id).catch(() => {});
+    this.track(mysqlEngine.deleteDatacenter(id));
     return { success: true, deletedId: id };
   }
 
@@ -715,7 +758,7 @@ class IPAMDatabase {
     this.vlans.push(newVlan);
     this.logActivity('CREATE', 'VLAN', newVlan.id, `VLAN ${vlanNum} Created`, `Assigned "${newVlan.name}" in ${dc.name}`);
     this.persist();
-    mysqlEngine.saveVlan(newVlan).catch(() => {});
+    this.track(mysqlEngine.saveVlan(newVlan));
     return newVlan;
   }
 
@@ -752,7 +795,7 @@ class IPAMDatabase {
 
     this.logActivity('UPDATE', 'VLAN', current.id, `VLAN ${current.vlanId} Updated`, `Updated "${current.name}" in ${targetDc.name}`);
     this.persist();
-    mysqlEngine.saveVlan(current).catch(() => {});
+    this.track(mysqlEngine.saveVlan(current));
     return current;
   }
 
@@ -769,7 +812,7 @@ class IPAMDatabase {
     this.vlans = this.vlans.filter(v => v.id !== id);
     this.logActivity('DELETE', 'VLAN', id, `VLAN ${vlan.vlanId} Deleted`, `Removed VLAN "${vlan.name}"`);
     this.persist();
-    mysqlEngine.deleteVlan(id).catch(() => {});
+    this.track(mysqlEngine.deleteVlan(id));
     return { success: true, deletedId: id };
   }
 
@@ -850,7 +893,7 @@ class IPAMDatabase {
     this.subnets.push(newSubnet);
     this.logActivity('CREATE', 'Subnet', newSubnet.id, `Subnet ${newSubnet.cidr} (${calc.ipVersion}) Created`, `Configured as ${segmentType} in ${dc.name}`);
     this.persist();
-    mysqlEngine.saveSubnet(newSubnet).catch(() => {});
+    this.track(mysqlEngine.saveSubnet(newSubnet));
     return newSubnet;
   }
 
@@ -919,7 +962,7 @@ class IPAMDatabase {
 
     this.logActivity('UPDATE', 'Subnet', current.id, `Subnet ${current.cidr} Updated`, `Updated configuration in ${targetDc.name}`);
     this.persist();
-    mysqlEngine.saveSubnet(current).catch(() => {});
+    this.track(mysqlEngine.saveSubnet(current));
     return current;
   }
 
@@ -933,7 +976,7 @@ class IPAMDatabase {
 
     this.logActivity('DELETE', 'Subnet', id, `Subnet ${subnet.cidr} Deleted`, `Removed subnet and purged ${deletedIPCount} child IP assignment(s).`);
     this.persist();
-    mysqlEngine.deleteSubnet(id).catch(() => {});
+    this.track(mysqlEngine.deleteSubnet(id));
     return { success: true, deletedId: id, deletedIPCount };
   }
 
@@ -1014,7 +1057,7 @@ class IPAMDatabase {
     this.ips.push(newIp);
     this.logActivity('CREATE', 'IP', newIp.id, `IP ${newIp.ipAddress} (${newIp.ipVersion}) Assigned`, `Status: ${newIp.status} (Host: ${newIp.assignedDevice || 'None'})`);
     this.persist();
-    mysqlEngine.saveIP(newIp).catch(() => {});
+    this.track(mysqlEngine.saveIP(newIp));
     return newIp;
   }
 
@@ -1065,7 +1108,7 @@ class IPAMDatabase {
     const actionType: ActivityLog['action'] = current.status === 'Reserved' ? 'RESERVE' : 'UPDATE';
     this.logActivity(actionType, 'IP', current.id, `IP ${current.ipAddress} Updated`, `Status: ${current.status}, Host: ${current.assignedDevice || 'None'}`);
     this.persist();
-    mysqlEngine.saveIP(current).catch(() => {});
+    this.track(mysqlEngine.saveIP(current));
     return current;
   }
 
@@ -1076,7 +1119,7 @@ class IPAMDatabase {
     this.ips = this.ips.filter(i => i.id !== id);
     this.logActivity('DELETE', 'IP', id, `IP ${ip.ipAddress} Released`, `Removed IP assignment record.`);
     this.persist();
-    mysqlEngine.deleteIP(id).catch(() => {});
+    this.track(mysqlEngine.deleteIP(id));
     return { success: true, deletedId: id, ipAddress: ip.ipAddress };
   }
 
@@ -1122,7 +1165,7 @@ class IPAMDatabase {
           this.ips.push(newIp);
           created.push(newIp);
           existingIps.add(ipStr);
-          mysqlEngine.saveIP(newIp).catch(() => {});
+          this.track(mysqlEngine.saveIP(newIp));
         }
       }
     } else {
@@ -1144,7 +1187,7 @@ class IPAMDatabase {
           this.ips.push(newIp);
           created.push(newIp);
           existingIps.add(ipStr);
-          mysqlEngine.saveIP(newIp).catch(() => {});
+          this.track(mysqlEngine.saveIP(newIp));
         }
       }
     }
@@ -1228,7 +1271,7 @@ class IPAMDatabase {
       existing.lastUpdated = new Date().toISOString();
       this.logActivity('RESERVE', 'IP', existing.id, `Reserved IP ${existing.ipAddress}`, `Assigned to ${existing.assignedDevice || 'Reserved Pool'}`);
       this.persist();
-      mysqlEngine.saveIP(existing).catch(() => {});
+      this.track(mysqlEngine.saveIP(existing));
       return existing;
     }
 
@@ -1246,7 +1289,7 @@ class IPAMDatabase {
     this.ips.push(newIp);
     this.logActivity('RESERVE', 'IP', newIp.id, `Reserved IP ${newIp.ipAddress}`, `Assigned to ${newIp.assignedDevice || 'Reserved Pool'}`);
     this.persist();
-    mysqlEngine.saveIP(newIp).catch(() => {});
+    this.track(mysqlEngine.saveIP(newIp));
     return newIp;
   }
 
@@ -1460,7 +1503,7 @@ class IPAMDatabase {
     };
     this.sessions.set(token, sessionObj);
     this.persist();
-    mysqlEngine.saveSession(token, userId, expiresAt).catch(() => {});
+    this.track(mysqlEngine.saveSession(token, userId, expiresAt));
     return { token, expiresAt };
   }
 
@@ -1470,7 +1513,7 @@ class IPAMDatabase {
     if (!session) return null;
     if (session.expiresAt <= Date.now()) {
       this.sessions.delete(token);
-      mysqlEngine.deleteSession(token).catch(() => {});
+      this.track(mysqlEngine.deleteSession(token));
       return null;
     }
     const user = this.getUserById(session.userId);
@@ -1481,7 +1524,7 @@ class IPAMDatabase {
     if (!token) return;
     this.sessions.delete(token);
     this.persist();
-    mysqlEngine.deleteSession(token).catch(() => {});
+    this.track(mysqlEngine.deleteSession(token));
   }
 
   public updateUserProfile(id: string, data: Partial<UserProfile>): UserProfile {
@@ -1517,7 +1560,7 @@ class IPAMDatabase {
     this.logActivity('UPDATE', 'User', current.id, `Profile Updated: ${current.name}`, `Updated contact & preferences for ${current.email}`);
     this.persist();
     const hash = this.passwordHashes.get(current.id) ?? '';
-    mysqlEngine.saveUser(current, hash, this.apiKeyHashes.get(current.id) ?? null).catch(() => {});
+    this.track(mysqlEngine.saveUser(current, hash, this.apiKeyHashes.get(current.id) ?? null));
     return current;
   }
 
@@ -1573,7 +1616,7 @@ class IPAMDatabase {
     this.persist();
     
     // Save to MySQL with salted hash
-    mysqlEngine.saveUser(newUser, bcryptHash, null).catch(() => {});
+    this.track(mysqlEngine.saveUser(newUser, bcryptHash, null));
     
     // Create new session
     const session = this.createSession(newUser.id);
@@ -1629,7 +1672,7 @@ class IPAMDatabase {
     this.persist();
 
     const hash = this.passwordHashes.get(user.id) ?? '';
-    mysqlEngine.saveUser(user, hash, keyHash).catch(() => {});
+    this.track(mysqlEngine.saveUser(user, hash, keyHash));
     return rawKey;
   }
 
@@ -1641,6 +1684,10 @@ class IPAMDatabase {
     }
     return null;
   }
+}
+
+export class DatabaseWriteError extends Error {
+  status = 503;
 }
 
 export const db = new IPAMDatabase();
