@@ -1,25 +1,9 @@
 import React, { useState } from 'react';
 import { useIPAM } from '../context/IPAMContext';
-import { 
-  Building2, 
-  Layers, 
-  Network, 
-  Hash, 
-  ShieldCheck, 
-  Globe, 
-  Lock, 
-  Activity, 
-  ArrowUpRight, 
-  Eye, 
-  Zap, 
-  Server, 
-  Sparkles,
-  Info,
-  SlidersHorizontal,
-  CheckCircle2
-} from 'lucide-react';
-import { Subnet, IPVersion } from '../types/ipam';
-import { parseCIDR, getIPVersion, formatCapacityCompact, formatCapacityDetailed } from '../utils/ipCalculator';
+import { ArrowUpRight, Building2, Hash, Layers, Network, Plus, Zap } from 'lucide-react';
+import { Subnet, IPVersion, IPAddress } from '../types/ipam';
+import { getIPVersion } from '../utils/ipCalculator';
+import { Bar, Ring, Segmented, card, formatCount, linkButton, muted, percentLabel, percentOf, primaryButton, secondaryButton, usableOf } from './ui';
 
 interface DashboardViewProps {
   onOpenSubnetVisualizer: (subnet: Subnet) => void;
@@ -29,1058 +13,290 @@ interface DashboardViewProps {
   onOpenAuditLogs?: (entityFilter?: string) => void;
 }
 
+const ACTION_DOT: Record<string, string> = { CREATE: 'bg-cyan-400', RESERVE: 'bg-amber-400', DELETE: 'bg-rose-500', UPDATE: 'bg-emerald-400' };
+
+// Heatmap cell color by how full a subnet is; empty subnets stay dark.
+const heat = (p: number) =>
+  p === 0 ? 'bg-zinc-200 dark:bg-zinc-800' : p < 25 ? 'bg-emerald-400/40' : p < 50 ? 'bg-emerald-400' : p < 80 ? 'bg-amber-400' : 'bg-rose-500';
+const HEAT_LEGEND = [
+  ['Empty', 0],
+  ['<25%', 10],
+  ['<50%', 30],
+  ['<80%', 60],
+  ['80%+', 90],
+] as const;
+
+const StatTile: React.FC<{ icon: React.ReactNode; label: string; value: React.ReactNode; onClick: () => void }> = ({ icon, label, value, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`${card} group flex items-center gap-4 p-4 text-left transition hover:border-cyan-500/60 focus-visible:outline-2 focus-visible:outline-cyan-500 cursor-pointer`}
+  >
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">{icon}</span>
+    <span className="min-w-0">
+      <span className="block font-mono text-2xl font-semibold leading-tight text-zinc-900 dark:text-white">{value}</span>
+      <span className={`block text-xs ${muted}`}>{label}</span>
+    </span>
+    <ArrowUpRight className={`ml-auto h-4 w-4 opacity-0 transition group-hover:opacity-100 ${muted}`} aria-hidden />
+  </button>
+);
+
+const Legend: React.FC<{ items: [string, string][] }> = ({ items }) => (
+  <span className={`flex flex-wrap gap-x-4 gap-y-1 text-xs ${muted}`}>
+    {items.map(([color, text]) => (
+      <span key={text} className="flex items-center gap-1.5">
+        <span className={`h-2 w-2 rounded-sm ${color}`} aria-hidden />
+        {text}
+      </span>
+    ))}
+  </span>
+);
+
 export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenSubnetVisualizer,
-  onOpenNewDatacenterModal,
   onOpenNewSubnetModal,
   onOpenReserveNextModal,
   onOpenAuditLogs,
 }) => {
-  const { 
-    stats, 
-    datacenters, 
-    subnets, 
-    ips, 
-    vlans,
-    activityLogs, 
-    setActiveTab, 
-    setFilters,
-    isDark 
-  } = useIPAM();
+  const { stats, datacenters, subnets, ips, vlans, activityLogs, setActiveTab, setFilters } = useIPAM();
 
-  // Active protocol tab: 'IPv4' or 'IPv6'
   const [selectedProtocol, setSelectedProtocol] = useState<IPVersion>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('ipam_dashboard_protocol');
-      if (saved === 'IPv6' || saved === 'IPv4') return saved;
+    try {
+      return localStorage.getItem('ipam_dashboard_protocol') === 'IPv6' ? 'IPv6' : 'IPv4';
+    } catch {
+      return 'IPv4';
     }
-    return 'IPv4';
   });
-
-  const [activeDCFilter, setActiveDCFilter] = useState<string>('all');
 
   const handleProtocolChange = (ver: IPVersion) => {
     setSelectedProtocol(ver);
-    if (typeof window !== 'undefined') {
+    try {
       localStorage.setItem('ipam_dashboard_protocol', ver);
-    }
-    // Also reset DC filter to 'all' to avoid empty view if DC has no subnets of this protocol
-    setActiveDCFilter('all');
+    } catch {}
   };
 
   if (!stats) {
     return (
-      <div className="flex items-center justify-center h-full min-h-[400px]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
-          <span className="text-xs font-mono text-slate-400">Loading Telemetry & Stats...</span>
-        </div>
+      <div className="flex h-full min-h-[400px] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-cyan-500" />
       </div>
     );
   }
 
-  const isV6 = selectedProtocol === 'IPv6';
+  const goTo = (tab: 'subnets' | 'ips' | 'datacenters') => {
+    if (tab !== 'datacenters') setFilters((prev) => ({ ...prev, ipVersion: selectedProtocol }));
+    setActiveTab(tab);
+  };
 
-  // 1. Filter Subnets strictly by active protocol
-  const protocolSubnets = subnets.filter((s) => {
-    const ver = s.ipVersion || getIPVersion(s.cidr);
-    return ver === selectedProtocol;
-  });
+  const versionCount = (ver: IPVersion) => subnets.filter((s) => (s.ipVersion || getIPVersion(s.cidr)) === ver).length;
+  const protocolSubnets = subnets.filter((s) => (s.ipVersion || getIPVersion(s.cidr)) === selectedProtocol);
 
-  const protocolSubnetIds = new Set(protocolSubnets.map((s) => s.id));
-
-  // 2. Filter IPs strictly by active protocol
-  const protocolIPs = ips.filter((ip) => {
-    const ver = ip.ipVersion || (ip.ipAddress.includes(':') ? 'IPv6' : 'IPv4');
-    return ver === selectedProtocol;
-  });
-
-  // Calculate Protocol Metrics
-  const activeCount = protocolIPs.filter((i) => i.status === 'Active').length;
-  const reservedCount = protocolIPs.filter((i) => i.status === 'Reserved').length;
-  const availableTrackedCount = protocolIPs.filter((i) => i.status === 'Available').length;
-  const totalAllocated = activeCount + reservedCount;
-
-  // Calculate Total Capacity for Active Protocol
-  let totalCapacityRaw = 0;
-  for (const s of protocolSubnets) {
-    try {
-      const calc = parseCIDR(s.cidr);
-      if (isV6) {
-        // Each /64 is 2^64 addresses
-        totalCapacityRaw += 1; // Count prefix units for BigInt scaling
-      } else {
-        totalCapacityRaw += calc.usableHosts;
-      }
-    } catch {}
+  const ipsBySubnet = new Map<string, IPAddress[]>();
+  for (const ip of ips) {
+    const list = ipsBySubnet.get(ip.subnetId);
+    if (list) list.push(ip);
+    else ipsBySubnet.set(ip.subnetId, [ip]);
   }
 
-  // Format Total Capacity box in K / 10^ notation
-  let formattedCapacity = '';
-  let capacitySubtitle = '';
-  let capacityTooltip = '';
+  // One pass per subnet; everything below aggregates these rows.
+  const subnetRows = protocolSubnets
+    .map((sub) => {
+      const subIPs = ipsBySubnet.get(sub.id) ?? [];
+      const active = subIPs.filter((i) => i.status === 'Active').length;
+      const reserved = subIPs.filter((i) => i.status === 'Reserved').length;
+      const usable = usableOf(sub.cidr);
+      return { sub, active, reserved, used: active + reserved, usable, percent: percentOf(active + reserved, usable) };
+    })
+    .sort((a, b) => b.percent - a.percent);
 
-  if (isV6) {
-    // 1 IPv6 /64 prefix = ~1.844 x 10^19 addresses
-    const prefixCount = protocolSubnets.length;
-    if (prefixCount === 0) {
-      formattedCapacity = '0';
-      capacitySubtitle = 'No IPv6 Prefixes Allocated';
-      capacityTooltip = '0 Addresses';
-    } else {
-      const totalSci = (prefixCount * 1.844).toFixed(2);
-      formattedCapacity = `${totalSci} × 10¹⁹`;
-      capacitySubtitle = `10¹⁹ Notation (2⁶⁴/block) • ${prefixCount} Prefixes`;
-      capacityTooltip = `Total Capacity: ~${(prefixCount * 1.8446744).toFixed(4)} × 10¹⁹ unique 128-bit addresses across ${prefixCount} IPv6 subnets`;
-    }
-  } else {
-    formattedCapacity = formatCapacityCompact(totalCapacityRaw, false);
-    capacitySubtitle = totalCapacityRaw >= 1000 
-      ? `Compact Notation (${totalCapacityRaw.toLocaleString()} hosts) • ${protocolSubnets.length} Subnets`
-      : `Across ${protocolSubnets.length} IPv4 CIDR blocks`;
-    capacityTooltip = `Total Usable IPv4 Hosts: ${totalCapacityRaw.toLocaleString()} across ${protocolSubnets.length} subnets`;
-  }
+  const sum = (rows: typeof subnetRows, key: 'active' | 'reserved' | 'used' | 'usable') => rows.reduce((t, r) => t + r[key], 0);
+  const totalActive = sum(subnetRows, 'active');
+  const totalReserved = sum(subnetRows, 'reserved');
+  const totalUsable = sum(subnetRows, 'usable');
+  const totalPercent = percentOf(totalActive + totalReserved, totalUsable);
+  const privateCount = protocolSubnets.filter((s) => s.segmentType === 'Private').length;
 
-  // Segment metrics
-  const totalPublicSubnets = protocolSubnets.filter((s) => s.segmentType === 'Public').length;
-  const totalPrivateSubnets = protocolSubnets.filter((s) => s.segmentType === 'Private').length;
-  const totalSubnetCount = protocolSubnets.length || 1;
-  const privatePercent = Math.round((totalPrivateSubnets / totalSubnetCount) * 100);
-  const publicPercent = 100 - privatePercent;
-
-  // Active protocol utilization percentage
-  const protocolUtilPercent = isV6
-    ? (protocolSubnets.length > 0 ? Math.min(100, Math.round((totalAllocated / (protocolSubnets.length * 100)) * 100)) : 0)
-    : (totalCapacityRaw > 0 ? Math.min(100, Math.round((totalAllocated / totalCapacityRaw) * 100)) : 0);
-
-  // Filter Active IP Leases for the Bento widget
-  const filteredIPs = activeDCFilter === 'all'
-    ? protocolIPs
-    : protocolIPs.filter((ip) => {
-        const sub = subnets.find((s) => s.id === ip.subnetId);
-        return sub && sub.datacenterId === activeDCFilter;
-      });
-
-  // Datacenter scope utilization for the active protocol
-  const dcProtocolUtilization = datacenters.map((dc) => {
-    const dcSubs = protocolSubnets.filter((s) => s.datacenterId === dc.id);
-    const dcSubIds = new Set(dcSubs.map((s) => s.id));
-    const dcIps = protocolIPs.filter((i) => dcSubIds.has(i.subnetId));
-    const dcActive = dcIps.filter((i) => i.status === 'Active').length;
-    const dcReserved = dcIps.filter((i) => i.status === 'Reserved').length;
-    
-    let dcCap = 0;
-    for (const sub of dcSubs) {
-      try {
-        const c = parseCIDR(sub.cidr);
-        dcCap += isV6 ? 100 : c.usableHosts;
-      } catch {}
-    }
-
-    const dcAlloc = dcActive + dcReserved;
-    const util = dcCap > 0 ? Math.min(100, Math.round((dcAlloc / dcCap) * 100)) : (dcIps.length > 0 ? 100 : 0);
-
-    return {
-      dc,
-      subnetsCount: dcSubs.length,
-      trackedIPsCount: dcIps.length,
-      activeCount: dcActive,
-      reservedCount: dcReserved,
-      utilizationPercent: util,
-    };
+  const dcRows = datacenters.map((dc) => {
+    const rows = subnetRows.filter((r) => r.sub.datacenterId === dc.id);
+    return { dc, subnetCount: rows.length, percent: percentOf(sum(rows, 'used'), sum(rows, 'usable')) };
   });
 
-  // Protocol count badges
-  const ipv4SubnetList = subnets.filter((s) => (s.ipVersion || getIPVersion(s.cidr)) === 'IPv4');
-  const ipv6SubnetList = subnets.filter((s) => (s.ipVersion || getIPVersion(s.cidr)) === 'IPv6');
-  const ipv4IPList = ips.filter((i) => (i.ipVersion || (i.ipAddress.includes(':') ? 'IPv6' : 'IPv4')) === 'IPv4');
-  const ipv6IPList = ips.filter((i) => (i.ipVersion || (i.ipAddress.includes(':') ? 'IPv6' : 'IPv4')) === 'IPv6');
 
   return (
-    <div className="p-3.5 sm:p-6 md:p-8 max-w-[1400px] mx-auto space-y-4 sm:space-y-6">
-      {/* Top Protocol Switcher & View Header */}
-      <div className={`flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b ${
-        isDark ? 'border-slate-800/80' : 'border-slate-200'
-      }`}>
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className={`text-lg sm:text-xl font-bold tracking-tight flex items-center gap-2 ${
-              isDark ? 'text-white' : 'text-slate-900'
-            }`}>
-              <Network className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
-              Network Topology & IPAM Dashboard
-            </h1>
-            <span className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold uppercase tracking-wider border ${
-              isV6 
-                ? (isDark ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30' : 'bg-cyan-50 text-cyan-800 border-cyan-200')
-                : (isDark ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30' : 'bg-indigo-50 text-indigo-800 border-indigo-200')
-            }`}>
-              {selectedProtocol} Scope Active
-            </span>
-          </div>
-          <p className={`text-[11px] sm:text-xs mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-            {isV6 
-              ? 'IPv6 128-Bit Prefixes • Global Unicast (GUA) & Unique Local (ULA) • SLAAC Host Pool' 
-              : 'IPv4 32-Bit Subnets • RFC 1918 Private & Public BGP • ARP / DHCP Inventory'}
-          </p>
+    <div className="mx-auto max-w-[1400px] space-y-4 p-4 sm:p-6 md:p-8">
+      {/* Header */}
+      <div className="flex flex-col gap-4 pb-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">Overview</h1>
+          <Segmented
+            label="IP version"
+            options={['IPv4', 'IPv6'] as const}
+            value={selectedProtocol}
+            onChange={handleProtocolChange}
+            render={(ver) => (
+              <span className="font-mono">
+                {ver} <span className="opacity-70">{versionCount(ver)}</span>
+              </span>
+            )}
+          />
         </div>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => onOpenReserveNextModal()} className={secondaryButton}>
+            <Zap className="h-4 w-4" /> Reserve IP
+          </button>
+          <button type="button" onClick={onOpenNewSubnetModal} className={primaryButton}>
+            <Plus className="h-4 w-4" /> New subnet
+          </button>
+        </div>
+      </div>
 
-        {/* Prominent Protocol Tabs Switcher */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div 
-            id="protocol-dashboard-switcher"
-            className={`flex items-center p-1 rounded-xl border font-mono shadow-inner ${
-              isDark ? 'bg-slate-900 border-slate-700/80' : 'bg-slate-200 border-slate-300'
-            }`}
-          >
-            <button
-              id="btn-switch-ipv4"
-              onClick={() => handleProtocolChange('IPv4')}
-              className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                !isV6
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : isDark
-                    ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-300/60'
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${!isV6 ? 'bg-white animate-pulse' : 'bg-indigo-400'}`}></span>
-              IPv4 Dashboard
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-medium ${
-                !isV6 
-                  ? 'bg-indigo-950/80 border border-indigo-400/40 text-indigo-200' 
-                  : isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-300 text-slate-700'
-              }`}>
-                {ipv4SubnetList.length} Prefixes
-              </span>
-            </button>
-
-            <button
-              id="btn-switch-ipv6"
-              onClick={() => handleProtocolChange('IPv6')}
-              className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                isV6
-                  ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
-                  : isDark
-                    ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-300/60'
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${isV6 ? 'bg-white animate-pulse' : 'bg-cyan-400'}`}></span>
-              IPv6 Dashboard
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-medium ${
-                isV6 
-                  ? 'bg-cyan-950/80 border border-cyan-400/40 text-cyan-200' 
-                  : isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-300 text-slate-700'
-              }`}>
-                {ipv6SubnetList.length} Prefixes
-              </span>
-            </button>
+      {/* Utilization ring + key counts */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
+        <button
+          type="button"
+          onClick={() => goTo('subnets')}
+          className={`${card} flex items-center gap-6 p-5 text-left transition hover:border-cyan-500/60 cursor-pointer`}
+        >
+          <Ring percent={totalPercent} label={`${selectedProtocol} utilization`} size={120}>
+            <span className="font-mono text-2xl font-semibold text-zinc-900 dark:text-white">{percentLabel(totalPercent)}</span>
+            <span className={`text-[10px] uppercase tracking-wider ${muted}`}>used</span>
+          </Ring>
+          <div className="min-w-0 space-y-3">
+            <div>
+              <p className="font-mono text-lg font-semibold text-zinc-900 dark:text-white">{totalActive + totalReserved}</p>
+              <p className={`text-xs ${muted}`}>of {formatCount(totalUsable)} addresses</p>
+            </div>
+            <Legend items={[['bg-cyan-400', `${totalActive} active`], ['bg-amber-400', `${totalReserved} reserved`]]} />
           </div>
+        </button>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onOpenReserveNextModal()}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer ${
-                isDark 
-                  ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20' 
-                  : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5" /> Reserve IP
-            </button>
-            <button
-              onClick={onOpenNewSubnetModal}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
-            >
-              <Network className="w-3.5 h-3.5" /> Allocate Subnet
-            </button>
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+          <StatTile icon={<Network className="h-5 w-5" />} label={`${selectedProtocol} subnets`} value={protocolSubnets.length} onClick={() => goTo('subnets')} />
+          <StatTile icon={<Hash className="h-5 w-5" />} label="IPs in use" value={totalActive + totalReserved} onClick={() => goTo('ips')} />
+          <StatTile icon={<Layers className="h-5 w-5" />} label="VLANs" value={vlans.length} onClick={() => setActiveTab('vlans')} />
+          <StatTile icon={<Building2 className="h-5 w-5" />} label="Datacenters" value={datacenters.length} onClick={() => goTo('datacenters')} />
+          <div className={`${card} col-span-2 flex flex-col justify-center gap-2 p-4 xl:col-span-4`}>
+            <div className="flex h-2 overflow-hidden rounded-full bg-purple-500" aria-hidden>
+              <div className="bg-cyan-400" style={{ width: `${percentOf(privateCount, protocolSubnets.length)}%` }} />
+            </div>
+            <Legend items={[['bg-cyan-400', `${privateCount} private`], ['bg-purple-500', `${protocolSubnets.length - privateCount} public`]]} />
           </div>
         </div>
       </div>
 
-      {/* Row 1: 4 High-Level Bento Cards for the Active Protocol */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4">
-        {/* Bento 1: TOTAL CAPACITY BOX (High Visibility + K / 10^ Notation + No Overflow) */}
-        <div 
-          id="bento-total-capacity"
-          onClick={() => {
-            setFilters(prev => ({ ...prev, ipVersion: selectedProtocol }));
-            setActiveTab('subnets');
-          }}
-          title={capacityTooltip}
-          className={`lg:col-span-3 p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between group ${
-            isDark
-              ? (isV6 
-                  ? 'bg-gradient-to-br from-cyan-950/40 via-slate-900/80 to-slate-900/60 border-cyan-500/30 hover:border-cyan-400/60 shadow-lg shadow-cyan-950/20' 
-                  : 'bg-gradient-to-br from-indigo-950/40 via-slate-900/80 to-slate-900/60 border-indigo-500/30 hover:border-indigo-400/60 shadow-lg shadow-indigo-950/20')
-              : (isV6
-                  ? 'bg-gradient-to-br from-cyan-50 via-white to-slate-50 border-cyan-200 hover:border-cyan-400 shadow-sm'
-                  : 'bg-gradient-to-br from-indigo-50 via-white to-slate-50 border-indigo-200 hover:border-indigo-400 shadow-sm')
-          }`}
-        >
-          {/* Subtle decorative glow */}
-          <div className={`absolute -right-6 -bottom-6 w-24 h-24 rounded-full blur-2xl pointer-events-none opacity-40 ${
-            isV6 ? 'bg-cyan-500/20' : 'bg-indigo-500/20'
-          }`} />
-
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-1.5">
-              <span className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 font-mono ${
-                isDark ? 'text-slate-300' : 'text-slate-700'
-              }`}>
-                <Layers className={`w-3.5 h-3.5 ${isV6 ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : (isDark ? 'text-indigo-400' : 'text-indigo-600')}`} />
-                {selectedProtocol} Capacity
-              </span>
-              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border ${
-                isV6 
-                  ? (isDark ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30' : 'bg-cyan-50 text-cyan-800 border-cyan-200')
-                  : (isDark ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30' : 'bg-indigo-50 text-indigo-800 border-indigo-200')
-              }`}>
-                {isV6 ? '10¹⁹ Notation' : 'K / M Notation'}
-              </span>
-            </div>
-
-            {/* Formatted Capacity Value */}
-            <div className="mt-2 min-w-0">
-              <div className={`text-2xl sm:text-3xl font-black font-mono tracking-tight truncate ${
-                isDark ? 'text-white' : 'text-slate-900'
-              }`} title={capacityTooltip}>
-                {formattedCapacity}
-              </div>
-              <p className={`text-[11px] mt-1 font-mono leading-tight truncate ${
-                isDark ? 'text-slate-400' : 'text-slate-600'
-              }`}>
-                {capacitySubtitle}
-              </p>
-            </div>
+      {/* Heatmap: every subnet as one square, fullest first */}
+      <section className={`${card} space-y-4 p-5`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">Subnet heatmap</h2>
+          <Legend items={HEAT_LEGEND.map(([text, p]): [string, string] => [heat(p), text])} />
+        </div>
+        {subnetRows.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-8 text-center">
+            <Network className="h-8 w-8 text-zinc-300 dark:text-zinc-700" />
+            <p className={`text-sm ${muted}`}>No {selectedProtocol} subnets yet.</p>
+            <button type="button" onClick={onOpenNewSubnetModal} className={primaryButton}>
+              Create the first one
+            </button>
           </div>
-
-          <div className={`mt-4 pt-3 border-t ${isDark ? 'border-slate-700/40' : 'border-slate-200'}`}>
-            <div className={`flex items-center justify-between text-[10px] font-mono mb-1 ${
-              isDark ? 'text-slate-400' : 'text-slate-600'
-            }`}>
-              <span>Allocated Load</span>
-              <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{totalAllocated} Tracked</span>
-            </div>
-            <div className={`w-full h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
-              <div 
-                className={`h-full rounded-full transition-all duration-500 ${
-                  isV6 ? 'bg-cyan-500' : 'bg-indigo-500'
-                }`}
-                style={{ width: `${Math.min(100, Math.max(8, protocolUtilPercent))}%` }}
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {subnetRows.map(({ sub, percent }) => (
+              <button
+                key={sub.id}
+                type="button"
+                onClick={() => onOpenSubnetVisualizer(sub)}
+                title={`${sub.cidr} · ${percentLabel(percent)}`}
+                aria-label={`${sub.cidr}, ${percentLabel(percent)} used`}
+                className={`h-7 w-7 rounded transition hover:scale-125 hover:ring-2 hover:ring-cyan-400 cursor-pointer ${heat(percent)}`}
               />
-            </div>
+            ))}
           </div>
-        </div>
+        )}
+      </section>
 
-        {/* Bento 2: Public vs Private Subnets */}
-        <div 
-          onClick={() => {
-            setFilters(prev => ({ ...prev, ipVersion: selectedProtocol }));
-            setActiveTab('subnets');
-          }}
-          className={`lg:col-span-3 p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer hover:border-purple-500/50 flex flex-col justify-between ${
-            isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'
-          }`}
-        >
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 font-mono ${
-                isDark ? 'text-slate-400' : 'text-slate-600'
-              }`}>
-                <Globe className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400" />
-                {selectedProtocol} Public Blocks
-              </span>
-              <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase font-mono border ${
-                isDark ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' : 'bg-purple-50 text-purple-800 border-purple-200'
-              }`}>
-                {isV6 ? 'GUA (2000::/3)' : 'BGP Routable'}
-              </span>
-            </div>
-
-            <div className={`text-3xl font-bold font-mono mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              {totalPublicSubnets}
-            </div>
-            <p className={`text-[11px] mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-              {isV6 ? 'Global Unicast IPv6 prefixes' : 'Internet-facing IPv4 prefixes'}
-            </p>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* Fullest subnets */}
+        <section className={`${card} p-5`}>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">Fullest subnets</h2>
+            <button type="button" onClick={() => goTo('subnets')} className={linkButton}>
+              See all
+            </button>
           </div>
-
-          <div className={`flex items-center justify-between text-[11px] font-mono mt-3 pt-2.5 border-t ${
-            isDark ? 'border-slate-700/30 text-slate-400' : 'border-slate-200 text-slate-600'
-          }`}>
-            <span>Private: <strong className={isDark ? 'text-slate-200' : 'text-slate-900'}>{totalPrivateSubnets}</strong></span>
-            <span className="text-purple-600 dark:text-purple-400 font-semibold">{totalPublicSubnets} Public</span>
-          </div>
-        </div>
-
-        {/* Bento 3: Active Host Assignments */}
-        <div 
-          onClick={() => {
-            setFilters(prev => ({ ...prev, ipVersion: selectedProtocol }));
-            setActiveTab('ips');
-          }}
-          className={`lg:col-span-3 p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer hover:border-indigo-500/50 flex flex-col justify-between ${
-            isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'
-          }`}
-        >
-          <div>
-            <span className={`text-xs font-semibold uppercase tracking-wider block mb-1 font-mono flex items-center gap-1.5 ${
-              isDark ? 'text-slate-400' : 'text-slate-600'
-            }`}>
-              <Hash className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
-              Active {selectedProtocol} Hosts
-            </span>
-            <div className="flex items-baseline justify-between mt-1">
-              <span className={`text-3xl font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                {activeCount}
-              </span>
-              <span className={`text-xs font-mono font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                {reservedCount} Reserved
-              </span>
-            </div>
-            <p className={`text-[11px] mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-              {protocolIPs.length} total tracked {selectedProtocol} hosts
-            </p>
-          </div>
-
-          {/* Segmented meter */}
-          <div className="flex gap-1 mt-3">
-            {[1, 2, 3, 4, 5, 6].map((bar) => {
-              const fillThreshold = Math.ceil((Math.min(100, Math.max(10, protocolUtilPercent)) / 100) * 6);
-              return (
-                <div 
-                  key={bar} 
-                  className={`h-1.5 flex-1 rounded-full transition-colors ${
-                    bar <= fillThreshold 
-                      ? (isV6 ? 'bg-cyan-500' : 'bg-indigo-500') 
-                      : (isDark ? 'bg-slate-700/60' : 'bg-slate-200')
-                  }`}
-                />
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Bento 4: Protocol Health Accent Card */}
-        <div className={`lg:col-span-3 rounded-2xl p-4 sm:p-5 relative overflow-hidden flex flex-col justify-between shadow-lg text-white ${
-          isV6 
-            ? 'bg-gradient-to-br from-cyan-600 to-teal-700 shadow-cyan-600/20' 
-            : 'bg-gradient-to-br from-indigo-600 to-blue-700 shadow-indigo-600/20'
-        }`}>
-          <div className="absolute -right-4 -bottom-4 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-white/90 text-xs font-semibold uppercase tracking-wider font-mono">
-                {selectedProtocol} Fabric
-              </span>
-              <span className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-              </span>
-            </div>
-            <div className="text-lg sm:text-xl font-bold tracking-tight mt-1 text-white">
-              {isV6 ? 'NDP / SLAAC Healthy' : 'ARP & Subnets Green'}
-            </div>
-            <p className="text-[11px] text-white/90 mt-1 font-mono">
-              {isV6 
-                ? 'Zero IPv6 prefix overlap collisions' 
-                : 'All RFC 1918 subnets validated'}
-            </p>
-          </div>
-          <button 
-            onClick={() => onOpenReserveNextModal()}
-            className={`mt-3 w-full py-1.5 bg-white font-semibold text-xs rounded-lg shadow hover:bg-slate-50 transition-colors active:scale-95 text-center cursor-pointer ${
-              isV6 ? 'text-cyan-800' : 'text-indigo-700'
-            }`}
-          >
-            Allocate Next {selectedProtocol} IP
-          </button>
-        </div>
-      </div>
-
-      {/* Row 2: Mid Bento Section (8-col Protocol IP Leases + 4-col DC Scopes) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Mid Bento Left (8 cols): Active Protocol IP Leases */}
-        <div className={`lg:col-span-8 p-4 sm:p-5 rounded-2xl border flex flex-col justify-between ${
-          isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'
-        }`}>
-          <div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-              <div>
-                <h2 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${
-                  isDark ? 'text-white' : 'text-slate-900'
-                }`}>
-                  <Hash className={`w-4 h-4 ${isV6 ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : (isDark ? 'text-indigo-400' : 'text-indigo-600')}`} />
-                  Active {selectedProtocol} Leases & Assignments
-                </h2>
-                <p className={`text-[11px] mt-0.5 font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                  {isV6 ? 'Dual-stack IPv6 endpoints and SLAAC interface bindings' : 'IPv4 DHCP and static VIP host allocations'}
-                </p>
-              </div>
-
-              {/* Datacenter filter chips */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-                <button
-                  onClick={() => setActiveDCFilter('all')}
-                  className={`text-xs px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
-                    activeDCFilter === 'all'
-                      ? (isV6 ? 'bg-cyan-600 text-white font-semibold' : 'bg-indigo-600 text-white font-semibold')
-                      : isDark
-                        ? 'bg-slate-700/60 hover:bg-slate-700 text-slate-200'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  All Scopes
-                </button>
-                {datacenters.map((dc) => (
+          {subnetRows.length === 0 ? (
+            <p className={`py-6 text-center text-sm ${muted}`}>None yet.</p>
+          ) : (
+            <ul className="space-y-1">
+              {subnetRows.slice(0, 6).map(({ sub, percent }) => (
+                <li key={sub.id}>
                   <button
-                    key={dc.id}
-                    onClick={() => setActiveDCFilter(dc.id)}
-                    className={`text-xs px-2.5 py-1 rounded font-medium transition-colors truncate max-w-28 cursor-pointer ${
-                      activeDCFilter === dc.id
-                        ? (isV6 ? 'bg-cyan-600 text-white font-semibold' : 'bg-indigo-600 text-white font-semibold')
-                        : isDark
-                          ? 'bg-slate-700/60 hover:bg-slate-700 text-slate-200'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                    }`}
+                    type="button"
+                    onClick={() => onOpenSubnetVisualizer(sub)}
+                    className="grid w-full grid-cols-[minmax(0,1fr)_5rem_2.5rem] items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-800/60 cursor-pointer"
                   >
-                    {dc.name}
+                    <span className="truncate font-mono text-sm text-zinc-800 dark:text-zinc-100">{sub.cidr}</span>
+                    <Bar percent={percent} label={`${sub.cidr} utilization`} />
+                    <span className="text-right font-mono text-xs text-zinc-600 dark:text-zinc-300">{percentLabel(percent)}</span>
                   </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Mobile Card View for Active IP Leases (< sm) */}
-            <div className="block sm:hidden space-y-2.5">
-              {filteredIPs.length === 0 ? (
-                <div className={`py-6 text-center text-xs font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  No {selectedProtocol} allocations registered for this scope
-                </div>
-              ) : (
-                filteredIPs.slice(0, 5).map((ip) => {
-                  const sub = subnets.find((s) => s.id === ip.subnetId);
-                  return (
-                    <div 
-                      key={ip.id}
-                      onClick={() => {
-                        setFilters(prev => ({ ...prev, ipVersion: selectedProtocol }));
-                        setActiveTab('ips');
-                      }}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer ${
-                        isDark ? 'bg-slate-900/60 border-slate-700/40 hover:border-slate-600' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className={`font-mono font-bold text-xs break-all ${
-                          isV6 
-                            ? (isDark ? 'text-cyan-400' : 'text-cyan-700') 
-                            : (isDark ? 'text-indigo-400' : 'text-indigo-700')
-                        }`}>
-                          {ip.ipAddress}
-                        </span>
-                        <span className={`px-2 py-0.5 text-[9px] font-bold rounded-full uppercase font-mono ${
-                          ip.status === 'Active'
-                            ? (isDark ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200')
-                            : ip.status === 'Reserved'
-                            ? (isDark ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-amber-50 text-amber-700 border border-amber-200')
-                            : (isDark ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border border-emerald-200')
-                        }`}>
-                          {ip.status}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className={`truncate max-w-[180px] font-medium ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
-                          {ip.assignedDevice || 'Unassigned Host'}
-                        </span>
-                        <span className={`font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{sub ? sub.cidr : '—'}</span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Desktop Table View (sm and up) */}
-            <div className="hidden sm:block overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className={`border-b uppercase text-[10px] font-semibold tracking-wider font-mono ${
-                    isDark ? 'border-slate-700/50 text-slate-400' : 'border-slate-200 text-slate-500'
-                  }`}>
-                    <th className="pb-2.5 px-2">{selectedProtocol} Address</th>
-                    <th className="pb-2.5 px-2">Subnet / VLAN</th>
-                    <th className="pb-2.5 px-2">Assigned Device / Host</th>
-                    <th className="pb-2.5 px-2 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className={`divide-y font-mono ${
-                  isDark ? 'divide-slate-700/30' : 'divide-slate-200'
-                }`}>
-                  {filteredIPs.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className={`py-6 text-center text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                        No {selectedProtocol} allocations registered for this datacenter scope
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredIPs.slice(0, 5).map((ip) => {
-                      const sub = subnets.find((s) => s.id === ip.subnetId);
-                      const vlan = sub?.vlanId ? vlans.find((v) => v.id === sub.vlanId) : null;
-                      return (
-                        <tr key={ip.id} className={`transition-colors ${
-                          isDark ? 'hover:bg-slate-700/20' : 'hover:bg-slate-50'
-                        }`}>
-                          <td className={`py-2.5 px-2 font-bold break-all ${
-                            isV6 
-                              ? (isDark ? 'text-cyan-400' : 'text-cyan-700') 
-                              : (isDark ? 'text-indigo-400' : 'text-indigo-700')
-                          }`}>
-                            {ip.ipAddress}
-                          </td>
-                          <td className={`py-2.5 px-2 text-[11px] ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                            {sub ? (
-                              <span>
-                                {sub.cidr}
-                                {vlan && <span className={`ml-1.5 font-semibold ${isDark ? 'text-purple-400' : 'text-purple-700'}`}>• VLAN {vlan.vlanId}</span>}
-                              </span>
-                            ) : '—'}
-                          </td>
-                          <td className="py-2.5 px-2">
-                            <span className={`font-sans font-medium text-xs ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>
-                              {ip.assignedDevice || 'Unassigned Host'}
-                            </span>
-                            {ip.description && (
-                              <span className={`block text-[10px] truncate max-w-xs font-sans ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                                {ip.description}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-2.5 px-2 text-right">
-                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${
-                              ip.status === 'Active'
-                                ? (isDark ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200')
-                                : ip.status === 'Reserved'
-                                ? (isDark ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-amber-50 text-amber-700 border border-amber-200')
-                                : (isDark ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border border-emerald-200')
-                            }`}>
-                              {ip.status}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className={`pt-3 border-t flex items-center justify-between text-xs mt-3 font-mono ${
-            isDark ? 'border-slate-700/40 text-slate-400' : 'border-slate-200 text-slate-600'
-          }`}>
-            <span>Showing {Math.min(5, filteredIPs.length)} of {filteredIPs.length} {selectedProtocol} host records</span>
-            <button
-              onClick={() => {
-                setFilters(prev => ({ ...prev, ipVersion: selectedProtocol }));
-                setActiveTab('ips');
-              }}
-              className={`font-semibold flex items-center gap-1 cursor-pointer ${
-                isV6 
-                  ? (isDark ? 'text-cyan-400 hover:text-cyan-300' : 'text-cyan-700 hover:text-cyan-800') 
-                  : (isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-700 hover:text-indigo-800')
-              }`}
-            >
-              Open {selectedProtocol} Directory <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Mid Bento Right (4 cols): Datacenter Scopes for Active Protocol */}
-        <div className={`lg:col-span-4 p-4 sm:p-5 rounded-2xl border flex flex-col justify-between ${
-          isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'
-        }`}>
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${
-                isDark ? 'text-white' : 'text-slate-900'
-              }`}>
-                <Building2 className={`w-4 h-4 ${isV6 ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : (isDark ? 'text-indigo-400' : 'text-indigo-600')}`} />
-                {selectedProtocol} Datacenter Scopes
-              </h2>
-              <span className={`text-xs font-mono font-semibold ${
-                isV6 
-                  ? (isDark ? 'text-cyan-400' : 'text-cyan-700') 
-                  : (isDark ? 'text-indigo-400' : 'text-indigo-700')
-              }`}>
-                {datacenters.length} Sites
-              </span>
-            </div>
-            
-            <div className="space-y-2.5">
-              {dcProtocolUtilization.map(({ dc, subnetsCount, trackedIPsCount, activeCount, utilizationPercent }) => (
-                <div 
-                  key={dc.id}
-                  onClick={() => setActiveTab('datacenters')}
-                  className={`p-3 rounded-xl border transition-all cursor-pointer ${
-                    isDark 
-                      ? 'bg-slate-900/50 border-slate-700/30 hover:border-slate-600' 
-                      : 'bg-slate-50 border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex justify-between items-center text-xs">
-                    <span className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{dc.name}</span>
-                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-                      isDark 
-                        ? 'bg-slate-800 text-slate-300 border-slate-700/40' 
-                        : 'bg-slate-200 text-slate-700 border-slate-300'
-                    }`}>
-                      {subnetsCount} {selectedProtocol} blocks
-                    </span>
-                  </div>
-                  <div className={`flex justify-between items-center text-[11px] mt-1 ${
-                    isDark ? 'text-slate-400' : 'text-slate-600'
-                  }`}>
-                    <span>{dc.location}</span>
-                    <span className={`font-mono font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{activeCount} Active IPs</span>
-                  </div>
-                  <div className={`w-full h-1.5 rounded-full mt-2 overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
-                    <div 
-                      className={`h-full rounded-full ${
-                        utilizationPercent > 80 ? 'bg-rose-500' :
-                        utilizationPercent > 50 ? 'bg-amber-500' :
-                        (isV6 ? 'bg-cyan-500' : 'bg-emerald-500')
-                      }`}
-                      style={{ width: `${Math.max(5, utilizationPercent)}%` }}
-                    />
-                  </div>
-                </div>
+                </li>
               ))}
-            </div>
-          </div>
+            </ul>
+          )}
+        </section>
 
-          <button
-            onClick={() => setActiveTab('datacenters')}
-            className={`mt-3 w-full py-1.5 rounded-lg border text-xs font-semibold transition-colors text-center font-mono cursor-pointer ${
-              isDark 
-                ? 'border-slate-700/50 text-slate-300 hover:bg-slate-700/40 hover:text-white' 
-                : 'border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-            }`}
-          >
-            Manage Datacenters
-          </button>
-        </div>
-      </div>
-
-      {/* Row 3: Lower Bento Section (4-col Protocol Type Breakdown + 8-col Network Alerts) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Lower Left (4 cols): Protocol Type Breakdown */}
-        <div className={`lg:col-span-4 p-4 sm:p-5 rounded-2xl border flex flex-col justify-between ${
-          isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'
-        }`}>
-          <div>
-            <h2 className={`text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2 ${
-              isDark ? 'text-white' : 'text-slate-900'
-            }`}>
-              <ShieldCheck className={`w-4 h-4 ${isV6 ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : (isDark ? 'text-indigo-400' : 'text-indigo-600')}`} />
-              {selectedProtocol} Scope Breakdown
-            </h2>
-
-            {/* Donut Representation */}
-            <div className="flex items-center justify-center my-4">
-              <div className="relative w-32 h-32 flex items-center justify-center">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                  <path
-                    className={isDark ? 'text-slate-700' : 'text-slate-200'}
-                    strokeWidth="3.5"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                  <path
-                    className={isV6 ? 'text-cyan-500' : 'text-indigo-500'}
-                    strokeDasharray={`${privatePercent}, 100`}
-                    strokeWidth="3.5"
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                </svg>
-                <div className="absolute flex flex-col items-center justify-center text-center">
-                  <span className={`text-2xl font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{privatePercent}%</span>
-                  <span className={`text-[9px] uppercase font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{isV6 ? 'ULA' : 'Private'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Legend breakdown */}
-            <div className="space-y-2 text-xs font-mono">
-              <div className="flex justify-between items-center">
-                <span className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  <span className={`w-2.5 h-2.5 rounded-full ${isV6 ? 'bg-cyan-500' : 'bg-indigo-500'}`}></span>
-                  {isV6 ? 'Unique Local (ULA fc00::/7)' : 'Private (RFC 1918)'}
-                </span>
-                <span className={`font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{totalPrivateSubnets} Blocks</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  <span className="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
-                  {isV6 ? 'Global Unicast (2000::/3)' : 'Public Routable BGP'}
-                </span>
-                <span className={`font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{totalPublicSubnets} Blocks</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Lower Right (8 cols): Network Alerts & Live Audit */}
-        <div className={`lg:col-span-8 p-4 sm:p-5 rounded-2xl border flex flex-col justify-between ${
-          isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'
-        }`}>
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${
-                isDark ? 'text-white' : 'text-slate-900'
-              }`}>
-                <Activity className="w-4 h-4 text-emerald-500 dark:text-emerald-400" /> Network Alerts & Audit Stream
-              </h2>
-              <div className="flex items-center gap-2">
-                <span className={`text-[10px] font-mono flex items-center gap-1 px-2 py-0.5 rounded border ${
-                  isDark ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30' : 'text-emerald-800 bg-emerald-50 border-emerald-200'
-                }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${isDark ? 'bg-emerald-400' : 'bg-emerald-600'}`}></span>
-                  Live Synchronized
-                </span>
-                <button
-                  type="button"
-                  onClick={() => onOpenAuditLogs?.()}
-                  className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded border transition-colors cursor-pointer ${
-                    isDark ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20' : 'text-emerald-800 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
-                  }`}
-                >
-                  View All ({activityLogs.length})
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2.5">
-              {activityLogs.length === 0 ? (
-                <div className={`py-6 text-center text-xs font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  No network collision or allocation events logged
-                </div>
-              ) : (
-                activityLogs.slice(0, 4).map((log) => {
-                  const isReserve = log.action === 'RESERVE';
-                  const isCreate = log.action === 'CREATE';
-                  const isDelete = log.action === 'DELETE';
-
-                  return (
-                    <div 
-                      key={log.id}
-                      onClick={() => onOpenAuditLogs?.(log.entityType)}
-                      className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-3 cursor-pointer transition-all hover:scale-[1.01] ${
-                        isDark 
-                          ? 'bg-slate-900/50 border-slate-700/30 hover:border-slate-600 hover:bg-slate-900/80' 
-                          : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-slate-100/80'
-                      }`}
-                      title="Click to inspect full audit event log"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${
-                          isReserve ? 'bg-amber-400' : isCreate ? 'bg-blue-400' : isDelete ? 'bg-rose-400' : 'bg-emerald-400'
-                        }`} />
-                        <div className="truncate">
-                          <span className={`font-semibold mr-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>{log.title}</span>
-                          <span className={`text-[11px] truncate ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{log.detail}</span>
-                        </div>
-                      </div>
-                      <span className={`text-[10px] font-mono shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          <div className={`pt-3 border-t flex items-center justify-between text-xs mt-3 font-mono ${
-            isDark ? 'border-slate-700/40 text-slate-400' : 'border-slate-200 text-slate-600'
-          }`}>
-            <span>Dual-Stack Audit log history stored securely</span>
-            <button
-              type="button"
-              onClick={() => onOpenAuditLogs?.()}
-              className={`font-semibold flex items-center gap-1 hover:underline cursor-pointer ${
-                isV6 
-                  ? (isDark ? 'text-cyan-400 hover:text-cyan-300' : 'text-cyan-700 hover:text-cyan-800') 
-                  : (isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-700 hover:text-indigo-800')
-              }`}
-            >
-              Full Audit Stream History →
+        {/* Datacenters */}
+        <section className={`${card} p-5`}>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">Datacenters</h2>
+            <button type="button" onClick={() => goTo('datacenters')} className={linkButton}>
+              Manage
             </button>
           </div>
-        </div>
-      </div>
+          {dcRows.length === 0 ? (
+            <p className={`py-6 text-center text-sm ${muted}`}>No datacenters yet.</p>
+          ) : (
+            <ul className="grid grid-cols-2 gap-4">
+              {dcRows.map(({ dc, subnetCount, percent }) => (
+                <li key={dc.id} className="flex flex-col items-center gap-2 text-center">
+                  <Ring percent={percent} label={`${dc.name} utilization`} size={72} />
+                  <span className="w-full truncate text-sm font-medium text-zinc-800 dark:text-zinc-100">{dc.name}</span>
+                  <span className={`-mt-2 font-mono text-xs ${muted}`}>{subnetCount} subnets</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-      {/* Row 4: Subnet Blocks & Interactive Visual Matrix for Active Protocol */}
-      <div className={`p-4 sm:p-5 rounded-2xl border ${
-        isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'
-      }`}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-          <div>
-            <h2 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${
-              isDark ? 'text-white' : 'text-slate-900'
-            }`}>
-              <Network className={`w-4 h-4 ${isV6 ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : (isDark ? 'text-indigo-400' : 'text-indigo-600')}`} />
-              Active {selectedProtocol} Subnet Blocks & Capacity
-            </h2>
-            <p className={`text-xs mt-0.5 font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-              {isV6 
-                ? 'IPv6 CIDR prefixes with 10¹⁹ mathematical capacity limits & SLAAC allocation metrics' 
-                : 'IPv4 CIDR network ranges with K-formatted usable hosts & VLAN mappings'}
-            </p>
+        {/* Recent activity */}
+        <section className={`${card} p-5`}>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">Activity</h2>
+            <button type="button" onClick={() => onOpenAuditLogs?.()} className={linkButton}>
+              View all
+            </button>
           </div>
-          <button
-            onClick={() => {
-              setFilters(prev => ({ ...prev, ipVersion: selectedProtocol }));
-              setActiveTab('subnets');
-            }}
-            className={`text-xs font-semibold flex items-center gap-1 font-mono cursor-pointer ${
-              isV6 
-                ? (isDark ? 'text-cyan-400 hover:text-cyan-300' : 'text-cyan-700 hover:text-cyan-800') 
-                : (isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-700 hover:text-indigo-800')
-            }`}
-          >
-            Manage All {selectedProtocol} Subnets <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className={`border-b uppercase text-[10px] font-semibold tracking-wider font-mono ${
-                isDark ? 'border-slate-700/50 text-slate-400' : 'border-slate-200 text-slate-500'
-              }`}>
-                <th className="py-2.5 px-3">{selectedProtocol} Prefix</th>
-                <th className="py-2.5 px-3">Datacenter</th>
-                <th className="py-2.5 px-3">VLAN</th>
-                <th className="py-2.5 px-3">Segment</th>
-                <th className="py-2.5 px-3">Usable Capacity</th>
-                <th className="py-2.5 px-3">Allocated Load</th>
-                <th className="py-2.5 px-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className={`divide-y font-mono ${isDark ? 'divide-slate-700/30' : 'divide-slate-200'}`}>
-              {protocolSubnets.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className={`py-8 text-center text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    No {selectedProtocol} subnets currently allocated. Click "Allocate Subnet" above to create one.
-                  </td>
-                </tr>
-              ) : (
-                protocolSubnets.map((sub) => {
-                  const dc = datacenters.find((d) => d.id === sub.datacenterId);
-                  const vlan = sub.vlanId ? vlans.find((v) => v.id === sub.vlanId) : null;
-                  const isPublic = sub.segmentType === 'Public';
-                  const subIPs = ips.filter((i) => i.subnetId === sub.id);
-                  const activeSubIPs = subIPs.filter((i) => i.status === 'Active').length;
-                  const reservedSubIPs = subIPs.filter((i) => i.status === 'Reserved').length;
-                  const totalSubAlloc = activeSubIPs + reservedSubIPs;
-
-                  let calc;
-                  try {
-                    calc = parseCIDR(sub.cidr);
-                  } catch {
-                    calc = null;
-                  }
-
-                  const totalCapDisplay = isV6 
-                    ? '1.84 × 10¹⁹ Usable' 
-                    : (calc ? `${formatCapacityCompact(calc.usableHosts, false)} Usable` : '254 Usable');
-
-                  const utilSubPercent = isV6 
-                    ? Math.min(100, Math.round((totalSubAlloc / Math.max(10, totalSubAlloc)) * 100))
-                    : (calc && calc.usableHosts > 0 ? Math.min(100, Math.round((totalSubAlloc / calc.usableHosts) * 100)) : 0);
-
-                  return (
-                    <tr 
-                      key={sub.id}
-                      className={`transition-colors ${isDark ? 'hover:bg-slate-700/20' : 'hover:bg-slate-50'}`}
-                    >
-                      <td className="py-3 px-3 font-bold text-sm break-all">
-                        <span className={
-                          isV6 
-                            ? (isDark ? 'text-cyan-400' : 'text-cyan-700') 
-                            : (isDark ? 'text-indigo-400' : 'text-indigo-700')
-                        }>
-                          {sub.cidr}
-                        </span>
-                      </td>
-                      <td className={`py-3 px-3 font-medium font-sans ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
-                        {dc?.name || 'Unknown Datacenter'}
-                      </td>
-                      <td className="py-3 px-3">
-                        {vlan ? (
-                          <span className={`px-2 py-0.5 rounded font-semibold text-[11px] ${
-                            isDark 
-                              ? 'text-purple-300 bg-purple-500/10 border border-purple-500/20' 
-                              : 'text-purple-800 bg-purple-50 border border-purple-200'
-                          }`}>
-                            VLAN {vlan.vlanId}
-                          </span>
-                        ) : (
-                          <span className={`italic text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Un-tagged</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
-                          isPublic 
-                            ? (isDark ? 'bg-purple-500/10 text-purple-300 border border-purple-500/20' : 'bg-purple-50 text-purple-800 border border-purple-200')
-                            : (isDark ? 'bg-slate-700/60 text-slate-300 border border-slate-600/40' : 'bg-slate-100 text-slate-800 border border-slate-200')
-                        }`}>
-                          {sub.segmentType}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 whitespace-nowrap" title={calc?.usableHostsFormatted || totalCapDisplay}>
-                        <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{totalCapDisplay}</span>
-                      </td>
-                      <td className="py-3 px-3">
-                        <div className="w-32">
-                          <div className="flex justify-between text-[11px] mb-1">
-                            <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>{totalSubAlloc} Alloc</span>
-                            <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{activeSubIPs} Active</span>
-                          </div>
-                          <div className={`w-full h-1.5 rounded-full overflow-hidden flex ${isDark ? 'bg-slate-700/60' : 'bg-slate-200'}`}>
-                            <div 
-                              className={isV6 ? 'bg-cyan-500 h-full' : 'bg-indigo-500 h-full'}
-                              style={{ width: `${Math.min(100, Math.max(10, utilSubPercent))}%` }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <button
-                          onClick={() => onOpenSubnetVisualizer(sub)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors inline-flex items-center gap-1 active:scale-95 cursor-pointer ${
-                            isV6 
-                              ? (isDark ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/20' : 'bg-cyan-50 text-cyan-800 border-cyan-200 hover:bg-cyan-100')
-                              : (isDark ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/20' : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100')
-                          }`}
-                          title="Open Interactive IP Matrix"
-                        >
-                          <Eye className="w-3.5 h-3.5" /> Visual Grid
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+          {activityLogs.length === 0 ? (
+            <p className={`py-6 text-center text-sm ${muted}`}>Nothing yet.</p>
+          ) : (
+            <ul className="space-y-1">
+              {activityLogs.slice(0, 6).map((log) => (
+                <li key={log.id}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenAuditLogs?.(log.entityType)}
+                    className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm transition hover:bg-zinc-50 dark:hover:bg-zinc-800/60 cursor-pointer"
+                  >
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${ACTION_DOT[log.action] ?? 'bg-zinc-400'}`} aria-hidden />
+                    <span className="truncate text-zinc-800 dark:text-zinc-100">{log.title}</span>
+                    <time className={`ml-auto shrink-0 font-mono text-xs ${muted}`} dateTime={log.timestamp}>
+                      {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </time>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     </div>
   );

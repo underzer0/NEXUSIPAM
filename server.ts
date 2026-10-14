@@ -45,7 +45,13 @@ async function startServer() {
     }
   }
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
+    const token = /(?:^|;\s*)ipam_session_token=([^;]+)/.exec(req.headers.cookie || '')?.[1];
+    // shortcut: session is checked only at connect, so a signed-out tab keeps receiving updates until it reconnects
+    if (!db.getUserBySession(token && decodeURIComponent(token))) {
+      ws.close(4401, 'Authentication required');
+      return;
+    }
     clients.add(ws);
 
     // Send initial bootstrap state immediately to newly connected client (shared resource state only)
@@ -58,7 +64,6 @@ async function startServer() {
         ips: db.getIPs(),
         stats: db.getStats(),
         activityLogs: db.getActivityLogs(),
-        users: db.getUsers(),
       },
       timestamp: new Date().toISOString(),
     };

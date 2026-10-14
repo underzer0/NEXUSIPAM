@@ -6,17 +6,24 @@ import { parseCIDR } from '../src/utils/ipCalculator';
 
 const SESSION_COOKIE_NAME = 'ipam_session_token';
 const SESSION_COOKIE_OPTIONS = {
-  httpOnly: false,
+  httpOnly: true,
+  // Production is served over HTTPS; local dev runs on plain http://localhost.
+  secure: process.env.NODE_ENV === 'production',
   sameSite: 'lax' as const,
   path: '/',
   maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
 };
 
+// Browsers sign in with the session cookie; scripts send `Authorization: Bearer <session token or API key>`.
 function getSessionUser(req: Request): UserProfile | null {
-  const token = req.cookies?.[SESSION_COOKIE_NAME] || 
-    (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : undefined);
-  return db.getUserBySession(token);
+  const token = getSessionToken(req);
+  return db.getUserBySession(token) || db.getUserByApiKey(token);
 }
+
+// Only what other engineers need to see; never API keys or contact details.
+const publicUser = (u: UserProfile) => ({ id: u.id, name: u.name, email: u.email, role: u.role, department: u.department });
+
+const PUBLIC_PATHS = new Set(['/health', '/db/retry', '/bootstrap', '/auth/me', '/auth/signin', '/auth/signout', '/auth/signup']);
 
 function getSessionToken(req: Request): string | undefined {
   return req.cookies?.[SESSION_COOKIE_NAME] || 
@@ -25,6 +32,11 @@ function getSessionToken(req: Request): string | undefined {
 
 export function createApiRouter(broadcast: (type: WSAction, payload: any) => void): Router {
   const router = Router();
+
+  router.use((req: Request, res: Response, next) => {
+    if (PUBLIC_PATHS.has(req.path) || getSessionUser(req)) return next();
+    res.status(401).json({ success: false, error: 'Authentication required' });
+  });
 
   // Health check
   router.get('/health', (req: Request, res: Response) => {
@@ -115,15 +127,18 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
         return;
       }
 
+      const currentUser = getSessionUser(req);
+      if (!currentUser) {
+        res.json({ success: true, dbConnected: true, data: { currentUser: null } });
+        return;
+      }
+
       const datacenters = db.getDatacenters();
       const vlans = db.getVlans();
       const subnets = db.getSubnets();
       const ips = db.getIPs();
       const stats = db.getStats();
       const activityLogs = db.getActivityLogs();
-      const currentUser = getSessionUser(req);
-      const users = db.getUsers();
-
       res.json({
         success: true,
         dbConnected: true,
@@ -135,7 +150,6 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
           stats,
           activityLogs,
           currentUser,
-          users,
         },
       });
     } catch (err: any) {
@@ -194,34 +208,34 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
     }
   });
 
-  router.post('/datacenters', (req: Request, res: Response) => {
+  router.post('/datacenters', async (req: Request, res: Response) => {
     try {
       const { name, location, description } = req.body;
-      const created = db.createDatacenter({ name, location, description });
+      const created = await db.persisted(() => db.createDatacenter({ name, location, description }));
       broadcast('DATACENTER_CREATED', created);
       res.status(201).json({ success: true, data: created });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
-  router.put('/datacenters/:id', (req: Request, res: Response) => {
+  router.put('/datacenters/:id', async (req: Request, res: Response) => {
     try {
-      const updated = db.updateDatacenter(req.params.id, req.body);
+      const updated = await db.persisted(() => db.updateDatacenter(req.params.id, req.body));
       broadcast('DATACENTER_UPDATED', updated);
       res.json({ success: true, data: updated });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
-  router.delete('/datacenters/:id', (req: Request, res: Response) => {
+  router.delete('/datacenters/:id', async (req: Request, res: Response) => {
     try {
-      const result = db.deleteDatacenter(req.params.id);
+      const result = await db.persisted(() => db.deleteDatacenter(req.params.id));
       broadcast('DATACENTER_DELETED', { id: req.params.id });
       res.json({ success: true, data: result });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
@@ -255,9 +269,9 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
     }
   });
 
-  router.post('/vlans', (req: Request, res: Response) => {
+  router.post('/vlans', async (req: Request, res: Response) => {
     try {
-      const created = db.createVlan(req.body);
+      const created = await db.persisted(() => db.createVlan(req.body));
       const dc = db.getDatacenterById(created.datacenterId);
       broadcast('VLAN_CREATED', created);
       res.status(201).json({
@@ -269,27 +283,27 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
         },
       });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
-  router.put('/vlans/:id', (req: Request, res: Response) => {
+  router.put('/vlans/:id', async (req: Request, res: Response) => {
     try {
-      const updated = db.updateVlan(req.params.id, req.body);
+      const updated = await db.persisted(() => db.updateVlan(req.params.id, req.body));
       broadcast('VLAN_UPDATED', updated);
       res.json({ success: true, data: updated });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
-  router.delete('/vlans/:id', (req: Request, res: Response) => {
+  router.delete('/vlans/:id', async (req: Request, res: Response) => {
     try {
-      const result = db.deleteVlan(req.params.id);
+      const result = await db.persisted(() => db.deleteVlan(req.params.id));
       broadcast('VLAN_DELETED', { id: req.params.id });
       res.json({ success: true, data: result });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
@@ -327,9 +341,9 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
     }
   });
 
-  router.post('/subnets', (req: Request, res: Response) => {
+  router.post('/subnets', async (req: Request, res: Response) => {
     try {
-      const created = db.createSubnet(req.body);
+      const created = await db.persisted(() => db.createSubnet(req.body));
       const dc = db.getDatacenterById(created.datacenterId);
       const vlan = created.vlanId ? db.getVlanById(created.vlanId) : null;
       let calculation: any = null;
@@ -364,27 +378,27 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
         },
       });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
-  router.put('/subnets/:id', (req: Request, res: Response) => {
+  router.put('/subnets/:id', async (req: Request, res: Response) => {
     try {
-      const updated = db.updateSubnet(req.params.id, req.body);
+      const updated = await db.persisted(() => db.updateSubnet(req.params.id, req.body));
       broadcast('SUBNET_UPDATED', updated);
       res.json({ success: true, data: updated });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
-  router.delete('/subnets/:id', (req: Request, res: Response) => {
+  router.delete('/subnets/:id', async (req: Request, res: Response) => {
     try {
-      const result = db.deleteSubnet(req.params.id);
+      const result = await db.persisted(() => db.deleteSubnet(req.params.id));
       broadcast('SUBNET_DELETED', { id: req.params.id });
       res.json({ success: true, data: result });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
@@ -394,31 +408,31 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
       const result = db.getNextAvailableIP(req.params.id);
       res.json({ success: true, data: result });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
   // Reserve Next Available IP
-  router.post('/subnets/:id/reserve-next-ip', (req: Request, res: Response) => {
+  router.post('/subnets/:id/reserve-next-ip', async (req: Request, res: Response) => {
     try {
       const { assignedDevice, description } = req.body;
-      const reserved = db.reserveNextAvailableIP(req.params.id, { assignedDevice, description });
+      const reserved = await db.persisted(() => db.reserveNextAvailableIP(req.params.id, { assignedDevice, description }));
       broadcast('IP_CREATED', reserved);
       res.status(201).json({ success: true, data: reserved });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
   // Bulk Generate IPs in Subnet
-  router.post('/subnets/:id/bulk-generate-ips', (req: Request, res: Response) => {
+  router.post('/subnets/:id/bulk-generate-ips', async (req: Request, res: Response) => {
     try {
       const { count, startingOffset, status } = req.body;
-      const result = db.bulkGenerateIPs(req.params.id, { count, startingOffset, status });
+      const result = await db.persisted(() => db.bulkGenerateIPs(req.params.id, { count, startingOffset, status }));
       broadcast('BULK_IPS_CREATED', { subnetId: req.params.id, created: result.created });
       res.status(201).json({ success: true, data: result });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
@@ -448,34 +462,34 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
     }
   });
 
-  router.post('/ips', (req: Request, res: Response) => {
+  router.post('/ips', async (req: Request, res: Response) => {
     try {
       const { ipAddress, subnetId, status, assignedDevice, description } = req.body;
-      const created = db.createIP({ ipAddress, subnetId, status, assignedDevice, description });
+      const created = await db.persisted(() => db.createIP({ ipAddress, subnetId, status, assignedDevice, description }));
       broadcast('IP_CREATED', created);
       res.status(201).json({ success: true, data: created });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
-  router.put('/ips/:id', (req: Request, res: Response) => {
+  router.put('/ips/:id', async (req: Request, res: Response) => {
     try {
-      const updated = db.updateIP(req.params.id, req.body);
+      const updated = await db.persisted(() => db.updateIP(req.params.id, req.body));
       broadcast('IP_UPDATED', updated);
       res.json({ success: true, data: updated });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
-  router.delete('/ips/:id', (req: Request, res: Response) => {
+  router.delete('/ips/:id', async (req: Request, res: Response) => {
     try {
-      const result = db.deleteIP(req.params.id);
+      const result = await db.persisted(() => db.deleteIP(req.params.id));
       broadcast('IP_DELETED', { id: req.params.id, ipAddress: result.ipAddress });
       res.json({ success: true, data: result });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
@@ -504,42 +518,42 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
     }
   });
 
-  router.put('/user/profile', (req: Request, res: Response) => {
+  router.put('/user/profile', async (req: Request, res: Response) => {
     try {
       const currentUser = getSessionUser(req);
       if (!currentUser) return res.status(401).json({ success: false, error: 'No authenticated user session found' });
-      const updated = db.updateUserProfile(currentUser.id, req.body);
-      broadcast('USER_UPDATED', updated);
+      const updated = await db.persisted(() => db.updateUserProfile(currentUser.id, req.body));
+      broadcast('USER_UPDATED', publicUser(updated));
       res.json({ success: true, data: updated });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
   router.get('/users', (req: Request, res: Response) => {
     try {
-      const users = db.getUsers();
+      const users = db.getUsers().map(publicUser);
       res.json({ success: true, data: users });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  router.post('/auth/signin', (req: Request, res: Response) => {
+  router.post('/auth/signin', async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body;
-      const { user, session } = db.signIn(email, password);
+      const { user, session } = await db.persisted(() => db.signIn(email, password));
       res.cookie(SESSION_COOKIE_NAME, session.token, SESSION_COOKIE_OPTIONS);
-      res.json({ success: true, data: { user, sessionToken: session.token } });
+      res.json({ success: true, data: { user } });
     } catch (err: any) {
-      res.status(401).json({ success: false, error: err.message });
+      res.status(err.status ?? 401).json({ success: false, error: err.message });
     }
   });
 
-  router.post('/auth/signout', (req: Request, res: Response) => {
+  router.post('/auth/signout', async (req: Request, res: Response) => {
     try {
       const token = getSessionToken(req);
-      db.signOutSession(token);
+      await db.persisted(() => db.signOutSession(token));
       res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
       res.json({ success: true, message: 'Signed out successfully' });
     } catch (err: any) {
@@ -547,54 +561,29 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
     }
   });
 
-  router.post('/auth/signup', (req: Request, res: Response) => {
+  router.post('/auth/signup', async (req: Request, res: Response) => {
     try {
       const { name, email, password, role, department, organization, location, phone, bio, primaryDatacenterId } = req.body;
-      const { user, session } = db.createUser({
-        name,
-        email,
-        password,
-        role,
-        department,
-        organization,
-        location,
-        phone,
-        bio,
-        primaryDatacenterId,
-      });
+      const { user, session } = await db.persisted(() =>
+        db.createUser({ name, email, password, role, department, organization, location, phone, bio, primaryDatacenterId }),
+      );
       res.cookie(SESSION_COOKIE_NAME, session.token, SESSION_COOKIE_OPTIONS);
-      broadcast('USER_CREATED', user);
-      res.status(201).json({ success: true, data: { user, sessionToken: session.token } });
+      res.status(201).json({ success: true, data: { user } });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 
-  router.post('/auth/switch-user', (req: Request, res: Response) => {
+  router.post('/user/generate-api-key', async (req: Request, res: Response) => {
     try {
-      const { userId } = req.body;
-      if (!userId) return res.status(400).json({ success: false, error: 'User ID is required' });
-      const user = db.getUserById(userId);
-      if (!user) return res.status(404).json({ success: false, error: 'User not found' });
-      
-      const session = db.createSession(user.id);
-      res.cookie(SESSION_COOKIE_NAME, session.token, SESSION_COOKIE_OPTIONS);
-      res.json({ success: true, data: { user, sessionToken: session.token } });
-    } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
-    }
-  });
-
-  router.post('/user/generate-api-key', (req: Request, res: Response) => {
-    try {
-      const currentUser = getSessionUser(req);
-      if (!currentUser) return res.status(401).json({ success: false, error: 'No authenticated user session found' });
-      const apiKey = db.generateApiKey(currentUser.id);
+      // Only a signed-in browser may mint keys, so a leaked key can't replace itself and lock the owner out.
+      const currentUser = db.getUserBySession(req.cookies?.[SESSION_COOKIE_NAME]);
+      if (!currentUser) return res.status(401).json({ success: false, error: 'Sign in to the web app to create an API key' });
+      const apiKey = await db.persisted(() => db.generateApiKey(currentUser.id));
       const updated = db.getUserById(currentUser.id);
-      broadcast('USER_UPDATED', updated);
       res.json({ success: true, data: { apiKey, user: updated } });
     } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
     }
   });
 

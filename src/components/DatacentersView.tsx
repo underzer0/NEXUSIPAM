@@ -1,22 +1,8 @@
 import React, { useState } from 'react';
 import { useIPAM } from '../context/IPAMContext';
-import { 
-  Building2, 
-  Plus, 
-  MapPin, 
-  Layers, 
-  Network, 
-  Hash, 
-  Edit, 
-  Trash2, 
-  Clock, 
-  ExternalLink, 
-  ShieldAlert, 
-  CheckCircle2, 
-  ArrowRight,
-  Eye
-} from 'lucide-react';
+import { Building2, Edit, Hash, Layers, MapPin, Network, Plus, Trash2 } from 'lucide-react';
 import { Datacenter, Subnet } from '../types/ipam';
+import { Bar, Ring, card, formatCount, iconButton, linkButton, muted, percentLabel, percentOf, primaryButton, secondaryButton, usableOf } from './ui';
 
 interface DatacentersViewProps {
   onOpenNewDatacenterModal: () => void;
@@ -33,308 +19,224 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
   onOpenNewSubnetModalForDC,
   onOpenNewVlanModalForDC,
 }) => {
-  const { 
-    datacenters, 
-    vlans, 
-    subnets, 
-    ips, 
-    stats, 
-    deleteDatacenter, 
-    setActiveTab, 
-    setFilters,
-    isDark 
-  } = useIPAM();
+  const { datacenters, vlans, subnets, ips, deleteDatacenter, setActiveTab, setFilters } = useIPAM();
 
   const [selectedDcId, setSelectedDcId] = useState<string | null>(datacenters[0]?.id || null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const activeDc = datacenters.find(d => d.id === selectedDcId) || datacenters[0];
-  const activeDcVlans = activeDc ? vlans.filter(v => v.datacenterId === activeDc.id) : [];
-  const activeDcSubnets = activeDc ? subnets.filter(s => s.datacenterId === activeDc.id) : [];
-  const activeDcSubnetIds = new Set(activeDcSubnets.map(s => s.id));
-  const activeDcIps = activeDc ? ips.filter(ip => activeDcSubnetIds.has(ip.subnetId)) : [];
+  // Used IPs per subnet, computed once for every card and list below.
+  const usedBySubnet = new Map<string, number>();
+  for (const ip of ips) {
+    if (ip.status !== 'Available') usedBySubnet.set(ip.subnetId, (usedBySubnet.get(ip.subnetId) ?? 0) + 1);
+  }
+  const subnetRows = subnets.map((sub) => {
+    const used = usedBySubnet.get(sub.id) ?? 0;
+    const usable = usableOf(sub.cidr);
+    return { sub, used, usable, percent: percentOf(used, usable) };
+  });
+
+  const dcStats = (dcId: string) => {
+    const rows = subnetRows.filter((r) => r.sub.datacenterId === dcId);
+    const used = rows.reduce((t, r) => t + r.used, 0);
+    const usable = rows.reduce((t, r) => t + r.usable, 0);
+    return { rows, used, percent: percentOf(used, usable), vlanCount: vlans.filter((v) => v.datacenterId === dcId).length };
+  };
+
+  const activeDc = datacenters.find((d) => d.id === selectedDcId) || datacenters[0];
 
   const handleDelete = async (dc: Datacenter) => {
-    if (!window.confirm(`Are you sure you want to delete Datacenter "${dc.name}" (${dc.location})?`)) return;
+    if (!window.confirm(`Delete datacenter ${dc.name}?`)) return;
     try {
       setDeleteError(null);
       await deleteDatacenter(dc.id);
-      if (selectedDcId === dc.id) {
-        setSelectedDcId(datacenters.find(d => d.id !== dc.id)?.id || null);
-      }
+      if (selectedDcId === dc.id) setSelectedDcId(datacenters.find((d) => d.id !== dc.id)?.id || null);
     } catch (err: any) {
       setDeleteError(err.message || 'Failed to delete datacenter');
     }
   };
 
-  return (
-    <div className="p-3.5 sm:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-6">
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className={`text-lg sm:text-xl font-bold tracking-tight flex items-center gap-2.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            <Building2 className="w-5 h-5 text-indigo-400" />
-            Datacenter Infrastructure Sites
-          </h1>
-          <p className={`text-[11px] sm:text-xs mt-0.5 sm:mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-            Physical geographic regions acting as independent routing and VLAN isolation scopes.
-          </p>
-        </div>
+  const active = activeDc ? dcStats(activeDc.id) : null;
+  const activeVlans = activeDc ? vlans.filter((v) => v.datacenterId === activeDc.id) : [];
 
-        <button
-          id="btn-add-datacenter"
-          onClick={onOpenNewDatacenterModal}
-          className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2 active:scale-95"
-        >
-          <Plus className="w-4 h-4" /> Add Datacenter Site
+  return (
+    <div className="mx-auto max-w-7xl space-y-4 p-4 sm:p-6 md:p-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">
+          Datacenters <span className={`font-mono text-base font-medium ${muted}`}>{datacenters.length}</span>
+        </h1>
+        <button id="btn-add-datacenter" type="button" onClick={onOpenNewDatacenterModal} className={primaryButton}>
+          <Plus className="h-4 w-4" /> New datacenter
         </button>
       </div>
 
       {deleteError && (
-        <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-start gap-2 font-mono">
-          <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-          <div>
-            <span className="font-bold">Cannot Delete Datacenter: </span>
-            {deleteError}
-          </div>
+        <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-sm text-rose-600 dark:text-rose-400">
+          {deleteError}
         </div>
       )}
 
-      {/* Datacenter Selection Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {datacenters.map((dc) => {
-          const isSelected = activeDc?.id === dc.id;
-          const dcVlanCount = vlans.filter(v => v.datacenterId === dc.id).length;
-          const dcSubnetList = subnets.filter(s => s.datacenterId === dc.id);
-          const dcSubnetIdsSet = new Set(dcSubnetList.map(s => s.id));
-          const dcIpList = ips.filter(i => dcSubnetIdsSet.has(i.subnetId));
-          const activeIps = dcIpList.filter(i => i.status === 'Active').length;
-          const resIps = dcIpList.filter(i => i.status === 'Reserved').length;
-
-          return (
-            <div
-              key={dc.id}
-              onClick={() => setSelectedDcId(dc.id)}
-              className={`p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
-                isSelected
-                  ? isDark
-                    ? 'bg-indigo-950/40 border-indigo-500/80 shadow-md ring-1 ring-indigo-500/40'
-                    : 'bg-indigo-50/80 border-indigo-400 shadow-md ring-1 ring-indigo-400'
-                  : isDark
-                    ? 'bg-slate-800/40 border-slate-700/50 hover:border-slate-600'
-                    : 'bg-white border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
-                      isSelected 
-                        ? 'bg-indigo-500 text-white shadow-sm' 
-                        : isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      <Building2 className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className={`font-bold text-sm leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>{dc.name}</h3>
-                      <span className={`text-xs flex items-center gap-1 mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                        <MapPin className={`w-3 h-3 shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
-                        <span className="truncate max-w-36">{dc.location}</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenEditDatacenterModal(dc);
-                      }}
-                      className="p-1 rounded text-slate-400 hover:text-indigo-400 hover:bg-slate-800"
-                      title="Edit Site Details"
-                    >
-                      <Edit className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(dc);
-                      }}
-                      className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-800"
-                      title="Delete Datacenter"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                <p className="mt-3 text-xs text-slate-400 line-clamp-2 leading-relaxed">
-                  {dc.description || 'Enterprise physical hosting location.'}
-                </p>
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-slate-700/40 grid grid-cols-3 gap-1 text-center font-mono text-xs">
-                <div>
-                  <span className="block text-[10px] text-slate-400 font-sans uppercase">VLANs</span>
-                  <span className="font-bold text-purple-400">{dcVlanCount}</span>
-                </div>
-                <div>
-                  <span className="block text-[10px] text-slate-400 font-sans uppercase">Subnets</span>
-                  <span className="font-bold text-emerald-400">{dcSubnetList.length}</span>
-                </div>
-                <div>
-                  <span className="block text-[10px] text-slate-400 font-sans uppercase">Alloc IPs</span>
-                  <span className="font-bold text-indigo-400">{activeIps + resIps}</span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Selected Datacenter Deep-Dive Breakdown */}
-      {activeDc && (
-        <div className={`p-6 rounded-2xl border ${
-          isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
-        }`}>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-inherit">
-            <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-xl font-bold">{activeDc.name} Detail Explorer</h2>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                  Site Scope Active
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
-                <MapPin className="w-3.5 h-3.5 text-blue-500" />
-                {activeDc.location} • <Clock className="w-3.5 h-3.5 ml-2" /> Provisioned {new Date(activeDc.createdAt).toLocaleDateString()}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setActiveTab('ips');
-                  setFilters(prev => ({ ...prev, datacenterId: activeDc.id }));
-                }}
-                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5"
-              >
-                <Hash className="w-3.5 h-3.5 text-blue-400" /> Filter IP Directory
-              </button>
-            </div>
-          </div>
-
-          {/* Subnet & VLAN Breakdown Tabs within this DC */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-            {/* Scoped VLANs in this Datacenter */}
-            <div className={`p-4 rounded-xl border ${
-              isDark ? 'bg-slate-900/40 border-slate-700/50' : 'bg-slate-50 border-slate-200'
-            }`}>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className={`font-bold text-sm flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  <Layers className="w-4 h-4 text-purple-400" />
-                  VLANs Scoped to {activeDc.name} ({activeDcVlans.length})
-                </h3>
-                <span className={`text-[11px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Unique (DC + VLAN ID)</span>
-              </div>
-
-              {activeDcVlans.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-400 font-mono">
-                  No VLANs configured in {activeDc.name} yet.
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-1 custom-scrollbar">
-                  {activeDcVlans.map((vlan) => {
-                    const linkedSubnets = activeDcSubnets.filter(s => s.vlanId === vlan.id);
-                    return (
-                      <div 
-                        key={vlan.id}
-                        className={`p-3 rounded-lg border text-xs flex items-center justify-between ${
-                          isDark ? 'bg-slate-800/60 border-slate-700/60' : 'bg-white border-slate-200'
-                        }`}
-                      >
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-purple-400 px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20">
-                              VLAN {vlan.vlanId}
-                            </span>
-                            <span className="font-semibold text-slate-200">{vlan.name}</span>
-                          </div>
-                          <span className="text-[11px] text-slate-400 block mt-1">{vlan.description}</span>
-                        </div>
-
-                        <div className="text-right font-mono text-[11px]">
-                          <span className="text-slate-400">{linkedSubnets.length} Subnet{linkedSubnets.length !== 1 ? 's' : ''}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Subnets in this Datacenter */}
-            <div className={`p-4 rounded-xl border ${
-              isDark ? 'bg-slate-900/40 border-slate-700/50' : 'bg-slate-50 border-slate-200'
-            }`}>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className={`font-bold text-sm flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  <Network className="w-4 h-4 text-emerald-400" />
-                  Subnets in {activeDc.name} ({activeDcSubnets.length})
-                </h3>
-              </div>
-
-              {activeDcSubnets.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-400 font-mono">
-                  No Subnets allocated in {activeDc.name} yet.
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-1 custom-scrollbar">
-                  {activeDcSubnets.map((sub) => {
-                    const subIps = ips.filter(i => i.subnetId === sub.id);
-                    const isPublic = sub.segmentType === 'Public';
-
-                    return (
-                      <div 
-                        key={sub.id}
-                        className={`p-3 rounded-lg border text-xs flex items-center justify-between ${
-                          isDark ? 'bg-slate-800/60 border-slate-700/60' : 'bg-white border-slate-200'
-                        }`}
-                      >
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-emerald-400">
-                              {sub.cidr}
-                            </span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono uppercase font-semibold border ${
-                              isPublic ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : 'bg-slate-700/50 text-slate-300 border-slate-600/30'
-                            }`}>
-                              {sub.segmentType}
-                            </span>
-                          </div>
-                          <span className="text-[11px] text-slate-400 block mt-1">{sub.description}</span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-[11px] text-slate-400">
-                            {subIps.length} IPs
-                          </span>
-                          <button
-                            onClick={() => onOpenSubnetVisualizer(sub)}
-                            className="p-1.5 rounded hover:bg-indigo-500/20 text-indigo-400 transition-colors"
-                            title="View Interactive Matrix"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
+      {datacenters.length === 0 ? (
+        <div className={`${card} flex flex-col items-center gap-3 p-12 text-center`}>
+          <Building2 className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
+          <p className={`text-sm ${muted}`}>No datacenters yet.</p>
+          <button type="button" onClick={onOpenNewDatacenterModal} className={primaryButton}>
+            Create the first one
+          </button>
         </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {datacenters.map((dc) => {
+            const { rows, used, percent, vlanCount } = dcStats(dc.id);
+            const isSelected = activeDc?.id === dc.id;
+            return (
+              <div
+                key={dc.id}
+                className={`${card} relative transition ${isSelected ? 'border-cyan-500! ring-2 ring-cyan-500/30' : 'hover:border-zinc-300 dark:hover:border-zinc-700'}`}
+              >
+                <button
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => setSelectedDcId(dc.id)}
+                  className="flex w-full flex-col gap-4 p-5 text-left cursor-pointer"
+                >
+                  <span className="flex items-center gap-4 pr-14">
+                    <Ring percent={percent} label={`${dc.name} utilization`} size={64} />
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold text-zinc-900 dark:text-white">{dc.name}</span>
+                      <span className={`flex items-center gap-1 text-xs ${muted}`}>
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{dc.location}</span>
+                      </span>
+                    </span>
+                  </span>
+                  <span className="grid grid-cols-3 gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-800/80">
+                    {(
+                      [
+                        [Layers, vlanCount, 'VLANs'],
+                        [Network, rows.length, 'subnets'],
+                        [Hash, used, 'IPs used'],
+                      ] as const
+                    ).map(([Icon, n, label]) => (
+                      <span key={label} className="flex flex-col items-center gap-0.5">
+                        <Icon className={`h-3.5 w-3.5 ${muted}`} aria-hidden />
+                        <span className="font-mono text-sm font-semibold text-zinc-900 dark:text-white">{n}</span>
+                        <span className={`text-[10px] ${muted}`}>{label}</span>
+                      </span>
+                    ))}
+                  </span>
+                </button>
+                <div className="absolute right-3 top-3 flex">
+                  <button type="button" onClick={() => onOpenEditDatacenterModal(dc)} className={`${iconButton} p-1.5`} title="Edit" aria-label={`Edit ${dc.name}`}>
+                    <Edit className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(dc)}
+                    className={`${iconButton} p-1.5 hover:text-rose-600! dark:hover:text-rose-400!`}
+                    title="Delete"
+                    aria-label={`Delete ${dc.name}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Selected datacenter */}
+      {activeDc && active && (
+        <section className={`${card} space-y-6 p-5 sm:p-6`}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">{activeDc.name}</h2>
+              <p className={`text-sm ${muted}`}>{activeDc.description || activeDc.location}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setFilters((prev) => ({ ...prev, datacenterId: activeDc.id }));
+                  setActiveTab('ips');
+                }}
+                className={secondaryButton}
+              >
+                <Hash className="h-4 w-4" /> View IPs
+              </button>
+              {onOpenNewVlanModalForDC && (
+                <button type="button" onClick={() => onOpenNewVlanModalForDC(activeDc.id)} className={secondaryButton}>
+                  <Plus className="h-4 w-4" /> VLAN
+                </button>
+              )}
+              {onOpenNewSubnetModalForDC && (
+                <button type="button" onClick={() => onOpenNewSubnetModalForDC(activeDc.id)} className={primaryButton}>
+                  <Plus className="h-4 w-4" /> Subnet
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div>
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-white">
+                <Layers className="h-4 w-4 text-purple-500" /> VLANs <span className={`font-mono text-xs ${muted}`}>{activeVlans.length}</span>
+              </h3>
+              {activeVlans.length === 0 ? (
+                <p className={`py-6 text-center text-sm ${muted}`}>No VLANs here yet.</p>
+              ) : (
+                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {activeVlans.map((vlan) => (
+                    <li key={vlan.id} className="flex items-center gap-2.5 rounded-lg border border-zinc-100 p-2 dark:border-zinc-800">
+                      <span className="flex h-9 w-11 shrink-0 items-center justify-center rounded-md bg-purple-500/15 font-mono text-sm font-bold text-purple-700 dark:text-purple-300">
+                        {vlan.vlanId}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-zinc-800 dark:text-zinc-100">{vlan.name}</span>
+                        <span className={`block font-mono text-[10px] ${muted}`}>{active.rows.filter((r) => r.sub.vlanId === vlan.id).length} subnets</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div>
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-white">
+                <Network className="h-4 w-4 text-cyan-500" /> Subnets <span className={`font-mono text-xs ${muted}`}>{active.rows.length}</span>
+              </h3>
+              {active.rows.length === 0 ? (
+                <p className={`py-6 text-center text-sm ${muted}`}>No subnets here yet.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {active.rows.map(({ sub, used, usable, percent }) => (
+                    <li key={sub.id}>
+                      <button
+                        type="button"
+                        onClick={() => onOpenSubnetVisualizer(sub)}
+                        title={`${used} / ${formatCount(usable)} used`}
+                        className="grid w-full grid-cols-[minmax(0,1fr)_5rem_2.5rem] items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-800/60 cursor-pointer"
+                      >
+                        <span className="truncate font-mono text-sm text-zinc-900 dark:text-white">{sub.cidr}</span>
+                        <Bar percent={percent} label={`${sub.cidr} utilization`} />
+                        <span className="text-right font-mono text-xs text-zinc-600 dark:text-zinc-300">{percentLabel(percent)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {active.rows.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('subnets')}
+                  className={`${linkButton} mt-3`}
+                >
+                  Manage subnets
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
       )}
     </div>
   );

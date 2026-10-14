@@ -3,7 +3,7 @@ import path from 'path';
 import { Datacenter, VLAN, Subnet, IPAddress, ActivityLog, IPAMStats, SegmentType, IPStatus, UserProfile, IPVersion } from '../src/types/ipam';
 import { isIPInCIDR, isValidCIDR, isValidIP, parseCIDR, ipToInt, intToIp, getIPVersion, compressIPv6, generateIPRange } from '../src/utils/ipCalculator';
 import { mysqlEngine } from './mysql';
-import { hashPasswordSync, verifyPasswordSync, generateSecureApiKey, hashSensitiveData, generateSessionToken } from './crypto';
+import { hashPasswordSync, verifyPasswordSync, generateSecureApiKey, hashSensitiveData, generateSessionToken, API_KEY_PREFIX } from './crypto';
 
 export interface UserSession {
   token: string;
@@ -97,6 +97,8 @@ class IPAMDatabase {
   private users: UserProfile[] = [];
   // Strictly stores salted BCrypt hashes ($2a$10$...), never plaintext!
   private passwordHashes: Map<string, string> = new Map();
+  // userId -> SHA-256 of the user's API key; the raw key is shown once and never kept.
+  private apiKeyHashes: Map<string, string> = new Map();
   // Active user sessions (token -> UserSession) for cookie authentication
   private sessions: Map<string, UserSession> = new Map();
   private dataDir: string;
@@ -108,6 +110,47 @@ class IPAMDatabase {
     this.dataDir = path.join(process.cwd(), 'data');
     this.dbFilePath = path.join(this.dataDir, 'ipam-database.json');
     this.initializeStore();
+  }
+
+  // MySQL writes started by the current persisted() call; null when none is running.
+  private pendingWrites: Promise<void>[] | null = null;
+
+  private track(write: Promise<void>): void {
+    const tracked = write.catch((err) => {
+      if (this.isDbConnected) console.error('[IPAM Database] Write failed:', err);
+      throw err;
+    });
+    if (this.pendingWrites) this.pendingWrites.push(tracked);
+    // Writes outside a request (session expiry cleanup) have nobody to report to.
+    else tracked.catch(() => {});
+  }
+
+  /**
+   * Runs a change and waits until MySQL has stored it. If any write fails, memory is reloaded
+   * from MySQL so the failed change is not shown as saved, and the caller gets a 503 error.
+   */
+  public async persisted<T>(change: () => T): Promise<T> {
+    if (!this.isDbConnected) throw new DatabaseWriteError('The database is not connected, so nothing was saved.');
+    // change() is synchronous, so no other request can add writes to this list meanwhile.
+    this.pendingWrites = [];
+    let result: T;
+    let writes: Promise<void>[];
+    try {
+      result = change();
+    } finally {
+      writes = this.pendingWrites;
+      this.pendingWrites = null;
+    }
+    const failed = (await Promise.allSettled(writes)).some((r) => r.status === 'rejected');
+    if (failed) {
+      const reload = await this.reloadFromMySQL().catch(() => null);
+      if (!reload?.success) {
+        this.isDbConnected = false;
+        this.dbError = 'Lost the connection to MySQL while saving.';
+      }
+      throw new DatabaseWriteError('The database did not save this change. Please try again.');
+    }
+    return result;
   }
 
   public isDatabaseConnected(): boolean {
@@ -147,6 +190,7 @@ class IPAMDatabase {
         this.activityLogs = mysqlData.activityLogs;
         this.users = mysqlData.users;
         this.passwordHashes = mysqlData.passwords;
+        this.apiKeyHashes = mysqlData.apiKeyHashes;
         if (mysqlData.sessions) {
           this.sessions = mysqlData.sessions;
         }
@@ -171,6 +215,7 @@ class IPAMDatabase {
     this.activityLogs = [];
     this.users = [];
     this.passwordHashes = new Map();
+    this.apiKeyHashes = new Map();
     this.sessions = new Map();
   }
 
@@ -191,10 +236,11 @@ class IPAMDatabase {
       collisionAlerts: true,
       exhaustionAlerts: true,
       themePreference: 'dark',
-      apiKey: generateSecureApiKey().maskedKey,
+      apiKey: '',
       createdAt: new Date().toISOString(),
     };
-    const defaultPasswordHash = hashPasswordSync('admin123');
+    // Without IPAM_ADMIN_PASSWORD the seeded admin gets an unguessable password and stays unusable.
+    const defaultPasswordHash = hashPasswordSync(process.env.IPAM_ADMIN_PASSWORD || generateSessionToken());
 
     const defaultDc: Datacenter = {
       id: 'dc-us-east-1',
@@ -216,6 +262,7 @@ class IPAMDatabase {
     const defaultSubnet: Subnet = {
       id: 'sub-10-10-0-0-24',
       cidr: '10.10.0.0/24',
+      ipVersion: 'IPv4',
       segmentType: 'Private',
       datacenterId: defaultDc.id,
       vlanId: defaultVlan.id,
@@ -236,9 +283,11 @@ class IPAMDatabase {
       await mysqlEngine.saveDatacenter(defaultDc);
       await mysqlEngine.saveVlan(defaultVlan);
       await mysqlEngine.saveSubnet(defaultSubnet);
-      await mysqlEngine.saveUser(adminUser, defaultPasswordHash);
+      await mysqlEngine.saveUser(adminUser, defaultPasswordHash, null);
     } catch (err) {
-      console.warn('[MySQL Seed Warning]', err);
+      console.error('[MySQL Seed Error]', err);
+      this.isDbConnected = false;
+      this.dbError = 'Could not write the starting data to MySQL.';
     }
   }
 
@@ -252,6 +301,7 @@ class IPAMDatabase {
       this.activityLogs = mysqlData.activityLogs;
       this.users = mysqlData.users;
       this.passwordHashes = mysqlData.passwords;
+      this.apiKeyHashes = mysqlData.apiKeyHashes;
       if (mysqlData.sessions) {
         this.sessions = mysqlData.sessions;
       }
@@ -299,8 +349,8 @@ class IPAMDatabase {
       }
       // Sync all users
       for (const user of this.users) {
-        const hash = this.passwordHashes.get(user.id) || hashPasswordSync('password123');
-        await mysqlEngine.saveUser(user, hash);
+        const hash = this.passwordHashes.get(user.id) ?? '';
+        await mysqlEngine.saveUser(user, hash, this.apiKeyHashes.get(user.id) ?? null);
       }
       // Sync all valid sessions
       for (const session of this.sessions.values()) {
@@ -424,7 +474,7 @@ class IPAMDatabase {
     }
     this.persist();
     // Asynchronously write through to MySQL
-    mysqlEngine.saveActivityLog(log).catch(() => {});
+    this.track(mysqlEngine.saveActivityLog(log));
     return log;
   }
 
@@ -461,7 +511,7 @@ class IPAMDatabase {
     this.datacenters.push(newDc);
     this.logActivity('CREATE', 'Datacenter', newDc.id, `Datacenter Created: ${newDc.name}`, `Added location ${newDc.location}`);
     this.persist();
-    mysqlEngine.saveDatacenter(newDc).catch(() => {});
+    this.track(mysqlEngine.saveDatacenter(newDc));
     return newDc;
   }
 
@@ -480,7 +530,7 @@ class IPAMDatabase {
     const updated = this.datacenters[index];
     this.logActivity('UPDATE', 'Datacenter', updated.id, `Datacenter Updated: ${updated.name}`, `Modified configuration for ${updated.name}`);
     this.persist();
-    mysqlEngine.saveDatacenter(updated).catch(() => {});
+    this.track(mysqlEngine.saveDatacenter(updated));
     return updated;
   }
 
@@ -499,7 +549,7 @@ class IPAMDatabase {
     this.datacenters = this.datacenters.filter(d => d.id !== id);
     this.logActivity('DELETE', 'Datacenter', id, `Datacenter Deleted: ${dc.name}`, `Removed datacenter location ${dc.location}`);
     this.persist();
-    mysqlEngine.deleteDatacenter(id).catch(() => {});
+    this.track(mysqlEngine.deleteDatacenter(id));
     return { success: true, deletedId: id };
   }
 
@@ -708,7 +758,7 @@ class IPAMDatabase {
     this.vlans.push(newVlan);
     this.logActivity('CREATE', 'VLAN', newVlan.id, `VLAN ${vlanNum} Created`, `Assigned "${newVlan.name}" in ${dc.name}`);
     this.persist();
-    mysqlEngine.saveVlan(newVlan).catch(() => {});
+    this.track(mysqlEngine.saveVlan(newVlan));
     return newVlan;
   }
 
@@ -745,7 +795,7 @@ class IPAMDatabase {
 
     this.logActivity('UPDATE', 'VLAN', current.id, `VLAN ${current.vlanId} Updated`, `Updated "${current.name}" in ${targetDc.name}`);
     this.persist();
-    mysqlEngine.saveVlan(current).catch(() => {});
+    this.track(mysqlEngine.saveVlan(current));
     return current;
   }
 
@@ -762,7 +812,7 @@ class IPAMDatabase {
     this.vlans = this.vlans.filter(v => v.id !== id);
     this.logActivity('DELETE', 'VLAN', id, `VLAN ${vlan.vlanId} Deleted`, `Removed VLAN "${vlan.name}"`);
     this.persist();
-    mysqlEngine.deleteVlan(id).catch(() => {});
+    this.track(mysqlEngine.deleteVlan(id));
     return { success: true, deletedId: id };
   }
 
@@ -843,7 +893,7 @@ class IPAMDatabase {
     this.subnets.push(newSubnet);
     this.logActivity('CREATE', 'Subnet', newSubnet.id, `Subnet ${newSubnet.cidr} (${calc.ipVersion}) Created`, `Configured as ${segmentType} in ${dc.name}`);
     this.persist();
-    mysqlEngine.saveSubnet(newSubnet).catch(() => {});
+    this.track(mysqlEngine.saveSubnet(newSubnet));
     return newSubnet;
   }
 
@@ -912,7 +962,7 @@ class IPAMDatabase {
 
     this.logActivity('UPDATE', 'Subnet', current.id, `Subnet ${current.cidr} Updated`, `Updated configuration in ${targetDc.name}`);
     this.persist();
-    mysqlEngine.saveSubnet(current).catch(() => {});
+    this.track(mysqlEngine.saveSubnet(current));
     return current;
   }
 
@@ -926,7 +976,7 @@ class IPAMDatabase {
 
     this.logActivity('DELETE', 'Subnet', id, `Subnet ${subnet.cidr} Deleted`, `Removed subnet and purged ${deletedIPCount} child IP assignment(s).`);
     this.persist();
-    mysqlEngine.deleteSubnet(id).catch(() => {});
+    this.track(mysqlEngine.deleteSubnet(id));
     return { success: true, deletedId: id, deletedIPCount };
   }
 
@@ -1007,7 +1057,7 @@ class IPAMDatabase {
     this.ips.push(newIp);
     this.logActivity('CREATE', 'IP', newIp.id, `IP ${newIp.ipAddress} (${newIp.ipVersion}) Assigned`, `Status: ${newIp.status} (Host: ${newIp.assignedDevice || 'None'})`);
     this.persist();
-    mysqlEngine.saveIP(newIp).catch(() => {});
+    this.track(mysqlEngine.saveIP(newIp));
     return newIp;
   }
 
@@ -1058,7 +1108,7 @@ class IPAMDatabase {
     const actionType: ActivityLog['action'] = current.status === 'Reserved' ? 'RESERVE' : 'UPDATE';
     this.logActivity(actionType, 'IP', current.id, `IP ${current.ipAddress} Updated`, `Status: ${current.status}, Host: ${current.assignedDevice || 'None'}`);
     this.persist();
-    mysqlEngine.saveIP(current).catch(() => {});
+    this.track(mysqlEngine.saveIP(current));
     return current;
   }
 
@@ -1069,7 +1119,7 @@ class IPAMDatabase {
     this.ips = this.ips.filter(i => i.id !== id);
     this.logActivity('DELETE', 'IP', id, `IP ${ip.ipAddress} Released`, `Removed IP assignment record.`);
     this.persist();
-    mysqlEngine.deleteIP(id).catch(() => {});
+    this.track(mysqlEngine.deleteIP(id));
     return { success: true, deletedId: id, ipAddress: ip.ipAddress };
   }
 
@@ -1115,7 +1165,7 @@ class IPAMDatabase {
           this.ips.push(newIp);
           created.push(newIp);
           existingIps.add(ipStr);
-          mysqlEngine.saveIP(newIp).catch(() => {});
+          this.track(mysqlEngine.saveIP(newIp));
         }
       }
     } else {
@@ -1137,7 +1187,7 @@ class IPAMDatabase {
           this.ips.push(newIp);
           created.push(newIp);
           existingIps.add(ipStr);
-          mysqlEngine.saveIP(newIp).catch(() => {});
+          this.track(mysqlEngine.saveIP(newIp));
         }
       }
     }
@@ -1221,7 +1271,7 @@ class IPAMDatabase {
       existing.lastUpdated = new Date().toISOString();
       this.logActivity('RESERVE', 'IP', existing.id, `Reserved IP ${existing.ipAddress}`, `Assigned to ${existing.assignedDevice || 'Reserved Pool'}`);
       this.persist();
-      mysqlEngine.saveIP(existing).catch(() => {});
+      this.track(mysqlEngine.saveIP(existing));
       return existing;
     }
 
@@ -1239,7 +1289,7 @@ class IPAMDatabase {
     this.ips.push(newIp);
     this.logActivity('RESERVE', 'IP', newIp.id, `Reserved IP ${newIp.ipAddress}`, `Assigned to ${newIp.assignedDevice || 'Reserved Pool'}`);
     this.persist();
-    mysqlEngine.saveIP(newIp).catch(() => {});
+    this.track(mysqlEngine.saveIP(newIp));
     return newIp;
   }
 
@@ -1453,7 +1503,7 @@ class IPAMDatabase {
     };
     this.sessions.set(token, sessionObj);
     this.persist();
-    mysqlEngine.saveSession(token, userId, expiresAt).catch(() => {});
+    this.track(mysqlEngine.saveSession(token, userId, expiresAt));
     return { token, expiresAt };
   }
 
@@ -1463,7 +1513,7 @@ class IPAMDatabase {
     if (!session) return null;
     if (session.expiresAt <= Date.now()) {
       this.sessions.delete(token);
-      mysqlEngine.deleteSession(token).catch(() => {});
+      this.track(mysqlEngine.deleteSession(token));
       return null;
     }
     const user = this.getUserById(session.userId);
@@ -1474,7 +1524,7 @@ class IPAMDatabase {
     if (!token) return;
     this.sessions.delete(token);
     this.persist();
-    mysqlEngine.deleteSession(token).catch(() => {});
+    this.track(mysqlEngine.deleteSession(token));
   }
 
   public updateUserProfile(id: string, data: Partial<UserProfile>): UserProfile {
@@ -1507,10 +1557,10 @@ class IPAMDatabase {
     if (data.exhaustionAlerts !== undefined) current.exhaustionAlerts = Boolean(data.exhaustionAlerts);
     if (data.themePreference !== undefined) current.themePreference = data.themePreference;
 
-    this.logActivity('UPDATE', 'Datacenter', current.id, `Profile Updated: ${current.name}`, `Updated contact & preferences for ${current.email}`);
+    this.logActivity('UPDATE', 'User', current.id, `Profile Updated: ${current.name}`, `Updated contact & preferences for ${current.email}`);
     this.persist();
-    const hash = this.passwordHashes.get(current.id) || hashPasswordSync('password123');
-    mysqlEngine.saveUser(current, hash).catch(() => {});
+    const hash = this.passwordHashes.get(current.id) ?? '';
+    this.track(mysqlEngine.saveUser(current, hash, this.apiKeyHashes.get(current.id) ?? null));
     return current;
   }
 
@@ -1536,8 +1586,6 @@ class IPAMDatabase {
     }
 
     const id = `user-${email.split('@')[0].replace(/[^a-z0-9]/g, '')}-${Date.now().toString(36)}`;
-    const { rawKey } = generateSecureApiKey();
-    
     const newUser: UserProfile = {
       id,
       name: data.name.trim(),
@@ -1554,21 +1602,21 @@ class IPAMDatabase {
       collisionAlerts: true,
       exhaustionAlerts: true,
       themePreference: 'dark',
-      apiKey: rawKey,
+      apiKey: '',
       createdAt: new Date().toISOString(),
     };
 
     // SECURE CRYPTOGRAPHY: Password is salted and hashed with BCrypt
-    const plainPassword = data.password && data.password.trim() ? data.password.trim() : 'password123';
-    const bcryptHash = hashPasswordSync(plainPassword);
+    if (!data.password || data.password.length < 6) throw new Error('Password must be at least 6 characters');
+    const bcryptHash = hashPasswordSync(data.password);
     this.passwordHashes.set(newUser.id, bcryptHash);
 
     this.users.push(newUser);
-    this.logActivity('CREATE', 'Datacenter', newUser.id, `New Account Created: ${newUser.name}`, `Registered ${newUser.email} with ${newUser.role} role`);
+    this.logActivity('CREATE', 'User', newUser.id, `New Account Created: ${newUser.name}`, `Registered ${newUser.email} with ${newUser.role} role`);
     this.persist();
     
     // Save to MySQL with salted hash
-    mysqlEngine.saveUser(newUser, bcryptHash).catch(() => {});
+    this.track(mysqlEngine.saveUser(newUser, bcryptHash, null));
     
     // Create new session
     const session = this.createSession(newUser.id);
@@ -1582,7 +1630,7 @@ class IPAMDatabase {
     const cleanEmail = email.trim().toLowerCase();
     const user = this.users.find(u => u.email.toLowerCase() === cleanEmail);
     if (!user) {
-      throw new Error(`No account found with email "${email}". Please verify your email or create an account.`);
+      throw new Error('Invalid email or password.');
     }
 
     const storedHash = this.passwordHashes.get(user.id);
@@ -1593,10 +1641,10 @@ class IPAMDatabase {
     // SECURE CRYPTOGRAPHY: BCrypt constant-time comparison
     const isMatch = verifyPasswordSync(password, storedHash);
     if (!isMatch) {
-      throw new Error('Invalid credentials. Please verify your password.');
+      throw new Error('Invalid email or password.');
     }
 
-    this.logActivity('UPDATE', 'Datacenter', user.id, `Engineer Authenticated: ${user.name}`, `Logged into IPAM session as ${user.email}`);
+    this.logActivity('UPDATE', 'User', user.id, `Engineer Authenticated: ${user.name}`, `Logged into IPAM session as ${user.email}`);
     
     const session = this.createSession(user.id);
     return { user, session };
@@ -1606,7 +1654,7 @@ class IPAMDatabase {
     if (!token) return true;
     const user = this.getUserBySession(token);
     if (user) {
-      this.logActivity('UPDATE', 'Datacenter', user.id, `Engineer Signed Out: ${user.name}`, `Session ended for ${user.email}`);
+      this.logActivity('UPDATE', 'User', user.id, `Engineer Signed Out: ${user.name}`, `Session ended for ${user.email}`);
     }
     this.deleteSession(token);
     return true;
@@ -1616,15 +1664,30 @@ class IPAMDatabase {
     const user = this.users.find(u => u.id === userId);
     if (!user) throw new Error('User not found');
     
-    const { rawKey } = generateSecureApiKey();
-    user.apiKey = rawKey;
-    this.logActivity('UPDATE', 'Datacenter', user.id, `API Key Regenerated`, `New token issued for ${user.email}`);
+    // Replaces any previous key, which stops working immediately.
+    const { rawKey, keyHash, maskedKey } = generateSecureApiKey();
+    user.apiKey = maskedKey;
+    this.apiKeyHashes.set(user.id, keyHash);
+    this.logActivity('UPDATE', 'User', user.id, `API Key Regenerated`, `New token issued for ${user.email}`);
     this.persist();
 
-    const hash = this.passwordHashes.get(user.id) || hashPasswordSync('password123');
-    mysqlEngine.saveUser(user, hash).catch(() => {});
-    return user.apiKey;
+    const hash = this.passwordHashes.get(user.id) ?? '';
+    this.track(mysqlEngine.saveUser(user, hash, keyHash));
+    return rawKey;
   }
+
+  public getUserByApiKey(key?: string): UserProfile | null {
+    if (!key?.startsWith(API_KEY_PREFIX)) return null;
+    const keyHash = hashSensitiveData(key);
+    for (const [userId, stored] of this.apiKeyHashes) {
+      if (stored === keyHash) return this.getUserById(userId) || null;
+    }
+    return null;
+  }
+}
+
+export class DatabaseWriteError extends Error {
+  status = 503;
 }
 
 export const db = new IPAMDatabase();

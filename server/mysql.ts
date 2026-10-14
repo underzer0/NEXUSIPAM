@@ -2,7 +2,7 @@ import mysql, { Pool, PoolOptions, RowDataPacket, ResultSetHeader } from 'mysql2
 import fs from 'fs';
 import path from 'path';
 import { Datacenter, VLAN, Subnet, IPAddress, ActivityLog, UserProfile } from '../src/types/ipam';
-import { hashPasswordSync, verifyPasswordSync, encryptSensitive, decryptSensitive, hashSensitiveData } from './crypto';
+import { hashPasswordSync, isBcryptHash, API_KEY_PREFIX } from './crypto';
 
 export interface MySQLConfig {
   host: string;
@@ -354,6 +354,15 @@ class MySQLEngine {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
 
+      // Wipe API keys from before hashing-only storage (nx_live_, kept decryptable). They no longer
+      // sign requests; only bip_ keys, stored as a hash with no encrypted copy, are kept.
+      const [wiped] = await this.pool.query<ResultSetHeader>(
+        `UPDATE users SET api_key_hash = NULL, api_key_encrypted = NULL, api_key_masked = NULL
+         WHERE api_key_encrypted IS NOT NULL OR (api_key_masked IS NOT NULL AND LEFT(api_key_masked, ?) <> ?)`,
+        [API_KEY_PREFIX.length, API_KEY_PREFIX],
+      );
+      if (wiped.affectedRows) console.log(`[MySQL] Removed ${wiped.affectedRows} legacy API key(s).`);
+
       this.schemaReady = true;
       console.log('[MySQL] All relational tables and session store successfully verified.');
     } catch (err: any) {
@@ -484,6 +493,7 @@ class MySQLEngine {
     activityLogs: ActivityLog[];
     users: UserProfile[];
     passwords: Map<string, string>;
+    apiKeyHashes: Map<string, string>;
     sessions: Map<string, { token: string; userId: string; expiresAt: number }>;
   } | null> {
     if (!this.pool || !this.isConnected) return null;
@@ -551,16 +561,20 @@ class MySQLEngine {
       // 6. Users
       const [userRows] = await this.pool.query<RowDataPacket[]>('SELECT * FROM users ORDER BY created_at ASC');
       const passwords = new Map<string, string>();
+      const apiKeyHashes = new Map<string, string>();
+      const plainPasswords: [string, string][] = [];
       const users: UserProfile[] = userRows.map(r => {
-        // Store password hash in memory map for auth verification
-        passwords.set(r.id, r.password_hash);
-        
-        let apiKey = r.api_key_masked || '';
-        if (r.api_key_encrypted) {
-          try {
-            apiKey = decryptSensitive(r.api_key_encrypted);
-          } catch {}
+        // Old databases may hold plain-text passwords; hash them so sign-in only ever compares bcrypt.
+        let hash: string = r.password_hash || '';
+        if (hash && !isBcryptHash(hash)) {
+          hash = hashPasswordSync(hash);
+          plainPasswords.push([r.id, hash]);
         }
+        passwords.set(r.id, hash);
+        
+        // Older nx_live_ keys were exposed in plaintext, so only keys made since hashing-only storage count.
+        const hasKey = r.api_key_hash && String(r.api_key_masked || '').startsWith(API_KEY_PREFIX);
+        if (hasKey) apiKeyHashes.set(r.id, r.api_key_hash);
 
         return {
           id: r.id,
@@ -578,10 +592,14 @@ class MySQLEngine {
           collisionAlerts: Boolean(r.collision_alerts),
           exhaustionAlerts: Boolean(r.exhaustion_alerts),
           themePreference: r.theme_preference || 'dark',
-          apiKey: apiKey || `nx_live_${r.id.substring(0, 8)}`,
+          apiKey: hasKey ? r.api_key_masked : '',
           createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
         };
       });
+      for (const [id, hash] of plainPasswords) {
+        await this.pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, id]);
+      }
+      if (plainPasswords.length) console.log(`[MySQL] Hashed ${plainPasswords.length} plain-text password(s).`);
 
       // 7. Active user sessions
       const sessions = new Map<string, { token: string; userId: string; expiresAt: number }>();
@@ -605,6 +623,7 @@ class MySQLEngine {
         activityLogs,
         users,
         passwords,
+        apiKeyHashes,
         sessions,
       };
     } catch (err: any) {
@@ -614,9 +633,10 @@ class MySQLEngine {
   }
 
   // --- WRITE OPERATORS ---
+  // Each write throws on failure so callers can tell the user instead of showing unsaved data as saved.
 
   public async saveDatacenter(dc: Datacenter): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query(
         `INSERT INTO datacenters (id, name, location, description, created_at)
@@ -626,20 +646,22 @@ class MySQLEngine {
       );
     } catch (err) {
       console.error('[MySQL Error] saveDatacenter:', err);
+      throw err;
     }
   }
 
   public async deleteDatacenter(id: string): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query('DELETE FROM datacenters WHERE id = ?', [id]);
     } catch (err) {
       console.error('[MySQL Error] deleteDatacenter:', err);
+      throw err;
     }
   }
 
   public async saveVlan(vlan: VLAN): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query(
         `INSERT INTO vlans (id, vlan_id, name, description, datacenter_id, created_at)
@@ -649,20 +671,22 @@ class MySQLEngine {
       );
     } catch (err) {
       console.error('[MySQL Error] saveVlan:', err);
+      throw err;
     }
   }
 
   public async deleteVlan(id: string): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query('DELETE FROM vlans WHERE id = ?', [id]);
     } catch (err) {
       console.error('[MySQL Error] deleteVlan:', err);
+      throw err;
     }
   }
 
   public async saveSubnet(subnet: Subnet): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query(
         `INSERT INTO subnets (id, cidr, ip_version, segment_type, datacenter_id, vlan_id, description, created_at)
@@ -672,20 +696,22 @@ class MySQLEngine {
       );
     } catch (err) {
       console.error('[MySQL Error] saveSubnet:', err);
+      throw err;
     }
   }
 
   public async deleteSubnet(id: string): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query('DELETE FROM subnets WHERE id = ?', [id]);
     } catch (err) {
       console.error('[MySQL Error] deleteSubnet:', err);
+      throw err;
     }
   }
 
   public async saveIP(ip: IPAddress): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query(
         `INSERT INTO ip_addresses (id, ip_address, ip_version, subnet_id, status, assigned_device, description, last_updated)
@@ -695,20 +721,22 @@ class MySQLEngine {
       );
     } catch (err) {
       console.error('[MySQL Error] saveIP:', err);
+      throw err;
     }
   }
 
   public async deleteIP(id: string): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query('DELETE FROM ip_addresses WHERE id = ?', [id]);
     } catch (err) {
       console.error('[MySQL Error] deleteIP:', err);
+      throw err;
     }
   }
 
   public async saveActivityLog(log: ActivityLog): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query(
         `INSERT INTO activity_logs (id, action, entity_type, entity_id, title, detail, timestamp)
@@ -717,31 +745,20 @@ class MySQLEngine {
       );
     } catch (err) {
       console.error('[MySQL Error] saveActivityLog:', err);
+      throw err;
     }
   }
 
-  public async saveUser(user: UserProfile, passwordHashOrPlain: string): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+  public async saveUser(user: UserProfile, passwordHashOrPlain: string, apiKeyHash: string | null): Promise<void> {
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       // Ensure password is safe bcrypt hash
       let passwordHash = passwordHashOrPlain;
-      if (!passwordHash.startsWith('$2a$') && !passwordHash.startsWith('$2b$')) {
+      if (!isBcryptHash(passwordHash)) {
         passwordHash = hashPasswordSync(passwordHash);
       }
 
-      // API key security
-      let apiKeyHash: string | null = null;
-      let apiKeyEncrypted: string | null = null;
-      let apiKeyMasked: string | null = null;
-
-      if (user.apiKey) {
-        apiKeyHash = hashSensitiveData(user.apiKey);
-        apiKeyEncrypted = encryptSensitive(user.apiKey);
-        apiKeyMasked = user.apiKey.length > 8 
-          ? `${user.apiKey.substring(0, 8)}...${user.apiKey.substring(user.apiKey.length - 4)}` 
-          : user.apiKey;
-      }
-
+      // user.apiKey is only the masked form; the raw key is never stored.
       await this.pool.query(
         `INSERT INTO users (
            id, name, email, password_hash, role, department, organization, location, phone, bio,
@@ -775,18 +792,19 @@ class MySQLEngine {
           user.exhaustionAlerts ? 1 : 0,
           user.themePreference || 'dark',
           apiKeyHash,
-          apiKeyEncrypted,
-          apiKeyMasked,
+          null,
+          apiKeyHash ? user.apiKey || null : null,
           new Date(user.createdAt),
         ]
       );
     } catch (err) {
       console.error('[MySQL Error] saveUser:', err);
+      throw err;
     }
   }
 
   public async saveSystemConfig(key: string, value: string): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query(
         `INSERT INTO system_config (config_key, config_value)
@@ -796,11 +814,12 @@ class MySQLEngine {
       );
     } catch (err) {
       console.error('[MySQL Error] saveSystemConfig:', err);
+      throw err;
     }
   }
 
   public async saveSession(token: string, userId: string, expiresAt: Date): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query(
         `INSERT INTO user_sessions (token, user_id, expires_at)
@@ -810,15 +829,17 @@ class MySQLEngine {
       );
     } catch (err) {
       console.error('[MySQL Error] saveSession:', err);
+      throw err;
     }
   }
 
   public async deleteSession(token: string): Promise<void> {
-    if (!this.pool || !this.isConnected) return;
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {
       await this.pool.query('DELETE FROM user_sessions WHERE token = ?', [token]);
     } catch (err) {
       console.error('[MySQL Error] deleteSession:', err);
+      throw err;
     }
   }
 }
