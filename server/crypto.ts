@@ -1,17 +1,6 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
-// Secret key for AES-256-GCM symmetric encryption
-const FALLBACK_SECRET = 'nexus_ipam_enterprise_master_key_2026_secure_storage';
-const SECRET_KEY = process.env.APP_SECRET_KEY || process.env.ENCRYPTION_KEY || FALLBACK_SECRET;
-
-/**
- * Derives a 32-byte key from the secret
- */
-function getEncryptionKey(): Buffer {
-  return crypto.createHash('sha256').update(SECRET_KEY).digest();
-}
-
 /**
  * Hashes a plaintext password using bcrypt with a secure salt
  */
@@ -57,52 +46,6 @@ export function verifyPasswordSync(plainPassword: string, hash: string): boolean
  */
 export function hashSensitiveData(data: string): string {
   return crypto.createHash('sha256').update(data).digest('hex');
-}
-
-/**
- * Encrypts sensitive string data using AES-256-GCM
- */
-export function encryptSensitive(plainText: string): string {
-  try {
-    const iv = crypto.randomBytes(12);
-    const key = getEncryptionKey();
-    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-    
-    let encrypted = cipher.update(plainText, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    const authTag = cipher.getAuthTag().toString('hex');
-    
-    // Format: iv:authTag:encrypted
-    return `${iv.toString('hex')}:${authTag}:${encrypted}`;
-  } catch (err) {
-    console.error('[Crypto] Encryption error:', err);
-    return plainText;
-  }
-}
-
-/**
- * Decrypts AES-256-GCM encrypted string
- */
-export function decryptSensitive(cipherPayload: string): string {
-  try {
-    const parts = cipherPayload.split(':');
-    if (parts.length !== 3) return cipherPayload;
-    
-    const [ivHex, authTagHex, encryptedHex] = parts;
-    const iv = Buffer.from(ivHex, 'hex');
-    const authTag = Buffer.from(authTagHex, 'hex');
-    const key = getEncryptionKey();
-    
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAuthTag(authTag);
-    
-    let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
-  } catch (err) {
-    console.error('[Crypto] Decryption error:', err);
-    return cipherPayload;
-  }
 }
 
 // Keys use a prefix the old nx_live_ keys never had, so no key issued before hashing-only storage can sign requests.
