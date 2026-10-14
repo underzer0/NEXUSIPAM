@@ -585,6 +585,8 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const user: UserProfile = json.data?.user || json.data;
     setCurrentUser(user);
     setIsAuthenticated(true);
+    // Load the data over HTTP so pages work even when the live-update socket can't connect.
+    await fetchBootstrapData();
     setActiveTab('dashboard');
     return user;
   };
@@ -622,6 +624,8 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newUser: UserProfile = json.data?.user || json.data;
     setCurrentUser(newUser);
     setIsAuthenticated(true);
+    // Load the data over HTTP so pages work even when the live-update socket can't connect.
+    await fetchBootstrapData();
     setActiveTab('dashboard');
     return newUser;
   };
