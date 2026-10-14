@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useIPAM } from '../context/IPAMContext';
 import { Check, Copy, Send } from 'lucide-react';
-import { card, chip, input, muted, primaryButton, secondaryButton } from './ui';
+import { card, chip, input, muted, primaryButton, secondaryButton, linkButton } from './ui';
 
 type Method = 'GET' | 'POST';
 
@@ -18,7 +18,7 @@ const METHOD_STYLE: Record<Method, string> = {
 };
 
 export const ApiExplorerView: React.FC = () => {
-  const { subnets, datacenters, vlans } = useIPAM();
+  const { subnets, datacenters, vlans, setActiveTab } = useIPAM();
   const subnetId = subnets[0]?.id || ':subnetId';
   const dcId = datacenters[0]?.id || ':datacenterId';
 
@@ -101,11 +101,11 @@ export const ApiExplorerView: React.FC = () => {
     }
   };
 
-  // The session cookie is httpOnly, so scripts outside the browser need their own token.
+  // The session cookie is httpOnly, so scripts outside the browser sign with an API key.
   const curl = [
     `curl -X ${endpoint.method} "${window.location.origin}${requestUrl}"`,
     '  -H "Content-Type: application/json"',
-    '  -H "Authorization: Bearer <session-token>"',
+    '  -H "Authorization: Bearer <your API key>"',
     ...(endpoint.method !== 'GET' && requestBody ? [`  -d '${requestBody.replace(/\s*\n\s*/g, ' ')}'`] : []),
   ].join(' \\\n');
 
@@ -181,7 +181,7 @@ export const ApiExplorerView: React.FC = () => {
               </span>
             )}
           </div>
-          <pre className="max-h-96 overflow-auto rounded-xl bg-zinc-950 p-4 font-mono text-xs text-emerald-300">
+          <pre className="max-h-96 overflow-auto rounded-lg bg-black p-4 font-mono text-xs text-emerald-300">
             {loading ? 'Sending…' : response ? response.body : <span className="text-zinc-500">Press Send to see the response.</span>}
           </pre>
         </div>
@@ -193,8 +193,13 @@ export const ApiExplorerView: React.FC = () => {
               {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />} Copy
             </button>
           </div>
-          <pre className="overflow-auto rounded-xl bg-zinc-950 p-4 font-mono text-xs text-zinc-300">{curl}</pre>
-          <p className={`text-xs ${muted}`}>Every request needs a signed-in session. Signing requests with API keys isn't supported yet.</p>
+          <pre className="overflow-auto rounded-lg bg-black p-4 font-mono text-xs text-zinc-300">{curl}</pre>
+          <p className={`text-xs ${muted}`}>
+            Scripts sign requests with an API key.{' '}
+            <button type="button" onClick={() => setActiveTab('profile')} className={`${linkButton} text-xs`}>
+              Create one on your profile
+            </button>
+          </p>
         </div>
       </div>
     </div>

@@ -89,7 +89,7 @@ export const SubnetCalculatorView: React.FC = () => {
               max={maxPrefix}
               value={safePrefix}
               onChange={(e) => setPrefix(parseInt(e.target.value, 10))}
-              className="w-full cursor-pointer accent-cyan-600"
+              className="w-full cursor-pointer accent-cyan-500"
             />
           </label>
         </div>
@@ -122,16 +122,27 @@ export const SubnetCalculatorView: React.FC = () => {
           <div className={`${card} space-y-5 p-5`}>
             <div>
               <p className={`text-sm ${muted}`}>Usable addresses</p>
-              <p className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">{result.usableHostsFormatted ?? result.usableHosts.toLocaleString()}</p>
+              <p className="font-mono text-3xl font-semibold tracking-tight text-zinc-900 dark:text-white">{result.usableHostsFormatted ?? result.usableHosts.toLocaleString()}</p>
             </div>
-            <div className="space-y-1.5">
-              <div className="flex h-3 overflow-hidden rounded-full" aria-hidden>
-                <div className="bg-cyan-500" style={{ width: `${(safePrefix / maxPrefix) * 100}%` }} />
-                <div className="flex-1 bg-emerald-500" />
+            {/* Bit map: every bit of the address, network bits in cyan, host bits in green */}
+            <div className="space-y-2">
+              <div
+                role="img"
+                aria-label={`${safePrefix} network bits, ${maxPrefix - safePrefix} host bits`}
+                className="grid grid-cols-4 gap-1.5"
+              >
+                {Array.from({ length: maxPrefix / (isV6 ? 32 : 8) }, (_, g) => (
+                  <div key={g} className={`grid gap-px ${isV6 ? 'grid-cols-16' : 'grid-cols-8'}`}>
+                    {Array.from({ length: isV6 ? 32 : 8 }, (_, b) => {
+                      const bit = g * (isV6 ? 32 : 8) + b;
+                      return <span key={b} className={`rounded-[2px] ${isV6 ? 'h-2' : 'h-5'} ${bit < safePrefix ? 'bg-cyan-400' : 'bg-emerald-400/70'}`} />;
+                    })}
+                  </div>
+                ))}
               </div>
               <p className={`flex justify-between text-xs ${muted}`}>
-                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-cyan-500" />{safePrefix} network bits</span>
-                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500" />{maxPrefix - safePrefix} host bits</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-cyan-400" />{safePrefix} network bits</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-emerald-400/70" />{maxPrefix - safePrefix} host bits</span>
               </p>
             </div>
             <div className="flex flex-wrap gap-2">

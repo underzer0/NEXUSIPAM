@@ -143,12 +143,12 @@ export const UserProfileView: React.FC = () => {
     <div id="user-profile-page" className="mx-auto max-w-4xl space-y-6 p-4 pb-24 sm:p-6 md:p-8 md:pb-12">
       {/* Identity */}
       <div className={`${card} flex flex-col gap-5 p-6 sm:flex-row sm:items-center`}>
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-cyan-600 text-xl font-bold text-white" aria-hidden>
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-cyan-500 font-mono text-xl font-bold text-zinc-950" aria-hidden>
           {initials(currentUser.name)}
         </div>
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="truncate text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">{currentUser.name}</h1>
+            <h1 className="truncate text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">{currentUser.name}</h1>
             <span className={`${chip} bg-cyan-500/10 text-cyan-700 dark:text-cyan-300`}>{currentUser.role}</span>
           </div>
           <p className={`truncate text-sm ${muted}`}>

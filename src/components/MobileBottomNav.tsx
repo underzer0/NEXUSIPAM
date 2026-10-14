@@ -25,7 +25,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenMenu }) 
     <nav
       id="mobile-bottom-nav"
       aria-label="Quick navigation"
-      className="fixed inset-x-0 bottom-0 z-30 flex border-t border-zinc-200 bg-white/95 px-2 pt-1.5 backdrop-blur-lg md:hidden dark:border-zinc-800 dark:bg-zinc-900/95"
+      className="fixed inset-x-0 bottom-0 z-30 flex border-t border-zinc-200 bg-white/95 px-2 pt-1.5 backdrop-blur-lg md:hidden dark:border-zinc-800/80 dark:bg-black/95"
       style={{ paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}
     >
       {ITEMS.map(({ id, label, icon: Icon }) => (

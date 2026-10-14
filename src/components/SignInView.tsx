@@ -12,7 +12,7 @@ export const AuthShell: React.FC<{ title: string; error: string | null; footer: 
 }) => (
   <div className="flex w-full items-center justify-center">
     <div className="w-full max-w-sm space-y-6">
-      <h1 className="text-center text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">{title}</h1>
+      <h1 className="text-center text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">{title}</h1>
       <div className={`${card} space-y-5 p-6`}>
         {error && (
           <p role="alert" className="rounded-xl bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">
