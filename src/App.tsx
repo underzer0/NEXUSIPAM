@@ -209,7 +209,6 @@ const MainAppContent: React.FC = () => {
               onOpenSubnetVisualizer={handleOpenVisualizer}
               onOpenNewDatacenterModal={handleOpenNewDatacenter}
               onOpenNewSubnetModal={() => handleOpenNewSubnet()}
-              onOpenReserveNextModal={() => handleOpenReserveNext()}
               onOpenAuditLogs={handleOpenAuditLogs}
             />
           )}
@@ -245,7 +244,6 @@ const MainAppContent: React.FC = () => {
             <IPDirectoryView
               onOpenNewIPModal={() => handleOpenNewIP()}
               onOpenEditIPModal={handleOpenEditIP}
-              onOpenReserveNextModal={handleOpenReserveNext}
               onOpenBulkGenerateModal={() => handleOpenBulkGenerate(null)}
             />
           )}

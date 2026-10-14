@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useIPAM } from '../context/IPAMContext';
-import { BookmarkCheck, Database, Edit, Network, Plus, Search, Trash2 } from 'lucide-react';
+import { BookmarkCheck, Database, Edit, Network, Search, Trash2 } from 'lucide-react';
 import { Subnet, IPAddress, VLAN } from '../types/ipam';
 import { getIPVersion, parseCIDR } from '../utils/ipCalculator';
 import { Ring, Segmented, card, chip, chipNeutral, formatCount, iconButton, input, muted, percentOf, primaryButton, usableOf } from './ui';
@@ -77,9 +77,6 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
         <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">
           Subnets <span className={`font-mono text-base font-medium ${muted}`}>{filteredSubnets.length}</span>
         </h1>
-        <button id="btn-add-subnet" type="button" onClick={onOpenNewSubnetModal} className={primaryButton}>
-          <Plus className="h-4 w-4" /> New subnet
-        </button>
       </div>
 
       {deleteError && (
