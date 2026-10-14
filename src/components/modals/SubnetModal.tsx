@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useIPAM } from '../../context/IPAMContext';
-import { X, Network, Building2, Layers, Globe, Lock, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
-import { Subnet, SegmentType, IPVersion } from '../../types/ipam';
-import { parseCIDR, isPrivateRFC1918, isValidCIDR, getIPVersion } from '../../utils/ipCalculator';
+import { Subnet, SegmentType } from '../../types/ipam';
+import { parseCIDR, isPrivateRFC1918, isValidCIDR } from '../../utils/ipCalculator';
+import { Field, FormActions, FormError, Modal, chip, fieldInput, muted } from '../ui';
 
 interface SubnetModalProps {
   isOpen: boolean;
@@ -11,102 +11,55 @@ interface SubnetModalProps {
   defaultDatacenterId?: string;
 }
 
-export const SubnetModal: React.FC<SubnetModalProps> = ({
-  isOpen,
-  onClose,
-  subnetToEdit,
-  defaultDatacenterId,
-}) => {
-  const { datacenters, vlans, createSubnet, updateSubnet, isDark } = useIPAM();
+const PRESETS = ['10.10.100.0/24', '172.16.50.0/26', 'fd00:10:10::/64', '2001:db8:1000::/64'];
+
+export const SubnetModal: React.FC<SubnetModalProps> = ({ isOpen, onClose, subnetToEdit, defaultDatacenterId }) => {
+  const { datacenters, vlans, createSubnet, updateSubnet } = useIPAM();
   const [cidr, setCidr] = useState('');
-  const [datacenterId, setDatacenterId] = useState(defaultDatacenterId || datacenters[0]?.id || '');
-  const [vlanId, setVlanId] = useState<string>('');
+  const [datacenterId, setDatacenterId] = useState('');
+  const [vlanId, setVlanId] = useState('');
   const [segmentType, setSegmentType] = useState<SegmentType>('Private');
   const [description, setDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Filter VLANs to those strictly in the selected datacenter
-  const availableVlans = vlans.filter(v => v.datacenterId === datacenterId);
-
   useEffect(() => {
-    if (subnetToEdit) {
-      setCidr(subnetToEdit.cidr);
-      setDatacenterId(subnetToEdit.datacenterId);
-      setVlanId(subnetToEdit.vlanId || '');
-      setSegmentType(subnetToEdit.segmentType);
-      setDescription(subnetToEdit.description);
-    } else {
-      setCidr('10.10.100.0/24');
-      setDatacenterId(defaultDatacenterId || datacenters[0]?.id || '');
-      setVlanId('');
-      setSegmentType('Private');
-      setDescription('');
-    }
+    setCidr(subnetToEdit?.cidr ?? '10.10.100.0/24');
+    setDatacenterId(subnetToEdit?.datacenterId ?? defaultDatacenterId ?? datacenters[0]?.id ?? '');
+    setVlanId(subnetToEdit?.vlanId ?? '');
+    setSegmentType(subnetToEdit?.segmentType ?? 'Private');
+    setDescription(subnetToEdit?.description ?? '');
     setError(null);
   }, [subnetToEdit, isOpen, defaultDatacenterId, datacenters]);
 
-  // Auto-detect Private/Public when CIDR changes
-  useEffect(() => {
-    if (cidr.includes('/')) {
-      const baseIp = cidr.split('/')[0];
-      if (baseIp) {
-        const isPriv = isPrivateRFC1918(baseIp);
-        setSegmentType(isPriv ? 'Private' : 'Public');
-      }
-    }
-  }, [cidr]);
-
   if (!isOpen) return null;
 
-  // Real-time calculation preview
-  let calcPreview = null;
-  let detectedVersion: IPVersion | 'Unknown' = 'Unknown';
+  // Guess Private/Public only while the user types, so editing never overrides a saved choice.
+  const changeCidr = (value: string) => {
+    setCidr(value);
+    const base = value.split('/')[0];
+    if (value.includes('/') && base) setSegmentType(isPrivateRFC1918(base) ? 'Private' : 'Public');
+  };
+
+  const trimmed = cidr.trim();
+  let preview: ReturnType<typeof parseCIDR> | null = null;
   try {
-    if (cidr.trim() && isValidCIDR(cidr.trim())) {
-      calcPreview = parseCIDR(cidr.trim());
-      detectedVersion = calcPreview.ipVersion;
-    }
-  } catch {
-    calcPreview = null;
-  }
+    if (isValidCIDR(trimmed)) preview = parseCIDR(trimmed);
+  } catch {}
+
+  const availableVlans = vlans.filter((v) => v.datacenterId === datacenterId).sort((a, b) => a.vlanId - b.vlanId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cidr.trim()) {
-      setError('CIDR Prefix is required (e.g. 10.10.10.0/24 or 2001:db8:10::/64).');
-      return;
-    }
-    if (!isValidCIDR(cidr.trim())) {
-      setError('Invalid CIDR format. Please provide a valid IPv4 (e.g. 10.10.10.0/24) or IPv6 (e.g. fd00:10::/64, 2001:db8::/64).');
-      return;
-    }
-    if (!datacenterId) {
-      setError('Please select a Datacenter.');
-      return;
-    }
+    if (!isValidCIDR(trimmed)) return setError('Enter a valid CIDR, like 10.10.10.0/24 or 2001:db8::/64.');
+    if (!datacenterId) return setError('Pick a datacenter.');
 
     setLoading(true);
     setError(null);
-
     try {
-      if (subnetToEdit) {
-        await updateSubnet(subnetToEdit.id, {
-          cidr: cidr.trim(),
-          datacenterId,
-          vlanId: vlanId ? vlanId : null,
-          segmentType,
-          description: description.trim(),
-        });
-      } else {
-        await createSubnet({
-          cidr: cidr.trim(),
-          datacenterId,
-          vlanId: vlanId ? vlanId : null,
-          segmentType,
-          description: description.trim(),
-        });
-      }
+      const data = { cidr: trimmed, datacenterId, vlanId: vlanId || null, segmentType, description: description.trim() };
+      if (subnetToEdit) await updateSubnet(subnetToEdit.id, data);
+      else await createSubnet(data);
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to save subnet.');
@@ -116,194 +69,89 @@ export const SubnetModal: React.FC<SubnetModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-      <div className={`relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden ${
-        isDark ? 'bg-slate-900 border-slate-700/60 text-slate-100' : 'bg-white border-slate-200 text-slate-800'
-      }`}>
-        <div className="p-4 sm:p-5 border-b border-slate-700/50 flex items-center justify-between shrink-0">
-          <h2 className="text-base font-bold flex items-center gap-2 text-white">
-            <Network className="w-5 h-5 text-indigo-400" />
-            {subnetToEdit ? 'Edit Subnet Allocation' : 'Allocate New Subnet Prefix'}
-          </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200 p-1 rounded-lg">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Modal title={subnetToEdit ? `Edit ${subnetToEdit.cidr}` : 'New subnet'} onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <FormError message={error} />
+        <Field
+          label="CIDR"
+          hint={
+            preview ? (
+              <span className="font-mono">
+                {preview.ipVersion} · {preview.usableHostsFormatted ?? preview.usableHosts.toLocaleString()} usable · {preview.firstUsableHost} – {preview.lastUsableHost}
+              </span>
+            ) : trimmed ? (
+              <span className="text-rose-600 dark:text-rose-400">Not a valid CIDR yet</span>
+            ) : null
+          }
+        >
+          <input required autoFocus spellCheck={false} value={cidr} onChange={(e) => changeCidr(e.target.value)} className={`${fieldInput} font-mono`} />
+        </Field>
+        {!subnetToEdit && (
+          <div className="-mt-2 flex flex-wrap gap-1.5">
+            {PRESETS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => changeCidr(p)}
+                className={`${chip} bg-slate-100 font-mono text-slate-700 hover:bg-indigo-500/10 hover:text-indigo-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-indigo-300 cursor-pointer`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-3.5 text-xs font-mono overflow-y-auto">
-          {error && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* Datacenter Target */}
-          <div>
-            <label className="block text-[10px] uppercase font-semibold text-slate-400 mb-1">Datacenter Scope *</label>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Datacenter">
             <select
               required
               value={datacenterId}
               onChange={(e) => {
                 setDatacenterId(e.target.value);
-                setVlanId(''); // reset vlan if DC changes
+                setVlanId(''); // VLANs belong to one datacenter
               }}
-              className="w-full px-3 py-1.5 rounded-lg border dark:bg-slate-950/80 dark:border-slate-700/60 font-medium text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className={fieldInput}
             >
-              {datacenters.map(dc => (
-                <option key={dc.id} value={dc.id}>{dc.name} ({dc.location})</option>
+              {datacenters.map((dc) => (
+                <option key={dc.id} value={dc.id}>{dc.name}</option>
               ))}
             </select>
-          </div>
-
-          {/* CIDR Prefix */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-[10px] uppercase font-semibold text-slate-400">Subnet CIDR Prefix *</label>
-              <div className="flex items-center gap-1">
-                {detectedVersion !== 'Unknown' && (
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${
-                    detectedVersion === 'IPv6' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                  }`}>
-                    {detectedVersion}
-                  </span>
-                )}
-              </div>
-            </div>
-            <input
-              type="text"
-              required
-              placeholder="e.g. 10.10.100.0/24 or fd00:10:10::/64 or 2001:db8::/64"
-              value={cidr}
-              onChange={(e) => setCidr(e.target.value)}
-              className="w-full px-3 py-1.5 rounded-lg border dark:bg-slate-950/80 dark:border-slate-700/60 font-mono font-bold text-xs text-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            />
-
-            {/* Quick Helper Presets */}
-            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-              <span className="text-[10px] text-slate-400">Presets:</span>
-              <button
-                type="button"
-                onClick={() => setCidr('10.10.100.0/24')}
-                className="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300"
-              >
-                IPv4 /24
-              </button>
-              <button
-                type="button"
-                onClick={() => setCidr('172.16.50.0/26')}
-                className="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300"
-              >
-                IPv4 /26
-              </button>
-              <button
-                type="button"
-                onClick={() => setCidr('fd00:10:10::/64')}
-                className="px-1.5 py-0.5 rounded text-[10px] bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-300 border border-cyan-800/40"
-              >
-                IPv6 ULA /64
-              </button>
-              <button
-                type="button"
-                onClick={() => setCidr('2001:db8:1000::/64')}
-                className="px-1.5 py-0.5 rounded text-[10px] bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-300 border border-cyan-800/40"
-              >
-                IPv6 Public /64
-              </button>
-            </div>
-          </div>
-
-          {/* Calculation Live Preview */}
-          {calcPreview && (
-            <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[11px] font-mono space-y-1 text-indigo-300">
-              <div className="flex justify-between items-center">
-                <span>Netmask: {calcPreview.netmask}</span>
-                <span className="text-emerald-400 font-bold">
-                  Usable: {calcPreview.usableHostsFormatted || calcPreview.usableHosts.toLocaleString()}
-                </span>
-              </div>
-              <div className="text-slate-400 truncate">
-                Range: {calcPreview.firstUsableHost} – {calcPreview.lastUsableHost}
-              </div>
-            </div>
-          )}
-
-          {/* VLAN Binding */}
-          <div>
-            <label className="block text-[10px] uppercase font-semibold text-slate-400 mb-1">Associated VLAN (Optional)</label>
-            <select
-              value={vlanId}
-              onChange={(e) => setVlanId(e.target.value)}
-              className="w-full px-3 py-1.5 rounded-lg border dark:bg-slate-950/80 dark:border-slate-700/60 font-medium text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">None (Un-tagged / Routed L3 Subnet)</option>
-              {availableVlans.map(v => (
-                <option key={v.id} value={v.id}>VLAN {v.vlanId} - {v.name}</option>
+          </Field>
+          <Field label="VLAN">
+            <select value={vlanId} onChange={(e) => setVlanId(e.target.value)} className={fieldInput}>
+              <option value="">None</option>
+              {availableVlans.map((v) => (
+                <option key={v.id} value={v.id}>{v.vlanId} · {v.name}</option>
               ))}
             </select>
-          </div>
+          </Field>
+        </div>
 
-          {/* Segment Type (Public vs Private) */}
-          <div>
-            <label className="block text-[10px] uppercase font-semibold text-slate-400 mb-1">Segment Routing Classification *</label>
-            <div className="grid grid-cols-2 gap-2.5">
+        <div className="space-y-1.5">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Segment</span>
+          <div role="radiogroup" aria-label="Segment" className="grid grid-cols-2 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
+            {(['Private', 'Public'] as SegmentType[]).map((s) => (
               <button
+                key={s}
                 type="button"
-                onClick={() => setSegmentType('Private')}
-                className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 font-medium transition-all ${
-                  segmentType === 'Private'
-                    ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 ring-1 ring-indigo-500/40'
-                    : 'bg-slate-950/60 border-slate-700/60 text-slate-400 hover:bg-slate-800/40'
+                role="radio"
+                aria-checked={segmentType === s}
+                onClick={() => setSegmentType(s)}
+                className={`rounded-lg py-1.5 text-sm font-semibold transition cursor-pointer ${
+                  segmentType === s ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950 dark:text-white' : `${muted} hover:text-slate-900 dark:hover:text-white`
                 }`}
               >
-                <Lock className="w-3.5 h-3.5" />
-                <span className="text-xs">Private (RFC1918 / ULA)</span>
+                {s}
               </button>
-
-              <button
-                type="button"
-                onClick={() => setSegmentType('Public')}
-                className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 font-medium transition-all ${
-                  segmentType === 'Public'
-                    ? 'bg-purple-600/20 border-purple-500 text-purple-300 ring-1 ring-purple-500/40'
-                    : 'bg-slate-950/60 border-slate-700/60 text-slate-400 hover:bg-slate-800/40'
-                }`}
-              >
-                <Globe className="w-3.5 h-3.5" />
-                <span className="text-xs">Publicly Routed (Global)</span>
-              </button>
-            </div>
+            ))}
           </div>
+        </div>
 
-          <div>
-            <label className="block text-[10px] uppercase font-semibold text-slate-400 mb-1">Description / Subnet Purpose</label>
-            <textarea
-              rows={2}
-              placeholder="e.g. Kubernetes worker node pool subnet with dual-stack SLAAC"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-1.5 rounded-lg border dark:bg-slate-950/80 dark:border-slate-700/60 text-slate-200 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            />
-          </div>
-
-          <div className="pt-3 border-t border-slate-700/50 flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-md shadow-indigo-500/20 disabled:opacity-50 transition-all active:scale-95"
-            >
-              {loading ? 'Saving...' : subnetToEdit ? 'Save Changes' : 'Allocate Subnet'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <Field label="Description (optional)">
+          <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} className={`${fieldInput} resize-none`} />
+        </Field>
+        <FormActions onCancel={onClose} loading={loading} submitLabel={subnetToEdit ? 'Save' : 'Create subnet'} />
+      </form>
+    </Modal>
   );
 };

@@ -1,4 +1,5 @@
 import React from 'react';
+import { X } from 'lucide-react';
 import { formatCapacityCompact, parseCIDR } from '../utils/ipCalculator';
 
 // Shared look for every screen: one card, one muted text color, one usage bar.
@@ -49,3 +50,60 @@ export const Bar: React.FC<{ percent: number; label: string }> = ({ percent, lab
     <div className={`h-full rounded-full transition-all duration-500 ${BAR_FILL[usageColor(percent)]}`} style={{ width: `${percent}%` }} />
   </div>
 );
+
+// One dialog frame for every form: Escape and the backdrop close it, the title labels it.
+export const Modal: React.FC<{ title: string; onClose: () => void; wide?: boolean; children: React.ReactNode }> = ({ title, onClose, wide, children }) => {
+  const titleId = React.useId();
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className={`${card} flex max-h-[90vh] w-full flex-col overflow-hidden shadow-2xl dark:bg-slate-900 ${wide ? 'max-w-3xl' : 'max-w-md'}`}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+          <h2 id={titleId} className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
+          <button type="button" onClick={onClose} className={`${iconButton} -mr-2`} aria-label="Close">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="overflow-y-auto p-5">{children}</div>
+      </div>
+    </div>
+  );
+};
+
+export const Field: React.FC<{ label: string; hint?: React.ReactNode; children: React.ReactNode }> = ({ label, hint, children }) => (
+  <label className="block space-y-1.5">
+    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
+    {children}
+    {hint && <span className={`block text-xs ${muted}`}>{hint}</span>}
+  </label>
+);
+
+export const FormError: React.FC<{ message: string | null }> = ({ message }) =>
+  message ? (
+    <p role="alert" className="rounded-xl bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">
+      {message}
+    </p>
+  ) : null;
+
+export const FormActions: React.FC<{ onCancel: () => void; submitLabel: string; loading?: boolean; disabled?: boolean }> = ({ onCancel, submitLabel, loading, disabled }) => (
+  <div className="flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+    <button type="button" onClick={onCancel} className={secondaryButton}>
+      Cancel
+    </button>
+    <button type="submit" disabled={loading || disabled} className={`${primaryButton} disabled:opacity-50`}>
+      {loading ? 'Saving…' : submitLabel}
+    </button>
+  </div>
+);
+
+export const fieldInput = `${input} w-full`;
