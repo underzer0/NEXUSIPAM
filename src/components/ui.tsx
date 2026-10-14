@@ -52,6 +52,33 @@ export const Bar: React.FC<{ percent: number; label: string }> = ({ percent, lab
   </div>
 );
 
+// Segmented toggle used for every small filter (IP version, status, action).
+export function Segmented<T extends string>({ label, options, value, onChange, render }: {
+  label: string;
+  options: readonly T[];
+  value: T;
+  onChange: (v: T) => void;
+  render?: (v: T) => React.ReactNode;
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex flex-wrap rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-800">
+      {options.map((o) => (
+        <button
+          key={o}
+          type="button"
+          aria-pressed={value === o}
+          onClick={() => onChange(o)}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition cursor-pointer ${
+            value === o ? 'bg-cyan-500 text-zinc-950' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
+          }`}
+        >
+          {render ? render(o) : o}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // Donut gauge: the color says how full, the number says exactly.
 export const Ring: React.FC<{ percent: number; label: string; size?: number; children?: React.ReactNode }> = ({ percent, label, size = 96, children }) => {
   const r = 42;
@@ -73,7 +100,11 @@ export const Ring: React.FC<{ percent: number; label: string; size?: number; chi
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        {children ?? <span className="font-mono text-lg font-semibold text-zinc-900 dark:text-white">{percentLabel(percent)}</span>}
+        {children ?? (
+          <span className={`font-mono font-semibold text-zinc-900 dark:text-white ${size < 64 ? 'text-[11px]' : size < 100 ? 'text-sm' : 'text-lg'}`}>
+            {percentLabel(percent)}
+          </span>
+        )}
       </div>
     </div>
   );

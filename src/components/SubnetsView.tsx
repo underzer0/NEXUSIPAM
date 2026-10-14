@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useIPAM } from '../context/IPAMContext';
-import { BookmarkCheck, Database, Edit, Eye, Network, Plus, Search, Trash2 } from 'lucide-react';
+import { BookmarkCheck, Database, Edit, Network, Plus, Search, Trash2 } from 'lucide-react';
 import { Subnet, IPAddress, VLAN } from '../types/ipam';
 import { getIPVersion, parseCIDR } from '../utils/ipCalculator';
-import { Bar, card, chip, chipNeutral, formatCount, iconButton, input, muted, percentLabel, percentOf, primaryButton, usableOf } from './ui';
+import { Ring, Segmented, card, chip, chipNeutral, formatCount, iconButton, input, muted, percentOf, primaryButton, usableOf } from './ui';
 
 interface SubnetsViewProps {
   onOpenNewSubnetModal: () => void;
@@ -34,7 +34,7 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
   const [dcFilter, setDcFilter] = useState('All');
   const [segmentFilter, setSegmentFilter] = useState('All');
   // The dashboard tiles set the global IP version before opening this page.
-  const [versionFilter, setVersionFilter] = useState(filters.ipVersion || 'All');
+  const [versionFilter, setVersionFilter] = useState<'All' | 'IPv4' | 'IPv6'>(filters.ipVersion === 'IPv4' || filters.ipVersion === 'IPv6' ? filters.ipVersion : 'All');
   const [searchFilter, setSearchFilter] = useState(filters.search);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -72,10 +72,10 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 md:p-8">
+    <div className="mx-auto max-w-7xl space-y-4 p-4 sm:p-6 md:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
-          Subnets <span className={`text-lg font-medium ${muted}`}>{filteredSubnets.length}</span>
+        <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">
+          Subnets <span className={`font-mono text-base font-medium ${muted}`}>{filteredSubnets.length}</span>
         </h1>
         <button id="btn-add-subnet" type="button" onClick={onOpenNewSubnetModal} className={primaryButton}>
           <Plus className="h-4 w-4" /> New subnet
@@ -101,23 +101,7 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
             className={`${input} w-full pl-9`}
           />
         </label>
-        <div role="group" aria-label="IP version" className="flex rounded-xl bg-zinc-200/70 p-1 dark:bg-zinc-800">
-          {['All', 'IPv4', 'IPv6'].map((ver) => (
-            <button
-              key={ver}
-              type="button"
-              aria-pressed={versionFilter === ver}
-              onClick={() => setVersionFilter(ver)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition cursor-pointer ${
-                versionFilter === ver
-                  ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-950 dark:text-white'
-                  : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
-              }`}
-            >
-              {ver}
-            </button>
-          ))}
-        </div>
+        <Segmented label="IP version" options={['All', 'IPv4', 'IPv6'] as const} value={versionFilter} onChange={setVersionFilter} />
         <select aria-label="Datacenter" value={dcFilter} onChange={(e) => setDcFilter(e.target.value)} className={input}>
           <option value="All">All datacenters</option>
           {datacenters.map((dc) => (
@@ -143,7 +127,7 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
           )}
         </div>
       ) : (
-        <ul className="space-y-3">
+        <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filteredSubnets.map((subnet) => {
             const subIps = ipsBySubnet.get(subnet.id) ?? [];
             const used = subIps.filter((i) => i.status !== 'Available').length;
@@ -151,43 +135,40 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
             const percent = percentOf(used, usable);
             const vlan = subnet.vlanId ? vlanById.get(subnet.vlanId) : undefined;
             const ver = subnet.ipVersion || getIPVersion(subnet.cidr);
+            const isPublic = subnet.segmentType === 'Public';
 
             return (
-              <li key={subnet.id} className={`${card} flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-center`}>
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onOpenSubnetVisualizer(subnet)}
-                      className="break-all font-mono text-base font-bold text-zinc-900 hover:text-cyan-600 dark:text-white dark:hover:text-cyan-400 cursor-pointer"
-                    >
+              <li key={subnet.id} className={`${card} group flex flex-col transition hover:border-cyan-500/60`}>
+                <button
+                  type="button"
+                  onClick={() => onOpenSubnetVisualizer(subnet)}
+                  title={rangeOf(subnet.cidr)}
+                  className="flex flex-1 items-center gap-4 p-4 text-left cursor-pointer"
+                >
+                  <Ring percent={percent} label={`${subnet.cidr} utilization`} size={60} />
+                  <span className="min-w-0 flex-1 space-y-1.5">
+                    <span className="block break-all font-mono text-base font-semibold text-zinc-900 group-hover:text-cyan-600 dark:text-white dark:group-hover:text-cyan-400">
                       {subnet.cidr}
-                    </button>
-                    <span className={chipNeutral}>{ver}</span>
-                    <span className={`${chip} ${subnet.segmentType === 'Public' ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300' : 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300'}`}>
-                      {subnet.segmentType}
                     </span>
-                    <span className={chipNeutral}>{dcName.get(subnet.datacenterId) ?? 'Unknown site'}</span>
-                    {vlan && <span className={`${chip} bg-purple-500/10 text-purple-700 dark:text-purple-300`}>VLAN {vlan.vlanId} · {vlan.name}</span>}
-                  </div>
-                  <p className={`truncate text-sm ${muted}`}>
-                    {subnet.description && <span>{subnet.description} · </span>}
-                    <span className="font-mono text-xs">{rangeOf(subnet.cidr)}</span>
-                  </p>
-                </div>
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className={`${chipNeutral} font-mono`}>{ver}</span>
+                      <span className={`${chip} ${isPublic ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300' : 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300'}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${isPublic ? 'bg-purple-500' : 'bg-cyan-400'}`} aria-hidden />
+                        {subnet.segmentType}
+                      </span>
+                      {vlan && <span className={`${chip} bg-purple-500/10 font-mono text-purple-700 dark:text-purple-300`} title={vlan.name}>VLAN {vlan.vlanId}</span>}
+                    </span>
+                    <span className={`block truncate text-xs ${muted}`}>
+                      {dcName.get(subnet.datacenterId) ?? 'Unknown site'}
+                      {subnet.description && ` · ${subnet.description}`}
+                    </span>
+                  </span>
+                </button>
 
-                <div className="w-full space-y-1.5 lg:w-56">
-                  <Bar percent={percent} label={`${subnet.cidr} utilization`} />
-                  <div className={`flex justify-between text-xs tabular-nums ${muted}`}>
-                    <span>{used} / {formatCount(usable)} used</span>
-                    <span className="font-semibold text-zinc-700 dark:text-zinc-200">{percentLabel(percent)}</span>
-                  </div>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-0.5 border-t border-zinc-100 pt-3 dark:border-zinc-800 lg:border-0 lg:pt-0">
-                  <button type="button" onClick={() => onOpenSubnetVisualizer(subnet)} className={iconButton} title="Address map" aria-label="Address map">
-                    <Eye className="h-4 w-4" />
-                  </button>
+                <div className="flex items-center gap-0.5 border-t border-zinc-100 px-2 py-1.5 dark:border-zinc-800/80">
+                  <span className={`mr-auto pl-2 font-mono text-xs ${muted}`}>
+                    {used} / {formatCount(usable)}
+                  </span>
                   <button type="button" onClick={() => onOpenReserveNextModal(subnet.id)} className={iconButton} title="Reserve next IP" aria-label="Reserve next IP">
                     <BookmarkCheck className="h-4 w-4" />
                   </button>

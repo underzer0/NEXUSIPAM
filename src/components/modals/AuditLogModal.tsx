@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useIPAM } from '../../context/IPAMContext';
 import { ActivityLog } from '../../types/ipam';
 import { Download, Search } from 'lucide-react';
-import { Modal, chip, chipNeutral, input, linkButton, muted, secondaryButton } from '../ui';
+import { Modal, Segmented, chip, chipNeutral, input, linkButton, muted, secondaryButton } from '../ui';
 
 interface AuditLogModalProps {
   isOpen: boolean;
@@ -13,7 +13,7 @@ interface AuditLogModalProps {
 const ACTIONS = ['ALL', 'CREATE', 'UPDATE', 'DELETE', 'RESERVE'] as const;
 const ENTITIES = ['ALL', 'Datacenter', 'VLAN', 'Subnet', 'IP', 'User'] as const;
 const ACTION_STYLE: Record<string, string> = {
-  CREATE: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
+  CREATE: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300',
   UPDATE: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300',
   DELETE: 'bg-rose-500/10 text-rose-700 dark:text-rose-300',
   RESERVE: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
@@ -45,10 +45,10 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({ isOpen, onClose, i
 
   const [searchQuery, setSearchQuery] = useState('');
   const [actionFilter, setActionFilter] = useState<(typeof ACTIONS)[number]>('ALL');
-  const [entityFilter, setEntityFilter] = useState<string>('ALL');
+  const [entityFilter, setEntityFilter] = useState<(typeof ENTITIES)[number]>('ALL');
 
   useEffect(() => {
-    setEntityFilter(initialEntityFilter || 'ALL');
+    setEntityFilter(ENTITIES.find((e) => e === initialEntityFilter) ?? 'ALL');
   }, [initialEntityFilter, isOpen]);
 
   if (!isOpen) return null;
@@ -87,11 +87,6 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({ isOpen, onClose, i
     );
   const exportJSON = () => download(`beyondip-audit-${stamp}.json`, 'application/json', JSON.stringify(filteredLogs, null, 2));
 
-  const pill = (active: boolean) =>
-    `rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
-      active ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-950 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
-    }`;
-
   return (
     <Modal title="Activity" onClose={onClose} wide>
       <div className="space-y-4">
@@ -112,20 +107,14 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({ isOpen, onClose, i
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <div role="group" aria-label="Action" className="flex flex-wrap rounded-xl bg-zinc-200/70 p-1 dark:bg-zinc-800">
-            {ACTIONS.map((a) => (
-              <button key={a} type="button" aria-pressed={actionFilter === a} onClick={() => setActionFilter(a)} className={pill(actionFilter === a)}>
-                {a === 'ALL' ? 'All actions' : a.charAt(0) + a.slice(1).toLowerCase()}
-              </button>
-            ))}
-          </div>
-          <div role="group" aria-label="Type" className="flex flex-wrap rounded-xl bg-zinc-200/70 p-1 dark:bg-zinc-800">
-            {ENTITIES.map((t) => (
-              <button key={t} type="button" aria-pressed={entityFilter === t} onClick={() => setEntityFilter(t)} className={pill(entityFilter === t)}>
-                {t === 'ALL' ? 'All types' : t}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            label="Action"
+            options={ACTIONS}
+            value={actionFilter}
+            onChange={setActionFilter}
+            render={(a) => (a === 'ALL' ? 'All actions' : a.charAt(0) + a.slice(1).toLowerCase())}
+          />
+          <Segmented label="Type" options={ENTITIES} value={entityFilter} onChange={setEntityFilter} render={(t) => (t === 'ALL' ? 'All types' : t)} />
         </div>
 
         {filteredLogs.length === 0 ? (

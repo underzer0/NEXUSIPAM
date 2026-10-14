@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useIPAM } from '../context/IPAMContext';
 import { BookmarkCheck, Check, Copy, Database, Edit, Hash, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { IPAddress, IPStatus, Subnet } from '../types/ipam';
-import { card, chip, chipNeutral, iconButton, input, linkButton, muted, primaryButton, secondaryButton } from './ui';
+import { Segmented, card, chipNeutral, iconButton, input, linkButton, muted, percentOf, primaryButton, secondaryButton } from './ui';
 
 interface IPDirectoryViewProps {
   onOpenNewIPModal: () => void;
@@ -11,12 +11,12 @@ interface IPDirectoryViewProps {
   onOpenBulkGenerateModal: () => void;
 }
 
-const STATUS_STYLE: Record<IPStatus, string> = {
-  Active: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
-  Reserved: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
-  Available: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+const STATUS_TEXT: Record<IPStatus, string> = {
+  Active: 'text-cyan-700 dark:text-cyan-300',
+  Reserved: 'text-amber-700 dark:text-amber-300',
+  Available: 'text-emerald-700 dark:text-emerald-300',
 };
-const STATUS_DOT: Record<IPStatus, string> = { Active: 'bg-blue-500', Reserved: 'bg-amber-500', Available: 'bg-emerald-500' };
+const STATUS_DOT: Record<IPStatus, string> = { Active: 'bg-cyan-400', Reserved: 'bg-amber-400', Available: 'bg-emerald-400' };
 const STATUSES: IPStatus[] = ['Active', 'Reserved', 'Available'];
 
 // shortcut: renders at most PAGE rows at a time; switch to a virtualized list if people need to scroll through thousands.
@@ -85,16 +85,13 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
     setLimit(PAGE);
   };
 
-  const segmented = (active: boolean) =>
-    `flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition cursor-pointer ${
-      active ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-950 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
-    }`;
+  const versionFilter = filters.ipVersion === 'IPv4' || filters.ipVersion === 'IPv6' ? filters.ipVersion : 'All';
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 md:p-8">
+    <div className="mx-auto max-w-7xl space-y-4 p-4 sm:p-6 md:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
-          IP addresses <span className={`text-lg font-medium ${muted}`}>{filteredIPs.length}</span>
+        <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">
+          IP addresses <span className={`font-mono text-base font-medium ${muted}`}>{filteredIPs.length}</span>
         </h1>
         <div className="flex flex-wrap gap-2">
           <button id="btn-reserve-next-ip" type="button" onClick={() => onOpenReserveNextModal()} className={secondaryButton}>
@@ -123,13 +120,7 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
               className={`${input} w-full pl-9`}
             />
           </label>
-          <div role="group" aria-label="IP version" className="flex rounded-xl bg-zinc-200/70 p-1 dark:bg-zinc-800">
-            {['All', 'IPv4', 'IPv6'].map((ver) => (
-              <button key={ver} type="button" aria-pressed={(filters.ipVersion || 'All') === ver} onClick={() => setFilter({ ipVersion: ver })} className={segmented((filters.ipVersion || 'All') === ver)}>
-                {ver}
-              </button>
-            ))}
-          </div>
+          <Segmented label="IP version" options={['All', 'IPv4', 'IPv6'] as const} value={versionFilter} onChange={(ver) => setFilter({ ipVersion: ver })} />
           <select aria-label="Datacenter" value={filters.datacenterId} onChange={(e) => setFilter({ datacenterId: e.target.value })} className={input}>
             <option value="All">All datacenters</option>
             {datacenters.map((dc) => (
@@ -144,24 +135,40 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
           </select>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div role="group" aria-label="Status" className="flex flex-wrap rounded-xl bg-zinc-200/70 p-1 dark:bg-zinc-800">
-            <button type="button" aria-pressed={filters.status === 'All'} onClick={() => setFilter({ status: 'All' })} className={segmented(filters.status === 'All')}>
-              All <span className={`text-xs ${muted}`}>{scopedIPs.length}</span>
-            </button>
-            {STATUSES.map((s) => (
-              <button key={s} type="button" aria-pressed={filters.status === s} onClick={() => setFilter({ status: s })} className={segmented(filters.status === s)}>
-                <span className={`h-2 w-2 rounded-full ${STATUS_DOT[s]}`} aria-hidden />
-                {s} <span className={`text-xs ${muted}`}>{statusCount(s)}</span>
+        {/* Status tiles double as the status filter; the bar shows the mix at a glance */}
+        <div role="group" aria-label="Status" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {(['All', ...STATUSES] as const).map((s) => {
+            const n = s === 'All' ? scopedIPs.length : statusCount(s);
+            const active = filters.status === s;
+            return (
+              <button
+                key={s}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setFilter({ status: s })}
+                className={`${card} flex items-center gap-3 px-4 py-3 text-left transition cursor-pointer ${
+                  active ? 'border-cyan-500! ring-1 ring-cyan-500/40' : 'hover:border-zinc-300 dark:hover:border-zinc-700'
+                }`}
+              >
+                <span className={`h-8 w-1 rounded-full ${s === 'All' ? 'bg-zinc-400 dark:bg-zinc-600' : STATUS_DOT[s]}`} aria-hidden />
+                <span>
+                  <span className="block font-mono text-xl font-semibold leading-tight text-zinc-900 dark:text-white">{n}</span>
+                  <span className={`block text-xs ${muted}`}>{s === 'All' ? 'All addresses' : s}</span>
+                </span>
               </button>
-            ))}
-          </div>
-          {hasFilters && (
-            <button type="button" onClick={() => { resetFilters(); setLimit(PAGE); }} className={`${linkButton} flex items-center gap-1`}>
-              <RotateCcw className="h-3.5 w-3.5" /> Clear filters
-            </button>
-          )}
+            );
+          })}
         </div>
+        <div className="flex h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800" aria-hidden>
+          {STATUSES.map((s) => (
+            <div key={s} className={`${STATUS_DOT[s]} transition-all duration-500`} style={{ width: `${percentOf(statusCount(s), scopedIPs.length)}%` }} />
+          ))}
+        </div>
+        {hasFilters && (
+          <button type="button" onClick={() => { resetFilters(); setLimit(PAGE); }} className={`${linkButton} flex items-center gap-1`}>
+            <RotateCcw className="h-3.5 w-3.5" /> Clear filters
+          </button>
+        )}
       </div>
 
       {/* List: one markup, a table-like grid on wide screens and stacked rows on phones */}
@@ -206,7 +213,10 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
                       {copiedId === ip.id ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
                     </button>
                   </div>
-                  <span className={`${chip} w-fit ${STATUS_STYLE[ip.status]}`}>{ip.status}</span>
+                  <span className={`flex items-center gap-1.5 text-xs font-medium ${STATUS_TEXT[ip.status]}`}>
+                    <span className={`h-2 w-2 rounded-full ${STATUS_DOT[ip.status]}`} aria-hidden />
+                    {ip.status}
+                  </span>
                   <div className="col-span-2 min-w-0 md:col-span-1">
                     <p className={`truncate text-sm ${ip.assignedDevice ? 'font-medium text-zinc-800 dark:text-zinc-100' : `italic ${muted}`}`}>
                       {ip.assignedDevice || 'Unassigned'}

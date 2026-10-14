@@ -11,7 +11,7 @@ interface SubnetVisualizerModalProps {
 }
 
 const CELL: Record<IPStatus, string> = {
-  Active: 'bg-blue-500 text-white hover:bg-blue-400',
+  Active: 'bg-cyan-400 text-zinc-950 hover:bg-cyan-300',
   Reserved: 'bg-amber-400 text-amber-950 hover:bg-amber-300',
   Available: 'bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 dark:text-emerald-300',
 };
@@ -124,7 +124,7 @@ export const SubnetVisualizerModal: React.FC<SubnetVisualizerModalProps> = ({ su
                     aria-label={`${ipStr}, ${status}${record?.assignedDevice ? `, ${record.assignedDevice}` : ''}`}
                     title={`${ipStr} · ${status}${record?.assignedDevice ? ` · ${record.assignedDevice}` : ''}`}
                     className={`h-8 truncate rounded-md px-0.5 font-mono text-[10px] font-semibold transition cursor-pointer ${CELL[status]} ${
-                      selectedIP === ipStr ? 'ring-2 ring-cyan-500 ring-offset-1 ring-offset-white dark:ring-offset-zinc-900' : ''
+                      selectedIP === ipStr ? 'ring-2 ring-white ring-offset-1 ring-offset-zinc-900 dark:ring-offset-zinc-950' : ''
                     }`}
                   >
                     {label}

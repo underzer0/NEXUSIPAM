@@ -3,7 +3,7 @@ import { useIPAM } from '../context/IPAMContext';
 import { ArrowUpRight, Building2, Hash, Layers, Network, Plus, Zap } from 'lucide-react';
 import { Subnet, IPVersion, IPAddress } from '../types/ipam';
 import { getIPVersion } from '../utils/ipCalculator';
-import { Bar, Ring, card, formatCount, linkButton, muted, percentLabel, percentOf, primaryButton, secondaryButton, usableOf } from './ui';
+import { Bar, Ring, Segmented, card, formatCount, linkButton, muted, percentLabel, percentOf, primaryButton, secondaryButton, usableOf } from './ui';
 
 interface DashboardViewProps {
   onOpenSubnetVisualizer: (subnet: Subnet) => void;
@@ -128,22 +128,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="flex flex-col gap-4 pb-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">Overview</h1>
-          <div role="group" aria-label="IP version" className="flex rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-800">
-            {(['IPv4', 'IPv6'] as IPVersion[]).map((ver) => (
-              <button
-                key={ver}
-                type="button"
-                aria-pressed={selectedProtocol === ver}
-                onClick={() => handleProtocolChange(ver)}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1 font-mono text-xs font-semibold transition cursor-pointer ${
-                  selectedProtocol === ver ? 'bg-cyan-500 text-zinc-950' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
-                }`}
-              >
-                {ver}
-                <span className="opacity-70">{versionCount(ver)}</span>
-              </button>
-            ))}
-          </div>
+          <Segmented
+            label="IP version"
+            options={['IPv4', 'IPv6'] as const}
+            value={selectedProtocol}
+            onChange={handleProtocolChange}
+            render={(ver) => (
+              <span className="font-mono">
+                {ver} <span className="opacity-70">{versionCount(ver)}</span>
+              </span>
+            )}
+          />
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={() => onOpenReserveNextModal()} className={secondaryButton}>
