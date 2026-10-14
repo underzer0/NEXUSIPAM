@@ -354,6 +354,15 @@ class MySQLEngine {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
 
+      // Wipe API keys from before hashing-only storage (nx_live_, kept decryptable). They no longer
+      // sign requests; only bip_ keys, stored as a hash with no encrypted copy, are kept.
+      const [wiped] = await this.pool.query<ResultSetHeader>(
+        `UPDATE users SET api_key_hash = NULL, api_key_encrypted = NULL, api_key_masked = NULL
+         WHERE api_key_encrypted IS NOT NULL OR (api_key_masked IS NOT NULL AND LEFT(api_key_masked, ?) <> ?)`,
+        [API_KEY_PREFIX.length, API_KEY_PREFIX],
+      );
+      if (wiped.affectedRows) console.log(`[MySQL] Removed ${wiped.affectedRows} legacy API key(s).`);
+
       this.schemaReady = true;
       console.log('[MySQL] All relational tables and session store successfully verified.');
     } catch (err: any) {
