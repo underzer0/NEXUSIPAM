@@ -1,0 +1,37 @@
+# Usage: create .env next to this file (see .env.example), then `docker compose up -d --build`.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    # Only the HTTPS proxy on this host should reach the app.
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      MYSQL_HOST: db
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ipam_db
+      MYSQL_USER: beyondip
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      IPAM_ADMIN_PASSWORD: ${IPAM_ADMIN_PASSWORD:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ipam_db
+      MYSQL_USER: beyondip
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  mysql-data:
