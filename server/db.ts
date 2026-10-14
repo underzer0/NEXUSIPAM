@@ -194,7 +194,8 @@ class IPAMDatabase {
       apiKey: generateSecureApiKey().maskedKey,
       createdAt: new Date().toISOString(),
     };
-    const defaultPasswordHash = hashPasswordSync('admin123');
+    // Without IPAM_ADMIN_PASSWORD the seeded admin gets an unguessable password and stays unusable.
+    const defaultPasswordHash = hashPasswordSync(process.env.IPAM_ADMIN_PASSWORD || generateSessionToken());
 
     const defaultDc: Datacenter = {
       id: 'dc-us-east-1',
@@ -216,6 +217,7 @@ class IPAMDatabase {
     const defaultSubnet: Subnet = {
       id: 'sub-10-10-0-0-24',
       cidr: '10.10.0.0/24',
+      ipVersion: 'IPv4',
       segmentType: 'Private',
       datacenterId: defaultDc.id,
       vlanId: defaultVlan.id,
@@ -299,7 +301,7 @@ class IPAMDatabase {
       }
       // Sync all users
       for (const user of this.users) {
-        const hash = this.passwordHashes.get(user.id) || hashPasswordSync('password123');
+        const hash = this.passwordHashes.get(user.id) ?? '';
         await mysqlEngine.saveUser(user, hash);
       }
       // Sync all valid sessions
@@ -1509,7 +1511,7 @@ class IPAMDatabase {
 
     this.logActivity('UPDATE', 'Datacenter', current.id, `Profile Updated: ${current.name}`, `Updated contact & preferences for ${current.email}`);
     this.persist();
-    const hash = this.passwordHashes.get(current.id) || hashPasswordSync('password123');
+    const hash = this.passwordHashes.get(current.id) ?? '';
     mysqlEngine.saveUser(current, hash).catch(() => {});
     return current;
   }
@@ -1559,8 +1561,8 @@ class IPAMDatabase {
     };
 
     // SECURE CRYPTOGRAPHY: Password is salted and hashed with BCrypt
-    const plainPassword = data.password && data.password.trim() ? data.password.trim() : 'password123';
-    const bcryptHash = hashPasswordSync(plainPassword);
+    if (!data.password || data.password.length < 6) throw new Error('Password must be at least 6 characters');
+    const bcryptHash = hashPasswordSync(data.password);
     this.passwordHashes.set(newUser.id, bcryptHash);
 
     this.users.push(newUser);
@@ -1582,7 +1584,7 @@ class IPAMDatabase {
     const cleanEmail = email.trim().toLowerCase();
     const user = this.users.find(u => u.email.toLowerCase() === cleanEmail);
     if (!user) {
-      throw new Error(`No account found with email "${email}". Please verify your email or create an account.`);
+      throw new Error('Invalid email or password.');
     }
 
     const storedHash = this.passwordHashes.get(user.id);
@@ -1593,7 +1595,7 @@ class IPAMDatabase {
     // SECURE CRYPTOGRAPHY: BCrypt constant-time comparison
     const isMatch = verifyPasswordSync(password, storedHash);
     if (!isMatch) {
-      throw new Error('Invalid credentials. Please verify your password.');
+      throw new Error('Invalid email or password.');
     }
 
     this.logActivity('UPDATE', 'Datacenter', user.id, `Engineer Authenticated: ${user.name}`, `Logged into IPAM session as ${user.email}`);
@@ -1621,7 +1623,7 @@ class IPAMDatabase {
     this.logActivity('UPDATE', 'Datacenter', user.id, `API Key Regenerated`, `New token issued for ${user.email}`);
     this.persist();
 
-    const hash = this.passwordHashes.get(user.id) || hashPasswordSync('password123');
+    const hash = this.passwordHashes.get(user.id) ?? '';
     mysqlEngine.saveUser(user, hash).catch(() => {});
     return user.apiKey;
   }

@@ -70,7 +70,6 @@ interface IPAMContextType {
     primaryDatacenterId?: string;
     password?: string;
   }) => Promise<UserProfile>;
-  switchUser: (userId: string) => Promise<UserProfile>;
   generateNewApiKey: () => Promise<string>;
 
   createDatacenter: (data: { name: string; location: string; description: string }) => Promise<Datacenter>;
@@ -285,12 +284,8 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         case 'USER_UPDATED':
           if (msg.payload) {
             setUsers(prev => prev.map(u => u.id === msg.payload.id ? msg.payload : u));
-            setCurrentUser(prev => {
-              if (prev.id === msg.payload.id) {
-                return msg.payload;
-              }
-              return prev;
-            });
+            // Broadcasts carry public fields only; keep our own private ones.
+            setCurrentUser(prev => prev.id === msg.payload.id ? { ...prev, ...msg.payload } : prev);
           }
           break;
 
@@ -398,16 +393,19 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    fetchBootstrapData().then(() => {
-      connectWs();
-    });
+    // The server only accepts signed-in sockets; its INIT_STATE then loads the data.
+    if (isAuthenticated) connectWs();
 
     return () => {
       isUnmounted = true;
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (ws) ws.close();
     };
-  }, [fetchBootstrapData, refreshStats]);
+  }, [isAuthenticated, refreshStats]);
+
+  useEffect(() => {
+    fetchBootstrapData();
+  }, [fetchBootstrapData]);
 
   // --- ACTIONS ---
 
@@ -655,20 +653,6 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return newUser;
   };
 
-  const switchUser = async (userId: string): Promise<UserProfile> => {
-    const res = await fetch('/api/auth/switch-user', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
-    });
-    const json = await res.json();
-    if (!json.success) throw new Error(json.error || 'Failed to switch user');
-    const user: UserProfile = json.data?.user || json.data;
-    setCurrentUser(user);
-    setIsAuthenticated(true);
-    return user;
-  };
-
   const generateNewApiKey = async (): Promise<string> => {
     const res = await fetch('/api/user/generate-api-key', {
       method: 'POST',
@@ -714,7 +698,6 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signIn,
         signOut,
         signUpUser,
-        switchUser,
         generateNewApiKey,
         createDatacenter,
         updateDatacenter,

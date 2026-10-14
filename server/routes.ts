@@ -6,7 +6,7 @@ import { parseCIDR } from '../src/utils/ipCalculator';
 
 const SESSION_COOKIE_NAME = 'ipam_session_token';
 const SESSION_COOKIE_OPTIONS = {
-  httpOnly: false,
+  httpOnly: true,
   sameSite: 'lax' as const,
   path: '/',
   maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
@@ -18,6 +18,11 @@ function getSessionUser(req: Request): UserProfile | null {
   return db.getUserBySession(token);
 }
 
+// Only what other engineers need to see; never API keys or contact details.
+export const publicUser = (u: UserProfile) => ({ id: u.id, name: u.name, email: u.email, role: u.role, department: u.department });
+
+const PUBLIC_PATHS = new Set(['/health', '/db/retry', '/bootstrap', '/auth/me', '/auth/signin', '/auth/signout', '/auth/signup']);
+
 function getSessionToken(req: Request): string | undefined {
   return req.cookies?.[SESSION_COOKIE_NAME] || 
     (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : undefined);
@@ -25,6 +30,11 @@ function getSessionToken(req: Request): string | undefined {
 
 export function createApiRouter(broadcast: (type: WSAction, payload: any) => void): Router {
   const router = Router();
+
+  router.use((req: Request, res: Response, next) => {
+    if (PUBLIC_PATHS.has(req.path) || getSessionUser(req)) return next();
+    res.status(401).json({ success: false, error: 'Authentication required' });
+  });
 
   // Health check
   router.get('/health', (req: Request, res: Response) => {
@@ -115,14 +125,19 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
         return;
       }
 
+      const currentUser = getSessionUser(req);
+      if (!currentUser) {
+        res.json({ success: true, dbConnected: true, data: { currentUser: null } });
+        return;
+      }
+
       const datacenters = db.getDatacenters();
       const vlans = db.getVlans();
       const subnets = db.getSubnets();
       const ips = db.getIPs();
       const stats = db.getStats();
       const activityLogs = db.getActivityLogs();
-      const currentUser = getSessionUser(req);
-      const users = db.getUsers();
+      const users = db.getUsers().map(publicUser);
 
       res.json({
         success: true,
@@ -509,7 +524,7 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
       const currentUser = getSessionUser(req);
       if (!currentUser) return res.status(401).json({ success: false, error: 'No authenticated user session found' });
       const updated = db.updateUserProfile(currentUser.id, req.body);
-      broadcast('USER_UPDATED', updated);
+      broadcast('USER_UPDATED', publicUser(updated));
       res.json({ success: true, data: updated });
     } catch (err: any) {
       res.status(400).json({ success: false, error: err.message });
@@ -518,7 +533,7 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
 
   router.get('/users', (req: Request, res: Response) => {
     try {
-      const users = db.getUsers();
+      const users = db.getUsers().map(publicUser);
       res.json({ success: true, data: users });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -530,7 +545,7 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
       const { email, password } = req.body;
       const { user, session } = db.signIn(email, password);
       res.cookie(SESSION_COOKIE_NAME, session.token, SESSION_COOKIE_OPTIONS);
-      res.json({ success: true, data: { user, sessionToken: session.token } });
+      res.json({ success: true, data: { user } });
     } catch (err: any) {
       res.status(401).json({ success: false, error: err.message });
     }
@@ -563,23 +578,8 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
         primaryDatacenterId,
       });
       res.cookie(SESSION_COOKIE_NAME, session.token, SESSION_COOKIE_OPTIONS);
-      broadcast('USER_CREATED', user);
-      res.status(201).json({ success: true, data: { user, sessionToken: session.token } });
-    } catch (err: any) {
-      res.status(400).json({ success: false, error: err.message });
-    }
-  });
-
-  router.post('/auth/switch-user', (req: Request, res: Response) => {
-    try {
-      const { userId } = req.body;
-      if (!userId) return res.status(400).json({ success: false, error: 'User ID is required' });
-      const user = db.getUserById(userId);
-      if (!user) return res.status(404).json({ success: false, error: 'User not found' });
-      
-      const session = db.createSession(user.id);
-      res.cookie(SESSION_COOKIE_NAME, session.token, SESSION_COOKIE_OPTIONS);
-      res.json({ success: true, data: { user, sessionToken: session.token } });
+      broadcast('USER_CREATED', publicUser(user));
+      res.status(201).json({ success: true, data: { user } });
     } catch (err: any) {
       res.status(400).json({ success: false, error: err.message });
     }
@@ -591,7 +591,6 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
       if (!currentUser) return res.status(401).json({ success: false, error: 'No authenticated user session found' });
       const apiKey = db.generateApiKey(currentUser.id);
       const updated = db.getUserById(currentUser.id);
-      broadcast('USER_UPDATED', updated);
       res.json({ success: true, data: { apiKey, user: updated } });
     } catch (err: any) {
       res.status(400).json({ success: false, error: err.message });
