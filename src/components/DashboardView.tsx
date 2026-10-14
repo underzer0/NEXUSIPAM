@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useIPAM } from '../context/IPAMContext';
-import { ArrowUpRight, Building2, Eye, Hash, Layers, Network, Plus, Zap } from 'lucide-react';
+import { ArrowUpRight, Building2, Hash, Layers, Network, Plus, Zap } from 'lucide-react';
 import { Subnet, IPVersion, IPAddress } from '../types/ipam';
 import { getIPVersion } from '../utils/ipCalculator';
-import { Bar, card, formatCount, linkButton, muted, percentLabel, percentOf, primaryButton, secondaryButton, usableOf } from './ui';
+import { Bar, Ring, card, formatCount, linkButton, muted, percentLabel, percentOf, primaryButton, secondaryButton, usableOf } from './ui';
 
 interface DashboardViewProps {
   onOpenSubnetVisualizer: (subnet: Subnet) => void;
@@ -13,28 +13,43 @@ interface DashboardViewProps {
   onOpenAuditLogs?: (entityFilter?: string) => void;
 }
 
-const ACTION_DOT: Record<string, string> = { CREATE: 'bg-blue-500', RESERVE: 'bg-amber-500', DELETE: 'bg-rose-500', UPDATE: 'bg-emerald-500' };
+const ACTION_DOT: Record<string, string> = { CREATE: 'bg-cyan-400', RESERVE: 'bg-amber-400', DELETE: 'bg-rose-500', UPDATE: 'bg-emerald-400' };
 
-const StatTile: React.FC<{ icon: React.ReactNode; label: string; value: React.ReactNode; onClick: () => void; children?: React.ReactNode }> = ({
-  icon,
-  label,
-  value,
-  onClick,
-  children,
-}) => (
+// Heatmap cell color by how full a subnet is; empty subnets stay dark.
+const heat = (p: number) =>
+  p === 0 ? 'bg-zinc-200 dark:bg-zinc-800' : p < 25 ? 'bg-emerald-400/40' : p < 50 ? 'bg-emerald-400' : p < 80 ? 'bg-amber-400' : 'bg-rose-500';
+const HEAT_LEGEND = [
+  ['Empty', 0],
+  ['<25%', 10],
+  ['<50%', 30],
+  ['<80%', 60],
+  ['80%+', 90],
+] as const;
+
+const StatTile: React.FC<{ icon: React.ReactNode; label: string; value: React.ReactNode; onClick: () => void }> = ({ icon, label, value, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`${card} group flex flex-col gap-3 p-5 text-left transition hover:border-cyan-400 hover:shadow-md focus-visible:outline-2 focus-visible:outline-cyan-500 cursor-pointer`}
+    className={`${card} group flex items-center gap-4 p-4 text-left transition hover:border-cyan-500/60 focus-visible:outline-2 focus-visible:outline-cyan-500 cursor-pointer`}
   >
-    <span className={`flex items-center gap-2 text-sm font-medium ${muted}`}>
-      {icon}
-      {label}
-      <ArrowUpRight className="ml-auto h-4 w-4 opacity-0 transition group-hover:opacity-100" />
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">{icon}</span>
+    <span className="min-w-0">
+      <span className="block font-mono text-2xl font-semibold leading-tight text-zinc-900 dark:text-white">{value}</span>
+      <span className={`block text-xs ${muted}`}>{label}</span>
     </span>
-    <span className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">{value}</span>
-    {children}
+    <ArrowUpRight className={`ml-auto h-4 w-4 opacity-0 transition group-hover:opacity-100 ${muted}`} aria-hidden />
   </button>
+);
+
+const Legend: React.FC<{ items: [string, string][] }> = ({ items }) => (
+  <span className={`flex flex-wrap gap-x-4 gap-y-1 text-xs ${muted}`}>
+    {items.map(([color, text]) => (
+      <span key={text} className="flex items-center gap-1.5">
+        <span className={`h-2 w-2 rounded-sm ${color}`} aria-hidden />
+        {text}
+      </span>
+    ))}
+  </span>
 );
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -103,94 +118,141 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const dcRows = datacenters.map((dc) => {
     const rows = subnetRows.filter((r) => r.sub.datacenterId === dc.id);
-    const used = sum(rows, 'used');
-    return { dc, subnetCount: rows.length, used, percent: percentOf(used, sum(rows, 'usable')) };
+    return { dc, subnetCount: rows.length, percent: percentOf(sum(rows, 'used'), sum(rows, 'usable')) };
   });
 
-  const dcName = new Map(datacenters.map((d) => [d.id, d.name]));
-  const vlanTag = new Map(vlans.map((v) => [v.id, v.vlanId]));
 
   return (
-    <div className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6 md:p-8">
+    <div className="mx-auto max-w-[1400px] space-y-4 p-4 sm:p-6 md:p-8">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 pb-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Overview</h1>
-          <div role="group" aria-label="IP version" className="flex rounded-xl bg-zinc-200/70 p-1 dark:bg-zinc-800">
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">Overview</h1>
+          <div role="group" aria-label="IP version" className="flex rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-800">
             {(['IPv4', 'IPv6'] as IPVersion[]).map((ver) => (
               <button
                 key={ver}
                 type="button"
                 aria-pressed={selectedProtocol === ver}
                 onClick={() => handleProtocolChange(ver)}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition cursor-pointer ${
-                  selectedProtocol === ver
-                    ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-950 dark:text-white'
-                    : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1 font-mono text-xs font-semibold transition cursor-pointer ${
+                  selectedProtocol === ver ? 'bg-cyan-500 text-zinc-950' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
                 }`}
               >
                 {ver}
-                <span className="rounded-full bg-zinc-500/15 px-1.5 text-xs font-medium">{versionCount(ver)}</span>
+                <span className="opacity-70">{versionCount(ver)}</span>
               </button>
             ))}
           </div>
         </div>
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => onOpenReserveNextModal()}
-            className={secondaryButton}
-          >
+          <button type="button" onClick={() => onOpenReserveNextModal()} className={secondaryButton}>
             <Zap className="h-4 w-4" /> Reserve IP
           </button>
-          <button
-            type="button"
-            onClick={onOpenNewSubnetModal}
-            className={primaryButton}
-          >
+          <button type="button" onClick={onOpenNewSubnetModal} className={primaryButton}>
             <Plus className="h-4 w-4" /> New subnet
           </button>
         </div>
       </div>
 
-      {/* Key numbers */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile icon={<Network className="h-4 w-4 text-cyan-500" />} label="Subnets" value={protocolSubnets.length} onClick={() => goTo('subnets')}>
-          <div className="flex h-2 overflow-hidden rounded-full bg-purple-500/80" aria-hidden>
-            <div className="bg-cyan-500" style={{ width: `${percentOf(privateCount, protocolSubnets.length)}%` }} />
-          </div>
-          <span className={`flex gap-4 text-xs ${muted}`}>
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-cyan-500" />{privateCount} private</span>
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-purple-500" />{protocolSubnets.length - privateCount} public</span>
-          </span>
-        </StatTile>
-
-        <StatTile icon={<Hash className="h-4 w-4 text-blue-500" />} label="IPs in use" value={totalActive + totalReserved} onClick={() => goTo('ips')}>
-          <span className={`flex gap-4 text-xs ${muted}`}>
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-blue-500" />{totalActive} active</span>
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-500" />{totalReserved} reserved</span>
-          </span>
-        </StatTile>
-
-        <StatTile icon={<Layers className="h-4 w-4 text-emerald-500" />} label="Usable addresses" value={formatCount(totalUsable)} onClick={() => goTo('subnets')}>
-          <span className={`text-xs ${muted}`}>across {protocolSubnets.length} {selectedProtocol} subnets</span>
-        </StatTile>
-
-        <StatTile
-          icon={<Building2 className="h-4 w-4 text-amber-500" />}
-          label="Utilization"
-          value={percentLabel(totalPercent)}
+      {/* Utilization ring + key counts */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
+        <button
+          type="button"
           onClick={() => goTo('subnets')}
+          className={`${card} flex items-center gap-6 p-5 text-left transition hover:border-cyan-500/60 cursor-pointer`}
         >
-          <Bar percent={totalPercent} label={`${selectedProtocol} utilization`} />
-        </StatTile>
+          <Ring percent={totalPercent} label={`${selectedProtocol} utilization`} size={120}>
+            <span className="font-mono text-2xl font-semibold text-zinc-900 dark:text-white">{percentLabel(totalPercent)}</span>
+            <span className={`text-[10px] uppercase tracking-wider ${muted}`}>used</span>
+          </Ring>
+          <div className="min-w-0 space-y-3">
+            <div>
+              <p className="font-mono text-lg font-semibold text-zinc-900 dark:text-white">{totalActive + totalReserved}</p>
+              <p className={`text-xs ${muted}`}>of {formatCount(totalUsable)} addresses</p>
+            </div>
+            <Legend items={[['bg-cyan-400', `${totalActive} active`], ['bg-amber-400', `${totalReserved} reserved`]]} />
+          </div>
+        </button>
+
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+          <StatTile icon={<Network className="h-5 w-5" />} label={`${selectedProtocol} subnets`} value={protocolSubnets.length} onClick={() => goTo('subnets')} />
+          <StatTile icon={<Hash className="h-5 w-5" />} label="IPs in use" value={totalActive + totalReserved} onClick={() => goTo('ips')} />
+          <StatTile icon={<Layers className="h-5 w-5" />} label="VLANs" value={vlans.length} onClick={() => setActiveTab('vlans')} />
+          <StatTile icon={<Building2 className="h-5 w-5" />} label="Datacenters" value={datacenters.length} onClick={() => goTo('datacenters')} />
+          <div className={`${card} col-span-2 flex flex-col justify-center gap-2 p-4 xl:col-span-4`}>
+            <div className="flex h-2 overflow-hidden rounded-full bg-purple-500" aria-hidden>
+              <div className="bg-cyan-400" style={{ width: `${percentOf(privateCount, protocolSubnets.length)}%` }} />
+            </div>
+            <Legend items={[['bg-cyan-400', `${privateCount} private`], ['bg-purple-500', `${protocolSubnets.length - privateCount} public`]]} />
+          </div>
+        </div>
       </div>
 
+      {/* Heatmap: every subnet as one square, fullest first */}
+      <section className={`${card} space-y-4 p-5`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">Subnet heatmap</h2>
+          <Legend items={HEAT_LEGEND.map(([text, p]): [string, string] => [heat(p), text])} />
+        </div>
+        {subnetRows.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-8 text-center">
+            <Network className="h-8 w-8 text-zinc-300 dark:text-zinc-700" />
+            <p className={`text-sm ${muted}`}>No {selectedProtocol} subnets yet.</p>
+            <button type="button" onClick={onOpenNewSubnetModal} className={primaryButton}>
+              Create the first one
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {subnetRows.map(({ sub, percent }) => (
+              <button
+                key={sub.id}
+                type="button"
+                onClick={() => onOpenSubnetVisualizer(sub)}
+                title={`${sub.cidr} · ${percentLabel(percent)}`}
+                aria-label={`${sub.cidr}, ${percentLabel(percent)} used`}
+                className={`h-7 w-7 rounded transition hover:scale-125 hover:ring-2 hover:ring-cyan-400 cursor-pointer ${heat(percent)}`}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* Fullest subnets */}
+        <section className={`${card} p-5`}>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">Fullest subnets</h2>
+            <button type="button" onClick={() => goTo('subnets')} className={linkButton}>
+              See all
+            </button>
+          </div>
+          {subnetRows.length === 0 ? (
+            <p className={`py-6 text-center text-sm ${muted}`}>None yet.</p>
+          ) : (
+            <ul className="space-y-1">
+              {subnetRows.slice(0, 6).map(({ sub, percent }) => (
+                <li key={sub.id}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenSubnetVisualizer(sub)}
+                    className="grid w-full grid-cols-[minmax(0,1fr)_5rem_2.5rem] items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-800/60 cursor-pointer"
+                  >
+                    <span className="truncate font-mono text-sm text-zinc-800 dark:text-zinc-100">{sub.cidr}</span>
+                    <Bar percent={percent} label={`${sub.cidr} utilization`} />
+                    <span className="text-right font-mono text-xs text-zinc-600 dark:text-zinc-300">{percentLabel(percent)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         {/* Datacenters */}
         <section className={`${card} p-5`}>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold text-zinc-900 dark:text-white">Datacenters</h2>
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">Datacenters</h2>
             <button type="button" onClick={() => goTo('datacenters')} className={linkButton}>
               Manage
             </button>
@@ -198,15 +260,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {dcRows.length === 0 ? (
             <p className={`py-6 text-center text-sm ${muted}`}>No datacenters yet.</p>
           ) : (
-            <ul className="space-y-4">
-              {dcRows.map(({ dc, subnetCount, used, percent }) => (
-                <li key={dc.id} className="space-y-1.5">
-                  <div className="flex items-baseline justify-between gap-2 text-sm">
-                    <span className="truncate font-medium text-zinc-800 dark:text-zinc-100">{dc.name}</span>
-                    <span className="font-semibold tabular-nums text-zinc-900 dark:text-white">{percentLabel(percent)}</span>
-                  </div>
-                  <Bar percent={percent} label={`${dc.name} utilization`} />
-                  <p className={`text-xs ${muted}`}>{subnetCount} subnets · {used} IPs used</p>
+            <ul className="grid grid-cols-2 gap-4">
+              {dcRows.map(({ dc, subnetCount, percent }) => (
+                <li key={dc.id} className="flex flex-col items-center gap-2 text-center">
+                  <Ring percent={percent} label={`${dc.name} utilization`} size={72} />
+                  <span className="w-full truncate text-sm font-medium text-zinc-800 dark:text-zinc-100">{dc.name}</span>
+                  <span className={`-mt-2 font-mono text-xs ${muted}`}>{subnetCount} subnets</span>
                 </li>
               ))}
             </ul>
@@ -214,27 +273,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </section>
 
         {/* Recent activity */}
-        <section className={`${card} p-5 lg:col-span-2`}>
+        <section className={`${card} p-5`}>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold text-zinc-900 dark:text-white">Recent activity</h2>
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">Activity</h2>
             <button type="button" onClick={() => onOpenAuditLogs?.()} className={linkButton}>
               View all
             </button>
           </div>
           {activityLogs.length === 0 ? (
-            <p className={`py-6 text-center text-sm ${muted}`}>Nothing has happened yet.</p>
+            <p className={`py-6 text-center text-sm ${muted}`}>Nothing yet.</p>
           ) : (
-            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            <ul className="space-y-1">
               {activityLogs.slice(0, 6).map((log) => (
                 <li key={log.id}>
                   <button
                     type="button"
                     onClick={() => onOpenAuditLogs?.(log.entityType)}
-                    className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm transition hover:bg-zinc-50 dark:hover:bg-zinc-800/60 cursor-pointer"
+                    className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm transition hover:bg-zinc-50 dark:hover:bg-zinc-800/60 cursor-pointer"
                   >
                     <span className={`h-2 w-2 shrink-0 rounded-full ${ACTION_DOT[log.action] ?? 'bg-zinc-400'}`} aria-hidden />
-                    <span className="truncate font-medium text-zinc-800 dark:text-zinc-100">{log.title}</span>
-                    <time className={`ml-auto shrink-0 text-xs tabular-nums ${muted}`} dateTime={log.timestamp}>
+                    <span className="truncate text-zinc-800 dark:text-zinc-100">{log.title}</span>
+                    <time className={`ml-auto shrink-0 font-mono text-xs ${muted}`} dateTime={log.timestamp}>
                       {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </time>
                   </button>
@@ -244,55 +303,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           )}
         </section>
       </div>
-
-      {/* The nine fullest subnets; the Subnets page has the rest */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-zinc-900 dark:text-white">{selectedProtocol} subnets</h2>
-          <button type="button" onClick={() => goTo('subnets')} className={linkButton}>
-            See all
-          </button>
-        </div>
-        {subnetRows.length === 0 ? (
-          <div className={`${card} flex flex-col items-center gap-3 p-10 text-center`}>
-            <Network className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
-            <p className={`text-sm ${muted}`}>No {selectedProtocol} subnets yet.</p>
-            <button type="button" onClick={onOpenNewSubnetModal} className={primaryButton}>
-              Create the first one
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {subnetRows.slice(0, 9).map(({ sub, used, usable, percent }) => (
-              <button
-                key={sub.id}
-                type="button"
-                onClick={() => onOpenSubnetVisualizer(sub)}
-                className={`${card} group flex flex-col gap-3 p-5 text-left transition hover:border-cyan-400 hover:shadow-md cursor-pointer`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="break-all font-mono text-base font-bold text-zinc-900 dark:text-white">{sub.cidr}</span>
-                  <Eye className="h-4 w-4 shrink-0 text-zinc-400 opacity-0 transition group-hover:opacity-100" aria-label="Open address map" />
-                </div>
-                <div className="flex flex-wrap gap-1.5 text-xs font-medium">
-                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">{dcName.get(sub.datacenterId) ?? 'Unknown site'}</span>
-                  {sub.vlanId && vlanTag.has(sub.vlanId) && (
-                    <span className="rounded-full bg-purple-500/10 px-2 py-0.5 text-purple-700 dark:text-purple-300">VLAN {vlanTag.get(sub.vlanId)}</span>
-                  )}
-                  <span className={`rounded-full px-2 py-0.5 ${sub.segmentType === 'Public' ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300' : 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300'}`}>
-                    {sub.segmentType}
-                  </span>
-                </div>
-                <Bar percent={percent} label={`${sub.cidr} utilization`} />
-                <div className={`flex justify-between text-xs tabular-nums ${muted}`}>
-                  <span>{used} / {formatCount(usable)} used</span>
-                  <span className="font-semibold text-zinc-700 dark:text-zinc-200">{percentLabel(percent)}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   );
 };
