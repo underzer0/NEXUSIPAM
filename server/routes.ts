@@ -12,10 +12,10 @@ const SESSION_COOKIE_OPTIONS = {
   maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
 };
 
+// Browsers sign in with the session cookie; scripts send `Authorization: Bearer <session token or API key>`.
 function getSessionUser(req: Request): UserProfile | null {
-  const token = req.cookies?.[SESSION_COOKIE_NAME] || 
-    (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : undefined);
-  return db.getUserBySession(token);
+  const token = getSessionToken(req);
+  return db.getUserBySession(token) || db.getUserByApiKey(token);
 }
 
 // Only what other engineers need to see; never API keys or contact details.
@@ -583,8 +583,9 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
 
   router.post('/user/generate-api-key', (req: Request, res: Response) => {
     try {
-      const currentUser = getSessionUser(req);
-      if (!currentUser) return res.status(401).json({ success: false, error: 'No authenticated user session found' });
+      // Only a signed-in browser may mint keys, so a leaked key can't replace itself and lock the owner out.
+      const currentUser = db.getUserBySession(req.cookies?.[SESSION_COOKIE_NAME]);
+      if (!currentUser) return res.status(401).json({ success: false, error: 'Sign in to the web app to create an API key' });
       const apiKey = db.generateApiKey(currentUser.id);
       const updated = db.getUserById(currentUser.id);
       res.json({ success: true, data: { apiKey, user: updated } });

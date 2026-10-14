@@ -3,7 +3,7 @@ import path from 'path';
 import { Datacenter, VLAN, Subnet, IPAddress, ActivityLog, IPAMStats, SegmentType, IPStatus, UserProfile, IPVersion } from '../src/types/ipam';
 import { isIPInCIDR, isValidCIDR, isValidIP, parseCIDR, ipToInt, intToIp, getIPVersion, compressIPv6, generateIPRange } from '../src/utils/ipCalculator';
 import { mysqlEngine } from './mysql';
-import { hashPasswordSync, verifyPasswordSync, generateSecureApiKey, hashSensitiveData, generateSessionToken } from './crypto';
+import { hashPasswordSync, verifyPasswordSync, generateSecureApiKey, hashSensitiveData, generateSessionToken, API_KEY_PREFIX } from './crypto';
 
 export interface UserSession {
   token: string;
@@ -97,6 +97,8 @@ class IPAMDatabase {
   private users: UserProfile[] = [];
   // Strictly stores salted BCrypt hashes ($2a$10$...), never plaintext!
   private passwordHashes: Map<string, string> = new Map();
+  // userId -> SHA-256 of the user's API key; the raw key is shown once and never kept.
+  private apiKeyHashes: Map<string, string> = new Map();
   // Active user sessions (token -> UserSession) for cookie authentication
   private sessions: Map<string, UserSession> = new Map();
   private dataDir: string;
@@ -147,6 +149,7 @@ class IPAMDatabase {
         this.activityLogs = mysqlData.activityLogs;
         this.users = mysqlData.users;
         this.passwordHashes = mysqlData.passwords;
+        this.apiKeyHashes = mysqlData.apiKeyHashes;
         if (mysqlData.sessions) {
           this.sessions = mysqlData.sessions;
         }
@@ -171,6 +174,7 @@ class IPAMDatabase {
     this.activityLogs = [];
     this.users = [];
     this.passwordHashes = new Map();
+    this.apiKeyHashes = new Map();
     this.sessions = new Map();
   }
 
@@ -191,7 +195,7 @@ class IPAMDatabase {
       collisionAlerts: true,
       exhaustionAlerts: true,
       themePreference: 'dark',
-      apiKey: generateSecureApiKey().maskedKey,
+      apiKey: '',
       createdAt: new Date().toISOString(),
     };
     // Without IPAM_ADMIN_PASSWORD the seeded admin gets an unguessable password and stays unusable.
@@ -238,7 +242,7 @@ class IPAMDatabase {
       await mysqlEngine.saveDatacenter(defaultDc);
       await mysqlEngine.saveVlan(defaultVlan);
       await mysqlEngine.saveSubnet(defaultSubnet);
-      await mysqlEngine.saveUser(adminUser, defaultPasswordHash);
+      await mysqlEngine.saveUser(adminUser, defaultPasswordHash, null);
     } catch (err) {
       console.warn('[MySQL Seed Warning]', err);
     }
@@ -254,6 +258,7 @@ class IPAMDatabase {
       this.activityLogs = mysqlData.activityLogs;
       this.users = mysqlData.users;
       this.passwordHashes = mysqlData.passwords;
+      this.apiKeyHashes = mysqlData.apiKeyHashes;
       if (mysqlData.sessions) {
         this.sessions = mysqlData.sessions;
       }
@@ -302,7 +307,7 @@ class IPAMDatabase {
       // Sync all users
       for (const user of this.users) {
         const hash = this.passwordHashes.get(user.id) ?? '';
-        await mysqlEngine.saveUser(user, hash);
+        await mysqlEngine.saveUser(user, hash, this.apiKeyHashes.get(user.id) ?? null);
       }
       // Sync all valid sessions
       for (const session of this.sessions.values()) {
@@ -1512,7 +1517,7 @@ class IPAMDatabase {
     this.logActivity('UPDATE', 'User', current.id, `Profile Updated: ${current.name}`, `Updated contact & preferences for ${current.email}`);
     this.persist();
     const hash = this.passwordHashes.get(current.id) ?? '';
-    mysqlEngine.saveUser(current, hash).catch(() => {});
+    mysqlEngine.saveUser(current, hash, this.apiKeyHashes.get(current.id) ?? null).catch(() => {});
     return current;
   }
 
@@ -1538,8 +1543,6 @@ class IPAMDatabase {
     }
 
     const id = `user-${email.split('@')[0].replace(/[^a-z0-9]/g, '')}-${Date.now().toString(36)}`;
-    const { rawKey } = generateSecureApiKey();
-    
     const newUser: UserProfile = {
       id,
       name: data.name.trim(),
@@ -1556,7 +1559,7 @@ class IPAMDatabase {
       collisionAlerts: true,
       exhaustionAlerts: true,
       themePreference: 'dark',
-      apiKey: rawKey,
+      apiKey: '',
       createdAt: new Date().toISOString(),
     };
 
@@ -1570,7 +1573,7 @@ class IPAMDatabase {
     this.persist();
     
     // Save to MySQL with salted hash
-    mysqlEngine.saveUser(newUser, bcryptHash).catch(() => {});
+    mysqlEngine.saveUser(newUser, bcryptHash, null).catch(() => {});
     
     // Create new session
     const session = this.createSession(newUser.id);
@@ -1618,14 +1621,25 @@ class IPAMDatabase {
     const user = this.users.find(u => u.id === userId);
     if (!user) throw new Error('User not found');
     
-    const { rawKey } = generateSecureApiKey();
-    user.apiKey = rawKey;
+    // Replaces any previous key, which stops working immediately.
+    const { rawKey, keyHash, maskedKey } = generateSecureApiKey();
+    user.apiKey = maskedKey;
+    this.apiKeyHashes.set(user.id, keyHash);
     this.logActivity('UPDATE', 'User', user.id, `API Key Regenerated`, `New token issued for ${user.email}`);
     this.persist();
 
     const hash = this.passwordHashes.get(user.id) ?? '';
-    mysqlEngine.saveUser(user, hash).catch(() => {});
-    return user.apiKey;
+    mysqlEngine.saveUser(user, hash, keyHash).catch(() => {});
+    return rawKey;
+  }
+
+  public getUserByApiKey(key?: string): UserProfile | null {
+    if (!key?.startsWith(API_KEY_PREFIX)) return null;
+    const keyHash = hashSensitiveData(key);
+    for (const [userId, stored] of this.apiKeyHashes) {
+      if (stored === keyHash) return this.getUserById(userId) || null;
+    }
+    return null;
   }
 }
 

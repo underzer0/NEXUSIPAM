@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useIPAM } from '../context/IPAMContext';
-import { LogOut, RefreshCw, Save } from 'lucide-react';
+import { Check, Copy, KeyRound, LogOut, RefreshCw, Save } from 'lucide-react';
 import { UserProfile } from '../types/ipam';
 import { card, chip, input, muted, primaryButton, secondaryButton } from './ui';
 
@@ -23,6 +23,76 @@ const formFrom = (u: UserProfile): Form => ({
 const initials = (n: string) => {
   const parts = (n || 'User').trim().split(/\s+/);
   return (parts.length >= 2 ? parts[0][0] + parts[1][0] : parts[0].slice(0, 2)).toUpperCase();
+};
+
+// The full key exists only in this component's state, right after it is made; the server keeps a hash.
+const ApiKeyCard: React.FC<{ masked: string }> = ({ masked: initialMasked }) => {
+  const [masked, setMasked] = useState(initialMasked);
+  const [newKey, setNewKey] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const generate = async () => {
+    if (masked && !window.confirm('Make a new key? The current one stops working right away.')) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/user/generate-api-key', { method: 'POST' });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      setNewKey(json.data.apiKey);
+      setMasked(json.data.user.apiKey);
+    } catch (err: any) {
+      setError(err.message || 'Could not create a key.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copy = () => {
+    if (!newKey) return;
+    navigator.clipboard.writeText(newKey);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <section className={`${card} space-y-4 p-6`}>
+      <div className="flex flex-wrap items-center gap-3">
+        <KeyRound className="h-5 w-5 text-indigo-500" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <h2 className="font-semibold text-slate-900 dark:text-white">API key</h2>
+          <p className={`text-sm ${muted}`}>Lets scripts call the API as you.</p>
+        </div>
+        <button id="btn-generate-api-key" type="button" onClick={generate} disabled={busy} className={`${secondaryButton} disabled:opacity-50`}>
+          <RefreshCw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} /> {masked ? 'Replace key' : 'Create key'}
+        </button>
+      </div>
+
+      {error && <p role="alert" className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
+
+      {newKey ? (
+        <div className="space-y-2 rounded-xl bg-amber-500/10 p-4">
+          <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Copy it now. It won't be shown again.</p>
+          <div className="flex items-center gap-2">
+            <code className="min-w-0 flex-1 break-all rounded-lg bg-white px-3 py-2 font-mono text-sm text-slate-900 dark:bg-slate-950 dark:text-white">{newKey}</code>
+            <button type="button" onClick={copy} className={secondaryButton} aria-label="Copy API key">
+              {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+      ) : (
+        masked && <code className={`block font-mono text-sm ${muted}`}>{masked}</code>
+      )}
+
+      {masked && (
+        <pre className="overflow-x-auto rounded-xl bg-slate-900 p-4 font-mono text-xs text-slate-200">
+          {`curl -H "Authorization: Bearer ${newKey ?? '<your key>'}" \\\n  ${window.location.origin}/api/subnets`}
+        </pre>
+      )}
+    </section>
+  );
 };
 
 export const UserProfileView: React.FC = () => {
@@ -143,6 +213,8 @@ export const UserProfileView: React.FC = () => {
           </button>
         </div>
       </form>
+
+      <ApiKeyCard key={currentUser.id} masked={currentUser.apiKey ?? ''} />
     </div>
   );
 };

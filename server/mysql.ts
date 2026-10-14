@@ -2,7 +2,7 @@ import mysql, { Pool, PoolOptions, RowDataPacket, ResultSetHeader } from 'mysql2
 import fs from 'fs';
 import path from 'path';
 import { Datacenter, VLAN, Subnet, IPAddress, ActivityLog, UserProfile } from '../src/types/ipam';
-import { hashPasswordSync, verifyPasswordSync, encryptSensitive, decryptSensitive, hashSensitiveData } from './crypto';
+import { hashPasswordSync, verifyPasswordSync, API_KEY_PREFIX } from './crypto';
 
 export interface MySQLConfig {
   host: string;
@@ -484,6 +484,7 @@ class MySQLEngine {
     activityLogs: ActivityLog[];
     users: UserProfile[];
     passwords: Map<string, string>;
+    apiKeyHashes: Map<string, string>;
     sessions: Map<string, { token: string; userId: string; expiresAt: number }>;
   } | null> {
     if (!this.pool || !this.isConnected) return null;
@@ -551,16 +552,14 @@ class MySQLEngine {
       // 6. Users
       const [userRows] = await this.pool.query<RowDataPacket[]>('SELECT * FROM users ORDER BY created_at ASC');
       const passwords = new Map<string, string>();
+      const apiKeyHashes = new Map<string, string>();
       const users: UserProfile[] = userRows.map(r => {
         // Store password hash in memory map for auth verification
         passwords.set(r.id, r.password_hash);
         
-        let apiKey = r.api_key_masked || '';
-        if (r.api_key_encrypted) {
-          try {
-            apiKey = decryptSensitive(r.api_key_encrypted);
-          } catch {}
-        }
+        // Older nx_live_ keys were exposed in plaintext, so only keys made since hashing-only storage count.
+        const hasKey = r.api_key_hash && String(r.api_key_masked || '').startsWith(API_KEY_PREFIX);
+        if (hasKey) apiKeyHashes.set(r.id, r.api_key_hash);
 
         return {
           id: r.id,
@@ -578,7 +577,7 @@ class MySQLEngine {
           collisionAlerts: Boolean(r.collision_alerts),
           exhaustionAlerts: Boolean(r.exhaustion_alerts),
           themePreference: r.theme_preference || 'dark',
-          apiKey: apiKey || `nx_live_${r.id.substring(0, 8)}`,
+          apiKey: hasKey ? r.api_key_masked : '',
           createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
         };
       });
@@ -605,6 +604,7 @@ class MySQLEngine {
         activityLogs,
         users,
         passwords,
+        apiKeyHashes,
         sessions,
       };
     } catch (err: any) {
@@ -720,7 +720,7 @@ class MySQLEngine {
     }
   }
 
-  public async saveUser(user: UserProfile, passwordHashOrPlain: string): Promise<void> {
+  public async saveUser(user: UserProfile, passwordHashOrPlain: string, apiKeyHash: string | null): Promise<void> {
     if (!this.pool || !this.isConnected) return;
     try {
       // Ensure password is safe bcrypt hash
@@ -729,19 +729,7 @@ class MySQLEngine {
         passwordHash = hashPasswordSync(passwordHash);
       }
 
-      // API key security
-      let apiKeyHash: string | null = null;
-      let apiKeyEncrypted: string | null = null;
-      let apiKeyMasked: string | null = null;
-
-      if (user.apiKey) {
-        apiKeyHash = hashSensitiveData(user.apiKey);
-        apiKeyEncrypted = encryptSensitive(user.apiKey);
-        apiKeyMasked = user.apiKey.length > 8 
-          ? `${user.apiKey.substring(0, 8)}...${user.apiKey.substring(user.apiKey.length - 4)}` 
-          : user.apiKey;
-      }
-
+      // user.apiKey is only the masked form; the raw key is never stored.
       await this.pool.query(
         `INSERT INTO users (
            id, name, email, password_hash, role, department, organization, location, phone, bio,
@@ -775,8 +763,8 @@ class MySQLEngine {
           user.exhaustionAlerts ? 1 : 0,
           user.themePreference || 'dark',
           apiKeyHash,
-          apiKeyEncrypted,
-          apiKeyMasked,
+          null,
+          apiKeyHash ? user.apiKey || null : null,
           new Date(user.createdAt),
         ]
       );

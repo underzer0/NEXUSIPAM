@@ -105,21 +105,16 @@ export function decryptSensitive(cipherPayload: string): string {
   }
 }
 
-/**
- * Generates a cryptographically random API Key
- */
-export function generateSecureApiKey(): { rawKey: string; keyHash: string; maskedKey: string; encryptedKey: string } {
-  const token = crypto.randomBytes(24).toString('hex');
-  const rawKey = `nx_live_${token}`;
-  const keyHash = hashSensitiveData(rawKey);
-  const maskedKey = `nx_live_${token.substring(0, 4)}...${token.substring(token.length - 4)}`;
-  const encryptedKey = encryptSensitive(rawKey);
+// Keys use a prefix the old nx_live_ keys never had, so no key issued before hashing-only storage can sign requests.
+export const API_KEY_PREFIX = 'bip_';
 
+export function generateSecureApiKey(): { rawKey: string; keyHash: string; maskedKey: string } {
+  const token = crypto.randomBytes(24).toString('hex');
+  const rawKey = `${API_KEY_PREFIX}${token}`;
   return {
     rawKey,
-    keyHash,
-    maskedKey,
-    encryptedKey,
+    keyHash: hashSensitiveData(rawKey),
+    maskedKey: `${API_KEY_PREFIX}${token.substring(0, 4)}...${token.substring(token.length - 4)}`,
   };
 }
 

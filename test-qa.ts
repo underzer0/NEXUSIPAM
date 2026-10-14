@@ -229,7 +229,13 @@ async function runTestSuite() {
   const testUser = userResult.user;
   assert(!!testUser.id, 'User created successfully with unique ID');
   assert(testUser.email.includes('@beyondip.net'), 'User email formatted correctly');
-  assert(testUser.apiKey.startsWith('nx_live_'), 'Secure API Key generated with live prefix');
+  assert(testUser.apiKey === '', 'New users start without an API key');
+  const firstKey = db.generateApiKey(testUser.id);
+  assert(firstKey.startsWith('bip_') && testUser.apiKey !== firstKey, 'API key is returned once and only a masked form is kept');
+  assert(db.getUserByApiKey(firstKey)?.id === testUser.id, 'API key signs requests as its owner');
+  assert(db.getUserByApiKey(testUser.apiKey) === null, 'Masked API key is rejected');
+  const secondKey = db.generateApiKey(testUser.id);
+  assert(db.getUserByApiKey(firstKey) === null && db.getUserByApiKey(secondKey)?.id === testUser.id, 'Regenerating revokes the previous API key');
   assert(!!userResult.session.token, 'Session token generated successfully');
 
   // Verify BCrypt sign in
