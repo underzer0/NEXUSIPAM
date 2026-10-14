@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { Datacenter, VLAN, Subnet, IPAddress, ActivityLog, IPAMStats, FilterState, WSMessage, SegmentType, IPStatus, UserProfile } from '../types/ipam';
 
-export type ActiveTab = 'dashboard' | 'datacenters' | 'vlans' | 'subnets' | 'ips' | 'calculator' | 'api-docs' | 'profile' | 'signup' | 'signin';
+export type ActiveTab = 'dashboard' | 'datacenters' | 'vlans' | 'subnets' | 'ips' | 'tools' | 'profile' | 'signup' | 'signin';
 
 const emptyUser: UserProfile = {
   id: '',

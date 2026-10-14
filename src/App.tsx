@@ -8,8 +8,7 @@ import { DatacentersView } from './components/DatacentersView';
 import { VlansView } from './components/VlansView';
 import { SubnetsView } from './components/SubnetsView';
 import { IPDirectoryView } from './components/IPDirectoryView';
-import { SubnetCalculatorView } from './components/SubnetCalculatorView';
-import { ApiExplorerView } from './components/ApiExplorerView';
+import { ToolsView } from './components/ToolsView';
 import { UserProfileView } from './components/UserProfileView';
 import { SignUpView } from './components/SignUpView';
 import { SignInView } from './components/SignInView';
@@ -329,13 +328,7 @@ const MainAppContent: React.FC = () => {
             />
           )}
 
-          {activeTab === 'calculator' && (
-            <SubnetCalculatorView />
-          )}
-
-          {activeTab === 'api-docs' && (
-            <ApiExplorerView />
-          )}
+          {activeTab === 'tools' && <ToolsView />}
 
           {activeTab === 'profile' && (
             <UserProfileView />

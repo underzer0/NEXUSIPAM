@@ -8,7 +8,6 @@ import {
   Network, 
   Hash, 
   Calculator, 
-  Code2, 
   Sun, 
   Moon, 
   Radio, 
@@ -86,16 +85,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: ips.length,
     },
     {
-      id: 'calculator' as const,
-      label: 'CIDR Calculator',
+      id: 'tools' as const,
+      label: 'Tools',
       icon: Calculator,
       badge: null,
-    },
-    {
-      id: 'api-docs' as const,
-      label: 'REST API Explorer',
-      icon: Code2,
-      badge: 'v1.0',
     },
     {
       id: 'profile' as const,
