@@ -2,14 +2,6 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
 /**
- * Hashes a plaintext password using bcrypt with a secure salt
- */
-export async function hashPassword(plainPassword: string): Promise<string> {
-  const salt = await bcrypt.genSalt(10);
-  return bcrypt.hash(plainPassword, salt);
-}
-
-/**
  * Synchronous bcrypt password hashing
  */
 export function hashPasswordSync(plainPassword: string): string {
@@ -17,28 +9,15 @@ export function hashPasswordSync(plainPassword: string): string {
   return bcrypt.hashSync(plainPassword, salt);
 }
 
-/**
- * Verifies a plaintext password against a bcrypt hash
- */
-export async function verifyPassword(plainPassword: string, hash: string): Promise<boolean> {
-  if (!hash || !plainPassword) return false;
-  // If hash is already a bcrypt hash ($2a$, $2b$, $2y$)
-  if (hash.startsWith('$2a$') || hash.startsWith('$2b$') || hash.startsWith('$2y$')) {
-    return bcrypt.compare(plainPassword, hash);
-  }
-  // Safe fallback comparison for legacy string while migration runs
-  return plainPassword === hash;
-}
+export const isBcryptHash = (hash: string) => /^\$2[aby]\$/.test(hash);
 
 /**
- * Synchronous bcrypt password comparison
+ * Checks a password against a bcrypt hash. Anything that isn't a bcrypt hash never matches;
+ * plain-text passwords from old databases are hashed when users are loaded.
  */
 export function verifyPasswordSync(plainPassword: string, hash: string): boolean {
-  if (!hash || !plainPassword) return false;
-  if (hash.startsWith('$2a$') || hash.startsWith('$2b$') || hash.startsWith('$2y$')) {
-    return bcrypt.compareSync(plainPassword, hash);
-  }
-  return plainPassword === hash;
+  if (!hash || !plainPassword || !isBcryptHash(hash)) return false;
+  return bcrypt.compareSync(plainPassword, hash);
 }
 
 /**

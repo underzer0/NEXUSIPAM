@@ -2,7 +2,7 @@ import mysql, { Pool, PoolOptions, RowDataPacket, ResultSetHeader } from 'mysql2
 import fs from 'fs';
 import path from 'path';
 import { Datacenter, VLAN, Subnet, IPAddress, ActivityLog, UserProfile } from '../src/types/ipam';
-import { hashPasswordSync, verifyPasswordSync, API_KEY_PREFIX } from './crypto';
+import { hashPasswordSync, isBcryptHash, API_KEY_PREFIX } from './crypto';
 
 export interface MySQLConfig {
   host: string;
@@ -562,9 +562,15 @@ class MySQLEngine {
       const [userRows] = await this.pool.query<RowDataPacket[]>('SELECT * FROM users ORDER BY created_at ASC');
       const passwords = new Map<string, string>();
       const apiKeyHashes = new Map<string, string>();
+      const plainPasswords: [string, string][] = [];
       const users: UserProfile[] = userRows.map(r => {
-        // Store password hash in memory map for auth verification
-        passwords.set(r.id, r.password_hash);
+        // Old databases may hold plain-text passwords; hash them so sign-in only ever compares bcrypt.
+        let hash: string = r.password_hash || '';
+        if (hash && !isBcryptHash(hash)) {
+          hash = hashPasswordSync(hash);
+          plainPasswords.push([r.id, hash]);
+        }
+        passwords.set(r.id, hash);
         
         // Older nx_live_ keys were exposed in plaintext, so only keys made since hashing-only storage count.
         const hasKey = r.api_key_hash && String(r.api_key_masked || '').startsWith(API_KEY_PREFIX);
@@ -590,6 +596,10 @@ class MySQLEngine {
           createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
         };
       });
+      for (const [id, hash] of plainPasswords) {
+        await this.pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, id]);
+      }
+      if (plainPasswords.length) console.log(`[MySQL] Hashed ${plainPasswords.length} plain-text password(s).`);
 
       // 7. Active user sessions
       const sessions = new Map<string, { token: string; userId: string; expiresAt: number }>();
@@ -744,7 +754,7 @@ class MySQLEngine {
     try {
       // Ensure password is safe bcrypt hash
       let passwordHash = passwordHashOrPlain;
-      if (!passwordHash.startsWith('$2a$') && !passwordHash.startsWith('$2b$')) {
+      if (!isBcryptHash(passwordHash)) {
         passwordHash = hashPasswordSync(passwordHash);
       }
 
