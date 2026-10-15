@@ -19,6 +19,7 @@ interface Result {
   secondary: string;
   tab: ActiveTab;
   search: string;
+  datacenterId?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenReserveNextModal, onToggleMobileMenu }) => {
@@ -54,13 +55,22 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenRese
         ...datacenters
           .filter((d) => d.name.toLowerCase().includes(q) || d.location.toLowerCase().includes(q))
           .slice(0, 2)
-          .map((d) => ({ key: d.id, icon: Building2, primary: d.name, secondary: d.location, tab: 'datacenters' as const, search: '' })),
+          .map((d) => ({ key: d.id, icon: Building2, primary: d.name, secondary: d.location, tab: 'datacenters' as const, search: '', datacenterId: d.id })),
       ]
     : [];
 
-  // The target page reads filters.search when it opens, so the result is pre-filtered.
+  // The target page follows filters.search, so the result is pre-filtered. Every other filter is
+  // cleared, or an earlier choice (IPv4 only, Reserved only, another datacenter) could hide the result.
   const openResult = (r: Result) => {
-    setFilters((prev) => ({ ...prev, search: r.search }));
+    setFilters({
+      search: r.search,
+      datacenterId: r.datacenterId ?? 'All',
+      vlanId: 'All',
+      status: 'All',
+      segmentType: 'All',
+      ipVersion: 'All',
+      subnetId: 'All',
+    });
     setActiveTab(r.tab);
     setQuery('');
     setOpen(false);

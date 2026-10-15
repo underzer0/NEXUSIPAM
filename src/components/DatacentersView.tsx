@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useIPAM } from '../context/IPAMContext';
 import { Building2, Edit, Hash, Layers, MapPin, Network, Plus, Trash2 } from 'lucide-react';
 import { Datacenter, Subnet } from '../types/ipam';
@@ -19,9 +19,13 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
   onOpenNewSubnetModalForDC,
   onOpenNewVlanModalForDC,
 }) => {
-  const { datacenters, vlans, subnets, ips, deleteDatacenter, setActiveTab, setFilters, isAdmin, canEditDc } = useIPAM();
+  const { datacenters, vlans, subnets, ips, deleteDatacenter, setActiveTab, filters, setFilters, isAdmin, canEditDc } = useIPAM();
 
   const [selectedDcId, setSelectedDcId] = useState<string | null>(datacenters[0]?.id || null);
+  // A datacenter picked in the header search opens selected.
+  useEffect(() => {
+    if (filters.datacenterId !== 'All') setSelectedDcId(filters.datacenterId);
+  }, [filters.datacenterId]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Used IPs per subnet, computed once for every card and list below.

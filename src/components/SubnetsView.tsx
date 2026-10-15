@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useIPAM } from '../context/IPAMContext';
 import { BookmarkCheck, Database, Edit, Network, Search, Trash2 } from 'lucide-react';
 import { Subnet, IPAddress, VLAN } from '../types/ipam';
@@ -36,6 +36,14 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
   // The dashboard tiles set the global IP version before opening this page.
   const [versionFilter, setVersionFilter] = useState<'All' | 'IPv4' | 'IPv6'>(filters.ipVersion === 'IPv4' || filters.ipVersion === 'IPv6' ? filters.ipVersion : 'All');
   const [searchFilter, setSearchFilter] = useState(filters.search);
+
+  // The header search can change filters while this page is already open; follow it.
+  useEffect(() => {
+    setSearchFilter(filters.search);
+    setVersionFilter(filters.ipVersion === 'IPv4' || filters.ipVersion === 'IPv6' ? filters.ipVersion : 'All');
+    setDcFilter('All');
+    setSegmentFilter('All');
+  }, [filters.search, filters.ipVersion]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const ipsBySubnet = new Map<string, IPAddress[]>();
