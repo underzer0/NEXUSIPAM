@@ -27,6 +27,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenRese
 
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  // Highlighted result for the arrow keys; Enter opens it.
+  const [active, setActive] = useState(0);
   const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -97,14 +99,21 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenRese
             aria-controls="global-search-results"
             placeholder="Search IPs, subnets, VLANs…"
             value={query}
+            aria-activedescendant={open && results[active] ? `search-result-${active}` : undefined}
             onChange={(e) => {
               setQuery(e.target.value);
+              setActive(0);
               setOpen(true);
             }}
             onFocus={() => setOpen(true)}
             onKeyDown={(e) => {
               if (e.key === 'Escape') setOpen(false);
-              if (e.key === 'Enter' && results[0]) openResult(results[0]);
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                setOpen(true);
+                if (results.length) setActive((i) => (i + (e.key === 'ArrowDown' ? 1 : results.length - 1)) % results.length);
+              }
+              if (e.key === 'Enter' && results[active]) openResult(results[active]);
             }}
             className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 pl-9 pr-9 text-sm text-zinc-900 placeholder-zinc-400 focus:border-cyan-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-100 dark:focus:bg-zinc-950"
           />
@@ -124,14 +133,18 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenRese
             {results.length === 0 ? (
               <p className={`py-6 text-center text-sm ${muted}`}>Nothing matches “{query}”.</p>
             ) : (
-              results.map((r) => (
+              results.map((r, i) => (
                 <button
                   key={r.key}
+                  id={`search-result-${i}`}
                   type="button"
                   role="option"
-                  aria-selected={false}
+                  aria-selected={i === active}
                   onClick={() => openResult(r)}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+                  onMouseEnter={() => setActive(i)}
+                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm cursor-pointer ${
+                    i === active ? 'bg-cyan-500/10' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                  }`}
                 >
                   <r.icon className="h-4 w-4 shrink-0 text-zinc-400" />
                   <span className="shrink-0 font-mono font-medium text-zinc-900 dark:text-white">{r.primary}</span>
