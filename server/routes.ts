@@ -21,7 +21,39 @@ function getSessionUser(req: Request): UserProfile | null {
 }
 
 // Only what other engineers need to see; never API keys or contact details.
-const publicUser = (u: UserProfile) => ({ id: u.id, name: u.name, email: u.email, role: u.role, department: u.department });
+const publicUser = (u: UserProfile) => ({
+  id: u.id,
+  name: u.name,
+  email: u.email,
+  role: u.role,
+  department: u.department,
+  access: u.access,
+  datacenterIds: u.datacenterIds,
+});
+
+// What the admin panel lists: account and permissions, no profile details or key material.
+const adminView = (u: UserProfile) => ({ ...publicUser(u), status: u.status, createdAt: u.createdAt });
+
+// Writes that touch no datacenter; anything else that isn't matched below is admin-only.
+const PERSONAL_WRITES = new Set(['/db/retry', '/auth/signin', '/auth/signout', '/auth/signup', '/user/profile', '/user/generate-api-key']);
+
+// The datacenters a write changes (old and new, for moves), or 'admin' when only admins may make it.
+function datacentersTouched(req: Request): string[] | 'admin' {
+  const body = req.body ?? {};
+  const dcOfSubnet = (id?: string) => (id ? db.getSubnetById(id)?.datacenterId : undefined);
+  let m: RegExpExecArray | null;
+  let ids: (string | undefined)[];
+  if (PERSONAL_WRITES.has(req.path)) ids = [];
+  else if (req.path === '/vlans') ids = [body.datacenterId];
+  else if ((m = /^\/vlans\/([^/]+)$/.exec(req.path))) ids = [db.getVlanById(m[1])?.datacenterId, body.datacenterId];
+  else if (req.path === '/subnets') ids = [body.datacenterId];
+  else if ((m = /^\/subnets\/([^/]+)(?:\/(?:reserve-next-ip|bulk-generate-ips))?$/.exec(req.path))) ids = [dcOfSubnet(m[1]), body.datacenterId];
+  else if (req.path === '/ips') ids = [dcOfSubnet(body.subnetId)];
+  else if ((m = /^\/ips\/([^/]+)$/.exec(req.path))) ids = [dcOfSubnet(db.getIPById(m[1])?.subnetId), dcOfSubnet(body.subnetId)];
+  else return 'admin';
+  // Unknown records drop out here; the handler then answers "not found" as before.
+  return ids.filter((id): id is string => !!id);
+}
 
 const PUBLIC_PATHS = new Set(['/health', '/db/retry', '/bootstrap', '/auth/me', '/auth/signin', '/auth/signout', '/auth/signup']);
 
@@ -36,6 +68,21 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
   router.use((req: Request, res: Response, next) => {
     if (PUBLIC_PATHS.has(req.path) || getSessionUser(req)) return next();
     res.status(401).json({ success: false, error: 'Authentication required' });
+  });
+
+  // Everyone signed in can read everything. Members change only what is in their datacenters;
+  // datacenters themselves and accounts are admin-only.
+  router.use((req: Request, res: Response, next) => {
+    if (PUBLIC_PATHS.has(req.path)) return next();
+    const user = getSessionUser(req)!;
+    if (user.access === 'admin') return next();
+    if (req.path.startsWith('/admin')) return res.status(403).json({ success: false, error: 'Only admins can do this.' });
+    if (req.method === 'GET') return next();
+    const touched = datacentersTouched(req);
+    if (touched === 'admin') return res.status(403).json({ success: false, error: 'Only admins can do this.' });
+    const denied = touched.find((dcId) => !db.canEditDatacenter(user, dcId));
+    if (!denied) return next();
+    res.status(403).json({ success: false, error: `You don't have edit rights in ${db.getDatacenterById(denied)?.name ?? 'this datacenter'}.` });
   });
 
   // Health check
@@ -564,11 +611,38 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
   router.post('/auth/signup', async (req: Request, res: Response) => {
     try {
       const { name, email, password, role, department, organization, location, phone, bio, primaryDatacenterId } = req.body;
-      const { user, session } = await db.persisted(() =>
+      const user = await db.persisted(() =>
         db.createUser({ name, email, password, role, department, organization, location, phone, bio, primaryDatacenterId }),
       );
-      res.cookie(SESSION_COOKIE_NAME, session.token, SESSION_COOKIE_OPTIONS);
-      res.status(201).json({ success: true, data: { user } });
+      // A request, not a sign-in: no session until an admin approves it.
+      res.status(201).json({ success: true, data: { pending: true, email: user.email } });
+    } catch (err: any) {
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
+    }
+  });
+
+  // --- ADMIN: accounts and permissions (guarded above) ---
+  router.get('/admin/users', (req: Request, res: Response) => {
+    res.json({ success: true, data: db.getUsers().map(adminView) });
+  });
+
+  router.put('/admin/users/:id', async (req: Request, res: Response) => {
+    try {
+      const { access, status, datacenterIds } = req.body ?? {};
+      const actor = getSessionUser(req)!;
+      const updated = await db.persisted(() => db.updateUserAccess(actor.id, req.params.id, { access, status, datacenterIds }));
+      broadcast('USER_UPDATED', publicUser(updated));
+      res.json({ success: true, data: adminView(updated) });
+    } catch (err: any) {
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
+    }
+  });
+
+  router.delete('/admin/users/:id', async (req: Request, res: Response) => {
+    try {
+      const actor = getSessionUser(req)!;
+      await db.persisted(() => db.deleteUser(actor.id, req.params.id));
+      res.json({ success: true });
     } catch (err: any) {
       res.status(err.status ?? 400).json({ success: false, error: err.message });
     }

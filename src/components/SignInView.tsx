@@ -1,19 +1,26 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { useIPAM } from '../context/IPAMContext';
 import { card, input, linkButton, muted, primaryButton } from './ui';
 
 // Shared frame for the sign-in and sign-up pages.
-export const AuthShell: React.FC<{ title: string; error: string | null; footer: React.ReactNode; children: React.ReactNode }> = ({
-  title,
-  error,
-  footer,
-  children,
-}) => (
+export const AuthShell: React.FC<{
+  title: string;
+  error: string | null;
+  notice?: string | null;
+  footer: React.ReactNode;
+  children: React.ReactNode;
+}> = ({ title, error, notice, footer, children }) => (
   <div className="flex w-full items-center justify-center">
     <div className="w-full max-w-sm space-y-6">
       <h1 className="text-center text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">{title}</h1>
       <div className={`${card} space-y-5 p-6`}>
+        {notice && !error && (
+          <p role="status" className="flex gap-2 rounded-lg bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            {notice}
+          </p>
+        )}
         {error && (
           <p role="alert" className="rounded-xl bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">
             {error}
@@ -46,7 +53,7 @@ export const PasswordInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>
 export const fieldLabel = 'text-sm font-medium text-zinc-700 dark:text-zinc-300';
 
 export const SignInView: React.FC = () => {
-  const { signIn, setActiveTab } = useIPAM();
+  const { signIn, setActiveTab, authNotice, setAuthNotice } = useIPAM();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -59,6 +66,7 @@ export const SignInView: React.FC = () => {
     setIsLoading(true);
     try {
       await signIn(email.trim(), password);
+      setAuthNotice(null);
     } catch (err: any) {
       setErrorMessage(err.message || 'Sign-in failed.');
     } finally {
@@ -70,11 +78,12 @@ export const SignInView: React.FC = () => {
     <AuthShell
       title="Sign in to BeyondIP"
       error={errorMessage}
+      notice={authNotice}
       footer={
         <>
           New here?{' '}
           <button id="btn-goto-signup" type="button" onClick={() => setActiveTab('signup')} className={linkButton}>
-            Create an account
+            Request an account
           </button>
         </>
       }

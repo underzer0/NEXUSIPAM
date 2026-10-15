@@ -22,9 +22,8 @@ export const SignUpView: React.FC = () => {
 
     setIsSubmitting(true);
     try {
+      // Goes to the sign-in page with a "request sent" notice; an admin approves it there.
       await signUpUser({ name: name.trim(), email: email.trim().toLowerCase(), password });
-      // Role, team and location are filled in on the profile page.
-      setActiveTab('profile');
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to create the account.');
     } finally {
@@ -34,7 +33,7 @@ export const SignUpView: React.FC = () => {
 
   return (
     <AuthShell
-      title="Create your account"
+      title="Request an account"
       error={errorMessage}
       footer={
         <>
@@ -77,7 +76,7 @@ export const SignUpView: React.FC = () => {
           />
         </label>
         <button id="btn-submit-signup" type="submit" disabled={isSubmitting} className={`${primaryButton} w-full disabled:opacity-50`}>
-          {isSubmitting ? 'Creating account…' : 'Create account'}
+          {isSubmitting ? 'Sending request…' : 'Request account'}
         </button>
       </form>
     </AuthShell>

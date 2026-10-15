@@ -1,13 +1,16 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { Datacenter, VLAN, Subnet, IPAddress, ActivityLog, IPAMStats, FilterState, WSMessage, SegmentType, IPStatus, UserProfile } from '../types/ipam';
 
-export type ActiveTab = 'dashboard' | 'datacenters' | 'vlans' | 'subnets' | 'ips' | 'tools' | 'profile' | 'signup' | 'signin';
+export type ActiveTab = 'dashboard' | 'datacenters' | 'vlans' | 'subnets' | 'ips' | 'tools' | 'admin' | 'profile' | 'signup' | 'signin';
 
 const emptyUser: UserProfile = {
   id: '',
   name: '',
   email: '',
   role: 'Network Engineer',
+  access: 'member',
+  status: 'active',
+  datacenterIds: [],
   department: 'Core Infrastructure',
   organization: 'BeyondIP Enterprise',
   location: 'Corporate HQ',
@@ -53,18 +56,13 @@ interface IPAMContextType {
   updateCurrentUser: (data: Partial<UserProfile>) => Promise<UserProfile>;
   signIn: (email: string, password: string) => Promise<UserProfile>;
   signOut: () => Promise<void>;
-  signUpUser: (data: {
-    name: string;
-    email: string;
-    role?: string;
-    department?: string;
-    organization?: string;
-    location?: string;
-    phone?: string;
-    bio?: string;
-    primaryDatacenterId?: string;
-    password?: string;
-  }) => Promise<UserProfile>;
+  // Sends an account request; on success the sign-in page shows authNotice.
+  signUpUser: (data: { name: string; email: string; password: string }) => Promise<void>;
+  authNotice: string | null;
+  setAuthNotice: (notice: string | null) => void;
+  isAdmin: boolean;
+  // Whether the signed-in user may change subnets, VLANs and IPs in this datacenter.
+  canEditDc: (datacenterId?: string) => boolean;
 
   createDatacenter: (data: { name: string; location: string; description: string }) => Promise<Datacenter>;
   updateDatacenter: (id: string, data: { name?: string; location?: string; description?: string }) => Promise<Datacenter>;
@@ -602,33 +600,22 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveTab('signin');
   };
 
-  const signUpUser = async (data: {
-    name: string;
-    email: string;
-    role?: string;
-    department?: string;
-    organization?: string;
-    location?: string;
-    phone?: string;
-    bio?: string;
-    primaryDatacenterId?: string;
-    password?: string;
-  }): Promise<UserProfile> => {
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
+
+  const signUpUser = async (data: { name: string; email: string; password: string }): Promise<void> => {
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     const json = await res.json();
-    if (!json.success) throw new Error(json.error || 'Failed to create account');
-    const newUser: UserProfile = json.data?.user || json.data;
-    setCurrentUser(newUser);
-    setIsAuthenticated(true);
-    // Load the data over HTTP so pages work even when the live-update socket can't connect.
-    await fetchBootstrapData();
-    setActiveTab('dashboard');
-    return newUser;
+    if (!json.success) throw new Error(json.error || 'Failed to send the request');
+    setAuthNotice(`Request sent for ${json.data.email}. You can sign in once an admin approves it.`);
+    setActiveTab('signin');
   };
+
+  const isAdmin = currentUser.access === 'admin';
+  const canEditDc = (datacenterId?: string) => isAdmin || (!!datacenterId && currentUser.datacenterIds.includes(datacenterId));
 
   return (
     <IPAMContext.Provider
@@ -657,6 +644,10 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signIn,
         signOut,
         signUpUser,
+        authNotice,
+        setAuthNotice,
+        isAdmin,
+        canEditDc,
         createDatacenter,
         updateDatacenter,
         deleteDatacenter,

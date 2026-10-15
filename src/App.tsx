@@ -9,6 +9,7 @@ import { VlansView } from './components/VlansView';
 import { SubnetsView } from './components/SubnetsView';
 import { IPDirectoryView } from './components/IPDirectoryView';
 import { ToolsView } from './components/ToolsView';
+import { AdminView } from './components/AdminView';
 import { UserProfileView } from './components/UserProfileView';
 import { SignUpView } from './components/SignUpView';
 import { SignInView } from './components/SignInView';
@@ -26,7 +27,7 @@ import { Sun, Moon, AlertTriangle, RefreshCw } from 'lucide-react';
 import { card, iconButton, muted, primaryButton } from './components/ui';
 
 const MainAppContent: React.FC = () => {
-  const { activeTab, isDark, loading, error, isAuthenticated, toggleTheme, retryDatabaseConnection } = useIPAM();
+  const { activeTab, isDark, loading, error, isAuthenticated, isAdmin, toggleTheme, retryDatabaseConnection } = useIPAM();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isRetryingDb, setIsRetryingDb] = useState(false);
@@ -249,6 +250,7 @@ const MainAppContent: React.FC = () => {
           )}
 
           {activeTab === 'tools' && <ToolsView />}
+          {activeTab === 'admin' && isAdmin && <AdminView />}
 
           {activeTab === 'profile' && (
             <UserProfileView />
