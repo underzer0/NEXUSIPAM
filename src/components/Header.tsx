@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useIPAM, ActiveTab } from '../context/IPAMContext';
 import { BookmarkCheck, Building2, Hash, Layers, Menu, Network, Plus, Search, X } from 'lucide-react';
 import { BeyondIPLogo } from './BeyondIPLogo';
+import { compressIPv6, isValidIP } from '../utils/ipCalculator';
 import { muted, primaryButton, secondaryButton } from './ui';
 
 interface HeaderProps {
@@ -40,10 +41,12 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenRese
   }, []);
 
   const q = query.toLowerCase().trim();
+  // Stored IPv6 addresses are in short form; match a typed long form too.
+  const qIP = isValidIP(q) && q.includes(':') ? compressIPv6(q) : q;
   const results: Result[] = q
     ? [
         ...ips
-          .filter((i) => i.ipAddress.includes(q) || i.assignedDevice.toLowerCase().includes(q))
+          .filter((i) => i.ipAddress.includes(qIP) || i.assignedDevice.toLowerCase().includes(q))
           .slice(0, 4)
           .map((i) => ({ key: i.id, icon: Hash, primary: i.ipAddress, secondary: i.assignedDevice || i.status, tab: 'ips' as const, search: i.ipAddress })),
         ...subnets

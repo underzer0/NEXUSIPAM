@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useIPAM } from '../context/IPAMContext';
 import { Check, Copy, Database, Edit, Hash, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { IPAddress, IPStatus, Subnet } from '../types/ipam';
-import { isValidIP } from '../utils/ipCalculator';
+import { compressIPv6, isValidIP } from '../utils/ipCalculator';
 import { Segmented, card, chipNeutral, iconButton, input, linkButton, muted, percentOf, primaryButton, secondaryButton } from './ui';
 
 interface IPDirectoryViewProps {
@@ -56,6 +56,8 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
   const q = filters.search.toLowerCase().trim();
   // A complete address finds that address only, not 10.0.0.10-19 (or subnet 10.0.0.128/25) as well.
   const exactIP = isValidIP(q);
+  // IPv6 has many spellings of one address (2001:db8:0:0::1 = 2001:db8::1); compare the short form, as stored.
+  const exactQ = exactIP && q.includes(':') ? compressIPv6(q) : q;
   // Everything except status, so the status chips can show counts for the current view.
   const scopedIPs = ips.filter((ip) => {
     const subnet = subnetById.get(ip.subnetId);
@@ -63,7 +65,7 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
     if (filters.ipVersion && filters.ipVersion !== 'All' && versionOf(ip) !== filters.ipVersion) return false;
     if (filters.datacenterId !== 'All' && subnet.datacenterId !== filters.datacenterId) return false;
     if (filters.subnetId !== 'All' && ip.subnetId !== filters.subnetId) return false;
-    if (exactIP) return ip.ipAddress.toLowerCase() === q;
+    if (exactIP) return ip.ipAddress.toLowerCase() === exactQ;
     return (
       !q ||
       ip.ipAddress.toLowerCase().includes(q) ||
