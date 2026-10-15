@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useIPAM, ActiveTab } from '../context/IPAMContext';
 import { BookmarkCheck, Building2, Hash, Layers, Menu, Network, Plus, Search, X } from 'lucide-react';
 import { BeyondIPLogo } from './BeyondIPLogo';
+import { compressIPv6, isValidIP } from '../utils/ipCalculator';
 import { muted, primaryButton, secondaryButton } from './ui';
 
 interface HeaderProps {
@@ -19,6 +20,7 @@ interface Result {
   secondary: string;
   tab: ActiveTab;
   search: string;
+  datacenterId?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenReserveNextModal, onToggleMobileMenu }) => {
@@ -26,6 +28,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenRese
 
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  // Highlighted result for the arrow keys; Enter opens it.
+  const [active, setActive] = useState(0);
   const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,10 +41,12 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenRese
   }, []);
 
   const q = query.toLowerCase().trim();
+  // Stored IPv6 addresses are in short form; match a typed long form too.
+  const qIP = isValidIP(q) && q.includes(':') ? compressIPv6(q) : q;
   const results: Result[] = q
     ? [
         ...ips
-          .filter((i) => i.ipAddress.includes(q) || i.assignedDevice.toLowerCase().includes(q))
+          .filter((i) => i.ipAddress.includes(qIP) || i.assignedDevice.toLowerCase().includes(q))
           .slice(0, 4)
           .map((i) => ({ key: i.id, icon: Hash, primary: i.ipAddress, secondary: i.assignedDevice || i.status, tab: 'ips' as const, search: i.ipAddress })),
         ...subnets
@@ -54,13 +60,22 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenRese
         ...datacenters
           .filter((d) => d.name.toLowerCase().includes(q) || d.location.toLowerCase().includes(q))
           .slice(0, 2)
-          .map((d) => ({ key: d.id, icon: Building2, primary: d.name, secondary: d.location, tab: 'datacenters' as const, search: '' })),
+          .map((d) => ({ key: d.id, icon: Building2, primary: d.name, secondary: d.location, tab: 'datacenters' as const, search: '', datacenterId: d.id })),
       ]
     : [];
 
-  // The target page reads filters.search when it opens, so the result is pre-filtered.
+  // The target page follows filters.search, so the result is pre-filtered. Every other filter is
+  // cleared, or an earlier choice (IPv4 only, Reserved only, another datacenter) could hide the result.
   const openResult = (r: Result) => {
-    setFilters((prev) => ({ ...prev, search: r.search }));
+    setFilters({
+      search: r.search,
+      datacenterId: r.datacenterId ?? 'All',
+      vlanId: 'All',
+      status: 'All',
+      segmentType: 'All',
+      ipVersion: 'All',
+      subnetId: 'All',
+    });
     setActiveTab(r.tab);
     setQuery('');
     setOpen(false);
@@ -87,14 +102,21 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenRese
             aria-controls="global-search-results"
             placeholder="Search IPs, subnets, VLANs…"
             value={query}
+            aria-activedescendant={open && results[active] ? `search-result-${active}` : undefined}
             onChange={(e) => {
               setQuery(e.target.value);
+              setActive(0);
               setOpen(true);
             }}
             onFocus={() => setOpen(true)}
             onKeyDown={(e) => {
               if (e.key === 'Escape') setOpen(false);
-              if (e.key === 'Enter' && results[0]) openResult(results[0]);
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                setOpen(true);
+                if (results.length) setActive((i) => (i + (e.key === 'ArrowDown' ? 1 : results.length - 1)) % results.length);
+              }
+              if (e.key === 'Enter' && results[active]) openResult(results[active]);
             }}
             className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 pl-9 pr-9 text-sm text-zinc-900 placeholder-zinc-400 focus:border-cyan-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-100 dark:focus:bg-zinc-950"
           />
@@ -114,14 +136,18 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenRese
             {results.length === 0 ? (
               <p className={`py-6 text-center text-sm ${muted}`}>Nothing matches “{query}”.</p>
             ) : (
-              results.map((r) => (
+              results.map((r, i) => (
                 <button
                   key={r.key}
+                  id={`search-result-${i}`}
                   type="button"
                   role="option"
-                  aria-selected={false}
+                  aria-selected={i === active}
                   onClick={() => openResult(r)}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+                  onMouseEnter={() => setActive(i)}
+                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm cursor-pointer ${
+                    i === active ? 'bg-cyan-500/10' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                  }`}
                 >
                   <r.icon className="h-4 w-4 shrink-0 text-zinc-400" />
                   <span className="shrink-0 font-mono font-medium text-zinc-900 dark:text-white">{r.primary}</span>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useIPAM } from '../context/IPAMContext';
 import { Edit, Layers, Plus, Search, Trash2 } from 'lucide-react';
 import { Subnet, VLAN } from '../types/ipam';
@@ -26,6 +26,10 @@ export const VlansView: React.FC<VlansViewProps> = ({ onOpenNewVlanModal, onOpen
   const [dcFilter, setDcFilter] = useState('All');
   // Header search results open this page with filters.search pre-set.
   const [searchFilter, setSearchFilter] = useState(filters.search);
+  useEffect(() => {
+    setSearchFilter(filters.search);
+    setDcFilter('All');
+  }, [filters.search]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const dcName = new Map(datacenters.map((d) => [d.id, d.name]));
