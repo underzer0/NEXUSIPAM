@@ -287,6 +287,25 @@ async function runTestSuite() {
   }
   assert(wrongPassRejected, 'BCrypt authentication correctly rejects incorrect password');
 
+  // Changing a password needs the current one and signs out every other session.
+  const otherSession = db.signIn(testUser.email, 'superSecretPassword99!').session.token;
+  let wrongCurrentRejected = false;
+  try {
+    db.changePassword(testUser.id, 'notMyPassword', 'brandNewPass1', authResult.session.token);
+  } catch {
+    wrongCurrentRejected = true;
+  }
+  assert(wrongCurrentRejected, 'Changing a password requires the current one');
+  db.changePassword(testUser.id, 'superSecretPassword99!', 'brandNewPass1', authResult.session.token);
+  assert(db.signIn(testUser.email, 'brandNewPass1').user.id === testUser.id, 'The new password signs in');
+  assert(
+    db.getUserBySession(otherSession) === null && db.getUserBySession(authResult.session.token)?.id === testUser.id,
+    'Other sessions end; the one used to change it stays',
+  );
+  db.resetPassword('qa-admin', testUser.id, 'temporary1');
+  assert(db.getUserBySession(authResult.session.token) === null, 'An admin reset signs the user out everywhere');
+  assert(db.signIn(testUser.email, 'temporary1').user.id === testUser.id, 'The temporary password signs in');
+
   // Disabling cuts off existing sessions and API keys at once.
   db.updateUserAccess('qa-admin', testUser.id, { status: 'disabled' });
   assert(db.getUserBySession(authResult.session.token) === null, 'Disabled accounts lose their sessions');

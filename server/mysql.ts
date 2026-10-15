@@ -885,6 +885,17 @@ class MySQLEngine {
     }
   }
 
+  // All of a user's sessions, except the one they are using when keepToken is given.
+  public async deleteUserSessions(userId: string, keepToken?: string): Promise<void> {
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
+    try {
+      await this.pool.query('DELETE FROM user_sessions WHERE user_id = ? AND token <> ?', [userId, keepToken ?? '']);
+    } catch (err) {
+      console.error('[MySQL Error] deleteUserSessions:', err);
+      throw err;
+    }
+  }
+
   public async deleteSession(token: string): Promise<void> {
     if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
     try {

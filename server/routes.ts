@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { db } from './db';
+import { db, WrongPasswordError } from './db';
 import { mysqlEngine } from './mysql';
 import { WSAction, UserProfile } from '../src/types/ipam';
 import { parseCIDR } from '../src/utils/ipCalculator';
@@ -20,6 +20,31 @@ function getSessionUser(req: Request): UserProfile | null {
   return db.getUserBySession(token) || db.getUserByApiKey(token);
 }
 
+// Wrong-password limit per account: 5 failures in 15 minutes locks that account's sign-in for the rest of the window.
+// Keyed by account, not IP, because behind the proxy every request arrives from the same address. That means
+// someone can lock a known account for up to 15 minutes; acceptable for an internal tool.
+// shortcut: kept in memory, so a restart clears it and each process counts separately.
+const MAX_FAILURES = 5;
+const FAILURE_WINDOW_MS = 15 * 60 * 1000;
+const failures = new Map<string, { count: number; until: number }>();
+
+function lockedMinutes(key: string): number {
+  const f = failures.get(key);
+  if (!f || f.until <= Date.now()) return 0;
+  return f.count >= MAX_FAILURES ? Math.ceil((f.until - Date.now()) / 60000) : 0;
+}
+
+function recordFailure(key: string): void {
+  // Guessing many made-up emails must not grow this map forever.
+  if (failures.size > 10_000) for (const [k, v] of failures) if (v.until <= Date.now()) failures.delete(k);
+  const f = failures.get(key);
+  if (!f || f.until <= Date.now()) failures.set(key, { count: 1, until: Date.now() + FAILURE_WINDOW_MS });
+  else f.count++;
+}
+
+const tooManyAttempts = (res: Response, minutes: number) =>
+  res.status(429).json({ success: false, error: `Too many wrong passwords. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.` });
+
 // Only what other engineers need to see; never API keys or contact details.
 const publicUser = (u: UserProfile) => ({
   id: u.id,
@@ -35,7 +60,7 @@ const publicUser = (u: UserProfile) => ({
 const adminView = (u: UserProfile) => ({ ...publicUser(u), status: u.status, createdAt: u.createdAt });
 
 // Writes that touch no datacenter; anything else that isn't matched below is admin-only.
-const PERSONAL_WRITES = new Set(['/db/retry', '/auth/signin', '/auth/signout', '/auth/signup', '/user/profile', '/user/generate-api-key']);
+const PERSONAL_WRITES = new Set(['/db/retry', '/auth/signin', '/auth/signout', '/auth/signup', '/user/profile', '/user/password', '/user/generate-api-key']);
 
 // The datacenters a write changes (old and new, for moves), or 'admin' when only admins may make it.
 function datacentersTouched(req: Request): string[] | 'admin' {
@@ -587,12 +612,17 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
   });
 
   router.post('/auth/signin', async (req: Request, res: Response) => {
+    const { email, password } = req.body ?? {};
+    const key = `signin:${String(email ?? '').trim().toLowerCase()}`;
+    const locked = lockedMinutes(key);
+    if (locked) return tooManyAttempts(res, locked);
     try {
-      const { email, password } = req.body;
       const { user, session } = await db.persisted(() => db.signIn(email, password));
+      failures.delete(key);
       res.cookie(SESSION_COOKIE_NAME, session.token, SESSION_COOKIE_OPTIONS);
       res.json({ success: true, data: { user } });
     } catch (err: any) {
+      if (err instanceof WrongPasswordError) recordFailure(key);
       res.status(err.status ?? 401).json({ success: false, error: err.message });
     }
   });
@@ -638,10 +668,43 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
     }
   });
 
+  router.put('/admin/users/:id/password', async (req: Request, res: Response) => {
+    try {
+      const actor = getSessionUser(req)!;
+      await db.persisted(() => db.resetPassword(actor.id, req.params.id, req.body?.password));
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
+    }
+  });
+
   router.delete('/admin/users/:id', async (req: Request, res: Response) => {
     try {
       const actor = getSessionUser(req)!;
       await db.persisted(() => db.deleteUser(actor.id, req.params.id));
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
+    }
+  });
+
+  router.put('/user/password', async (req: Request, res: Response) => {
+    try {
+      // Browser session only, like API keys: a leaked key must not be able to take over the account.
+      const token = req.cookies?.[SESSION_COOKIE_NAME];
+      const currentUser = db.getUserBySession(token);
+      if (!currentUser) return res.status(401).json({ success: false, error: 'Sign in to the web app to change your password' });
+      const key = `password:${currentUser.id}`;
+      const locked = lockedMinutes(key);
+      if (locked) return tooManyAttempts(res, locked);
+      const { currentPassword, newPassword } = req.body ?? {};
+      try {
+        await db.persisted(() => db.changePassword(currentUser.id, currentPassword, newPassword, token));
+      } catch (err) {
+        if (err instanceof WrongPasswordError) recordFailure(key);
+        throw err;
+      }
+      failures.delete(key);
       res.json({ success: true });
     } catch (err: any) {
       res.status(err.status ?? 400).json({ success: false, error: err.message });
