@@ -14,7 +14,7 @@ interface SubnetModalProps {
 const PRESETS = ['10.10.100.0/24', '172.16.50.0/26', 'fd00:10:10::/64', '2001:db8:1000::/64'];
 
 export const SubnetModal: React.FC<SubnetModalProps> = ({ isOpen, onClose, subnetToEdit, defaultDatacenterId }) => {
-  const { datacenters, vlans, createSubnet, updateSubnet } = useIPAM();
+  const { editableDatacenters: datacenters, vlans, createSubnet, updateSubnet } = useIPAM();
   const [cidr, setCidr] = useState('');
   const [datacenterId, setDatacenterId] = useState('');
   const [vlanId, setVlanId] = useState('');

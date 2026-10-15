@@ -22,7 +22,7 @@ interface Result {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenReserveNextModal, onToggleMobileMenu }) => {
-  const { setFilters, datacenters, subnets, ips, vlans, setActiveTab } = useIPAM();
+  const { setFilters, datacenters, subnets, ips, vlans, setActiveTab, editableDatacenters, editableSubnets } = useIPAM();
 
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -134,14 +134,18 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewSubnetModal, onOpenRese
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
-        <button id="btn-quick-reserve-ip" type="button" onClick={onOpenReserveNextModal} className={`${secondaryButton} px-3`} aria-label="Reserve next IP">
-          <BookmarkCheck className="h-4 w-4" />
-          <span className="hidden sm:inline">Reserve IP</span>
-        </button>
-        <button id="btn-quick-new-subnet" type="button" onClick={onOpenNewSubnetModal} className={`${primaryButton} px-3`} aria-label="New subnet">
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">New subnet</span>
-        </button>
+        {editableSubnets.length > 0 && (
+          <button id="btn-quick-reserve-ip" type="button" onClick={onOpenReserveNextModal} className={`${secondaryButton} px-3`} aria-label="Reserve next IP">
+            <BookmarkCheck className="h-4 w-4" />
+            <span className="hidden sm:inline">Reserve IP</span>
+          </button>
+        )}
+        {editableDatacenters.length > 0 && (
+          <button id="btn-quick-new-subnet" type="button" onClick={onOpenNewSubnetModal} className={`${primaryButton} px-3`} aria-label="New subnet">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">New subnet</span>
+          </button>
+        )}
       </div>
     </header>
   );

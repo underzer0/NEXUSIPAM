@@ -19,7 +19,7 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
   onOpenNewSubnetModalForDC,
   onOpenNewVlanModalForDC,
 }) => {
-  const { datacenters, vlans, subnets, ips, deleteDatacenter, setActiveTab, setFilters } = useIPAM();
+  const { datacenters, vlans, subnets, ips, deleteDatacenter, setActiveTab, setFilters, isAdmin, canEditDc } = useIPAM();
 
   const [selectedDcId, setSelectedDcId] = useState<string | null>(datacenters[0]?.id || null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -64,9 +64,11 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
         <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">
           Datacenters <span className={`font-mono text-base font-medium ${muted}`}>{datacenters.length}</span>
         </h1>
-        <button id="btn-add-datacenter" type="button" onClick={onOpenNewDatacenterModal} className={primaryButton}>
-          <Plus className="h-4 w-4" /> New datacenter
-        </button>
+        {isAdmin && (
+          <button id="btn-add-datacenter" type="button" onClick={onOpenNewDatacenterModal} className={primaryButton}>
+            <Plus className="h-4 w-4" /> New datacenter
+          </button>
+        )}
       </div>
 
       {deleteError && (
@@ -79,9 +81,11 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
         <div className={`${card} flex flex-col items-center gap-3 p-12 text-center`}>
           <Building2 className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
           <p className={`text-sm ${muted}`}>No datacenters yet.</p>
-          <button type="button" onClick={onOpenNewDatacenterModal} className={primaryButton}>
-            Create the first one
-          </button>
+          {isAdmin && (
+            <button type="button" onClick={onOpenNewDatacenterModal} className={primaryButton}>
+              Create the first one
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -125,20 +129,22 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
                     ))}
                   </span>
                 </button>
-                <div className="absolute right-3 top-3 flex">
-                  <button type="button" onClick={() => onOpenEditDatacenterModal(dc)} className={`${iconButton} p-1.5`} title="Edit" aria-label={`Edit ${dc.name}`}>
-                    <Edit className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(dc)}
-                    className={`${iconButton} p-1.5 hover:text-rose-600! dark:hover:text-rose-400!`}
-                    title="Delete"
-                    aria-label={`Delete ${dc.name}`}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                {isAdmin && (
+                  <div className="absolute right-3 top-3 flex">
+                    <button type="button" onClick={() => onOpenEditDatacenterModal(dc)} className={`${iconButton} p-1.5`} title="Edit" aria-label={`Edit ${dc.name}`}>
+                      <Edit className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(dc)}
+                      className={`${iconButton} p-1.5 hover:text-rose-600! dark:hover:text-rose-400!`}
+                      title="Delete"
+                      aria-label={`Delete ${dc.name}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -164,12 +170,12 @@ export const DatacentersView: React.FC<DatacentersViewProps> = ({
               >
                 <Hash className="h-4 w-4" /> View IPs
               </button>
-              {onOpenNewVlanModalForDC && (
+              {onOpenNewVlanModalForDC && canEditDc(activeDc.id) && (
                 <button type="button" onClick={() => onOpenNewVlanModalForDC(activeDc.id)} className={secondaryButton}>
                   <Plus className="h-4 w-4" /> VLAN
                 </button>
               )}
-              {onOpenNewSubnetModalForDC && (
+              {onOpenNewSubnetModalForDC && canEditDc(activeDc.id) && (
                 <button type="button" onClick={() => onOpenNewSubnetModalForDC(activeDc.id)} className={primaryButton}>
                   <Plus className="h-4 w-4" /> Subnet
                 </button>

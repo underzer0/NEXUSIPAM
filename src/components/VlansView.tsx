@@ -21,7 +21,7 @@ interface VlansViewProps {
 }
 
 export const VlansView: React.FC<VlansViewProps> = ({ onOpenNewVlanModal, onOpenEditVlanModal }) => {
-  const { vlans, datacenters, subnets, deleteVlan, filters } = useIPAM();
+  const { vlans, datacenters, subnets, deleteVlan, filters, canEditDc, editableDatacenters } = useIPAM();
 
   const [dcFilter, setDcFilter] = useState('All');
   // Header search results open this page with filters.search pre-set.
@@ -66,9 +66,11 @@ export const VlansView: React.FC<VlansViewProps> = ({ onOpenNewVlanModal, onOpen
         <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">
           VLANs <span className={`font-mono text-base font-medium ${muted}`}>{filteredVlans.length}</span>
         </h1>
-        <button id="btn-add-vlan" type="button" onClick={onOpenNewVlanModal} className={primaryButton}>
-          <Plus className="h-4 w-4" /> New VLAN
-        </button>
+        {editableDatacenters.length > 0 && (
+          <button id="btn-add-vlan" type="button" onClick={onOpenNewVlanModal} className={primaryButton}>
+            <Plus className="h-4 w-4" /> New VLAN
+          </button>
+        )}
       </div>
 
       {deleteError && (
@@ -132,7 +134,7 @@ export const VlansView: React.FC<VlansViewProps> = ({ onOpenNewVlanModal, onOpen
         <div className={`${card} flex flex-col items-center gap-3 p-12 text-center`}>
           <Layers className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
           <p className={`text-sm ${muted}`}>{vlans.length === 0 ? 'No VLANs yet.' : 'No VLANs match these filters.'}</p>
-          {vlans.length === 0 && (
+          {vlans.length === 0 && editableDatacenters.length > 0 && (
             <button type="button" onClick={onOpenNewVlanModal} className={primaryButton}>
               Create the first one
             </button>
@@ -172,18 +174,22 @@ export const VlansView: React.FC<VlansViewProps> = ({ onOpenNewVlanModal, onOpen
                     )}
                     {linked.length > 3 && <span className={`${chipNeutral} font-mono`}>+{linked.length - 3}</span>}
                   </div>
-                  <button type="button" onClick={() => onOpenEditVlanModal(vlan)} className={iconButton} title="Edit" aria-label={`Edit VLAN ${vlan.vlanId}`}>
-                    <Edit className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(vlan)}
-                    className={`${iconButton} hover:text-rose-600! dark:hover:text-rose-400!`}
-                    title="Delete"
-                    aria-label={`Delete VLAN ${vlan.vlanId}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {canEditDc(vlan.datacenterId) && (
+                    <>
+                      <button type="button" onClick={() => onOpenEditVlanModal(vlan)} className={iconButton} title="Edit" aria-label={`Edit VLAN ${vlan.vlanId}`}>
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(vlan)}
+                        className={`${iconButton} hover:text-rose-600! dark:hover:text-rose-400!`}
+                        title="Delete"
+                        aria-label={`Delete VLAN ${vlan.vlanId}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </li>
             );

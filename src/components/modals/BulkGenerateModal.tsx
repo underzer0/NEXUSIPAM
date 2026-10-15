@@ -10,7 +10,7 @@ interface BulkGenerateModalProps {
 }
 
 export const BulkGenerateModal: React.FC<BulkGenerateModalProps> = ({ isOpen, onClose, subnet }) => {
-  const { subnets, bulkGenerateIPs } = useIPAM();
+  const { editableSubnets: subnets, bulkGenerateIPs } = useIPAM();
   const [subnetId, setSubnetId] = useState('');
   const [count, setCount] = useState('10');
   const [startingOffset, setStartingOffset] = useState('1');

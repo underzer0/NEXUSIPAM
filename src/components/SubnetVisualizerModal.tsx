@@ -19,7 +19,7 @@ const STATUSES: IPStatus[] = ['Active', 'Reserved', 'Available'];
 const MAX_CELLS = 256;
 
 export const SubnetVisualizerModal: React.FC<SubnetVisualizerModalProps> = ({ subnet, onClose }) => {
-  const { ips, datacenters, vlans, updateIP, createIP, deleteIP } = useIPAM();
+  const { ips, datacenters, vlans, updateIP, createIP, deleteIP, canEditDc } = useIPAM();
   const [selectedIP, setSelectedIP] = useState<string | null>(null);
   const [editStatus, setEditStatus] = useState<IPStatus>('Active');
   const [editDevice, setEditDevice] = useState('');
@@ -31,6 +31,7 @@ export const SubnetVisualizerModal: React.FC<SubnetVisualizerModalProps> = ({ su
   if (!subnet) return null;
 
   const dcName = datacenters.find((d) => d.id === subnet.datacenterId)?.name;
+  const editable = canEditDc(subnet.datacenterId);
   const vlan = subnet.vlanId ? vlans.find((v) => v.id === subnet.vlanId) : null;
   let usable = '';
   try {
@@ -145,29 +146,36 @@ export const SubnetVisualizerModal: React.FC<SubnetVisualizerModalProps> = ({ su
                   </button>
                 </div>
                 <FormError message={error} />
-                <Field label="Status">
-                  <select value={editStatus} onChange={(e) => setEditStatus(e.target.value as IPStatus)} className={fieldInput}>
-                    {STATUSES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Device">
-                  <input value={editDevice} onChange={(e) => setEditDevice(e.target.value)} className={`${fieldInput} font-mono`} />
-                </Field>
-                <Field label="Note">
-                  <input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className={fieldInput} />
-                </Field>
-                <div className="flex items-center gap-2 pt-1">
-                  {selectedRecord && (
-                    <button type="button" onClick={handleRelease} className="text-sm font-medium text-rose-600 hover:underline dark:text-rose-400 cursor-pointer">
-                      Release
+                {/* Read-only for people without edit rights in this datacenter; the server enforces it too. */}
+                <fieldset disabled={!editable} className="space-y-3 disabled:opacity-70">
+                  <Field label="Status">
+                    <select value={editStatus} onChange={(e) => setEditStatus(e.target.value as IPStatus)} className={fieldInput}>
+                      {STATUSES.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Device">
+                    <input value={editDevice} onChange={(e) => setEditDevice(e.target.value)} className={`${fieldInput} font-mono`} />
+                  </Field>
+                  <Field label="Note">
+                    <input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className={fieldInput} />
+                  </Field>
+                </fieldset>
+                {editable ? (
+                  <div className="flex items-center gap-2 pt-1">
+                    {selectedRecord && (
+                      <button type="button" onClick={handleRelease} className="text-sm font-medium text-rose-600 hover:underline dark:text-rose-400 cursor-pointer">
+                        Release
+                      </button>
+                    )}
+                    <button type="submit" disabled={saving} className={`${primaryButton} ml-auto disabled:opacity-50`}>
+                      {saving ? 'Saving…' : 'Save'}
                     </button>
-                  )}
-                  <button type="submit" disabled={saving} className={`${primaryButton} ml-auto disabled:opacity-50`}>
-                    {saving ? 'Saving…' : 'Save'}
-                  </button>
-                </div>
+                  </div>
+                ) : (
+                  <p className={`text-xs ${muted}`}>Read only: you don't have edit rights in {dcName ?? 'this datacenter'}.</p>
+                )}
               </form>
             ) : (
               <div className={`flex h-full flex-col items-center justify-center gap-2 py-8 text-center text-sm ${muted}`}>

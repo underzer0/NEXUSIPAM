@@ -56,7 +56,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenNewSubnetModal,
   onOpenAuditLogs,
 }) => {
-  const { stats, datacenters, subnets, ips, vlans, activityLogs, setActiveTab, setFilters } = useIPAM();
+  const { stats, datacenters, subnets, ips, vlans, activityLogs, setActiveTab, setFilters, editableDatacenters } = useIPAM();
 
   const [selectedProtocol, setSelectedProtocol] = useState<IPVersion>(() => {
     try {
@@ -184,9 +184,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex flex-col items-center gap-3 py-8 text-center">
             <Network className="h-8 w-8 text-zinc-300 dark:text-zinc-700" />
             <p className={`text-sm ${muted}`}>No {selectedProtocol} subnets yet.</p>
-            <button type="button" onClick={onOpenNewSubnetModal} className={primaryButton}>
-              Create the first one
-            </button>
+            {editableDatacenters.length > 0 && (
+              <button type="button" onClick={onOpenNewSubnetModal} className={primaryButton}>
+                Create the first one
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex flex-wrap gap-1.5">

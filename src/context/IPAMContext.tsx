@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { Datacenter, VLAN, Subnet, IPAddress, ActivityLog, IPAMStats, FilterState, WSMessage, SegmentType, IPStatus, UserProfile } from '../types/ipam';
 
 export type ActiveTab = 'dashboard' | 'datacenters' | 'vlans' | 'subnets' | 'ips' | 'tools' | 'admin' | 'profile' | 'signup' | 'signin';
@@ -63,6 +63,9 @@ interface IPAMContextType {
   isAdmin: boolean;
   // Whether the signed-in user may change subnets, VLANs and IPs in this datacenter.
   canEditDc: (datacenterId?: string) => boolean;
+  // What the user may change, for pickers in dialogs; stable between renders.
+  editableDatacenters: Datacenter[];
+  editableSubnets: Subnet[];
 
   createDatacenter: (data: { name: string; location: string; description: string }) => Promise<Datacenter>;
   updateDatacenter: (id: string, data: { name?: string; location?: string; description?: string }) => Promise<Datacenter>;
@@ -616,6 +619,15 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const isAdmin = currentUser.access === 'admin';
   const canEditDc = (datacenterId?: string) => isAdmin || (!!datacenterId && currentUser.datacenterIds.includes(datacenterId));
+  const editableDatacenters = useMemo(
+    () => (isAdmin ? datacenters : datacenters.filter((dc) => currentUser.datacenterIds.includes(dc.id))),
+    [isAdmin, datacenters, currentUser.datacenterIds],
+  );
+  const editableSubnets = useMemo(() => {
+    if (isAdmin) return subnets;
+    const ids = new Set(editableDatacenters.map((dc) => dc.id));
+    return subnets.filter((s) => ids.has(s.datacenterId));
+  }, [isAdmin, subnets, editableDatacenters]);
 
   return (
     <IPAMContext.Provider
@@ -648,6 +660,8 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAuthNotice,
         isAdmin,
         canEditDc,
+        editableDatacenters,
+        editableSubnets,
         createDatacenter,
         updateDatacenter,
         deleteDatacenter,

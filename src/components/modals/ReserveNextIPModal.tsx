@@ -11,7 +11,7 @@ interface ReserveNextIPModalProps {
 }
 
 export const ReserveNextIPModal: React.FC<ReserveNextIPModalProps> = ({ isOpen, onClose, defaultSubnetId }) => {
-  const { subnets, reserveNextIP, getNextAvailableIP } = useIPAM();
+  const { editableSubnets: subnets, reserveNextIP, getNextAvailableIP } = useIPAM();
   const [subnetId, setSubnetId] = useState('');
   const [assignedDevice, setAssignedDevice] = useState('');
   const [description, setDescription] = useState('');

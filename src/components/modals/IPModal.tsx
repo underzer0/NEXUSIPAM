@@ -14,7 +14,7 @@ interface IPModalProps {
 const STATUSES: IPStatus[] = ['Active', 'Reserved', 'Available'];
 
 export const IPModal: React.FC<IPModalProps> = ({ isOpen, onClose, ipToEdit, defaultSubnetId }) => {
-  const { subnets, createIP, updateIP } = useIPAM();
+  const { editableSubnets: subnets, createIP, updateIP } = useIPAM();
   const [subnetId, setSubnetId] = useState('');
   const [ipAddress, setIpAddress] = useState('');
   const [status, setStatus] = useState<IPStatus>('Active');

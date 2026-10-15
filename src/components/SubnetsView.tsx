@@ -29,7 +29,7 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
   onOpenReserveNextModal,
   onOpenBulkGenerateModal,
 }) => {
-  const { subnets, datacenters, vlans, ips, deleteSubnet, filters } = useIPAM();
+  const { subnets, datacenters, vlans, ips, deleteSubnet, filters, canEditDc, editableDatacenters } = useIPAM();
 
   const [dcFilter, setDcFilter] = useState('All');
   const [segmentFilter, setSegmentFilter] = useState('All');
@@ -117,7 +117,7 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
         <div className={`${card} flex flex-col items-center gap-3 p-12 text-center`}>
           <Network className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
           <p className={`text-sm ${muted}`}>{subnets.length === 0 ? 'No subnets yet.' : 'No subnets match these filters.'}</p>
-          {subnets.length === 0 && (
+          {subnets.length === 0 && editableDatacenters.length > 0 && (
             <button type="button" onClick={onOpenNewSubnetModal} className={primaryButton}>
               Create the first one
             </button>
@@ -166,24 +166,28 @@ export const SubnetsView: React.FC<SubnetsViewProps> = ({
                   <span className={`mr-auto pl-2 font-mono text-xs ${muted}`}>
                     {used} / {formatCount(usable)}
                   </span>
-                  <button type="button" onClick={() => onOpenReserveNextModal(subnet.id)} className={iconButton} title="Reserve next IP" aria-label="Reserve next IP">
-                    <BookmarkCheck className="h-4 w-4" />
-                  </button>
-                  <button type="button" onClick={() => onOpenBulkGenerateModal(subnet)} className={iconButton} title="Bulk add IPs" aria-label="Bulk add IPs">
-                    <Database className="h-4 w-4" />
-                  </button>
-                  <button type="button" onClick={() => onOpenEditSubnetModal(subnet)} className={iconButton} title="Edit" aria-label="Edit subnet">
-                    <Edit className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(subnet)}
-                    className={`${iconButton} hover:text-rose-600! dark:hover:text-rose-400!`}
-                    title="Delete"
-                    aria-label="Delete subnet"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {canEditDc(subnet.datacenterId) && (
+                    <>
+                      <button type="button" onClick={() => onOpenReserveNextModal(subnet.id)} className={iconButton} title="Reserve next IP" aria-label="Reserve next IP">
+                        <BookmarkCheck className="h-4 w-4" />
+                      </button>
+                      <button type="button" onClick={() => onOpenBulkGenerateModal(subnet)} className={iconButton} title="Bulk add IPs" aria-label="Bulk add IPs">
+                        <Database className="h-4 w-4" />
+                      </button>
+                      <button type="button" onClick={() => onOpenEditSubnetModal(subnet)} className={iconButton} title="Edit" aria-label="Edit subnet">
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(subnet)}
+                        className={`${iconButton} hover:text-rose-600! dark:hover:text-rose-400!`}
+                        title="Delete"
+                        aria-label="Delete subnet"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </li>
             );
