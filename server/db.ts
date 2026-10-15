@@ -1634,7 +1634,7 @@ class IPAMDatabase {
     const cleanEmail = email.trim().toLowerCase();
     const user = this.users.find(u => u.email.toLowerCase() === cleanEmail);
     if (!user) {
-      throw new Error('Invalid email or password.');
+      throw new WrongPasswordError('Invalid email or password.');
     }
 
     const storedHash = this.passwordHashes.get(user.id);
@@ -1645,7 +1645,7 @@ class IPAMDatabase {
     // SECURE CRYPTOGRAPHY: BCrypt constant-time comparison
     const isMatch = verifyPasswordSync(password, storedHash);
     if (!isMatch) {
-      throw new Error('Invalid email or password.');
+      throw new WrongPasswordError('Invalid email or password.');
     }
     // Checked after the password so these messages don't reveal which emails exist.
     if (user.status === 'pending') throw new Error('Your account is waiting for an admin to approve it.');
@@ -1734,7 +1734,7 @@ class IPAMDatabase {
   public changePassword(userId: string, currentPassword: string, newPassword: string, keepToken: string): void {
     const user = this.users.find(u => u.id === userId);
     if (!user) throw new Error('User not found');
-    if (!verifyPasswordSync(currentPassword ?? '', this.passwordHashes.get(userId) ?? '')) throw new Error('Your current password is wrong.');
+    if (!verifyPasswordSync(currentPassword ?? '', this.passwordHashes.get(userId) ?? '')) throw new WrongPasswordError('Your current password is wrong.');
     this.setPassword(user, newPassword, keepToken);
     this.logActivity('UPDATE', 'User', user.id, `Password Changed: ${user.name}`, `${user.email} changed their password`);
   }
@@ -1787,6 +1787,9 @@ class IPAMDatabase {
     return null;
   }
 }
+
+// Thrown only for a wrong email or password, so the routes can count failed attempts.
+export class WrongPasswordError extends Error {}
 
 export class DatabaseWriteError extends Error {
   status = 503;
