@@ -180,6 +180,8 @@ export type WSAction =
   | 'BULK_IPS_CREATED'
   | 'ACTIVITY_LOG'
   | 'USER_UPDATED'
+  // Number of sign-up requests waiting for approval; only admins show it.
+  | 'PENDING_REQUESTS'
   | 'USER_CREATED';
 
 export interface WSMessage {

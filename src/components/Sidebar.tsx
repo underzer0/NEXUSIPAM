@@ -17,7 +17,7 @@ const initials = (n: string) => {
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, isMobileOpen = false, onMobileClose }) => {
-  const { activeTab, setActiveTab, datacenters, vlans, subnets, ips, currentUser, wsConnected, isDark, toggleTheme, isAdmin } = useIPAM();
+  const { activeTab, setActiveTab, datacenters, vlans, subnets, ips, currentUser, wsConnected, isDark, toggleTheme, isAdmin, pendingRequests } = useIPAM();
 
   const navItems = [
     { id: 'dashboard' as const, label: 'Overview', icon: LayoutDashboard, count: null },
@@ -71,9 +71,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, isMob
                 }`}
               >
                 {isActive && <span className="absolute inset-y-1.5 -left-3 w-0.5 rounded-full bg-cyan-400" aria-hidden />}
-                <Icon className="h-[18px] w-[18px] shrink-0" />
+                <span className="relative shrink-0">
+                  <Icon className="h-[18px] w-[18px]" />
+                  {/* Collapsed sidebar: a dot says requests are waiting */}
+                  {id === 'admin' && pendingRequests > 0 && !expanded && (
+                    <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-amber-400" aria-label={`${pendingRequests} requests waiting`} />
+                  )}
+                </span>
                 {expanded && <span className="flex-1 truncate text-left">{label}</span>}
                 {expanded && count !== null && <span className={`font-mono text-xs ${muted}`}>{count}</span>}
+                {expanded && id === 'admin' && pendingRequests > 0 && (
+                  <span className="rounded-full bg-amber-400 px-1.5 font-mono text-[11px] font-semibold text-zinc-950" title={`${pendingRequests} requests waiting`}>
+                    {pendingRequests}
+                  </span>
+                )}
               </button>
             );
           })}

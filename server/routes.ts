@@ -222,6 +222,7 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
           stats,
           activityLogs,
           currentUser,
+          pendingRequests: currentUser.access === 'admin' ? db.getPendingRequestCount() : 0,
         },
       });
     } catch (err: any) {
@@ -644,6 +645,7 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
       const user = await db.persisted(() =>
         db.createUser({ name, email, password, role, department, organization, location, phone, bio, primaryDatacenterId }),
       );
+      broadcast('PENDING_REQUESTS', { count: db.getPendingRequestCount() });
       // A request, not a sign-in: no session until an admin approves it.
       res.status(201).json({ success: true, data: { pending: true, email: user.email } });
     } catch (err: any) {
@@ -662,6 +664,7 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
       const actor = getSessionUser(req)!;
       const updated = await db.persisted(() => db.updateUserAccess(actor.id, req.params.id, { access, status, datacenterIds }));
       broadcast('USER_UPDATED', publicUser(updated));
+      broadcast('PENDING_REQUESTS', { count: db.getPendingRequestCount() });
       res.json({ success: true, data: adminView(updated) });
     } catch (err: any) {
       res.status(err.status ?? 400).json({ success: false, error: err.message });
@@ -682,6 +685,7 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
     try {
       const actor = getSessionUser(req)!;
       await db.persisted(() => db.deleteUser(actor.id, req.params.id));
+      broadcast('PENDING_REQUESTS', { count: db.getPendingRequestCount() });
       res.json({ success: true });
     } catch (err: any) {
       res.status(err.status ?? 400).json({ success: false, error: err.message });
