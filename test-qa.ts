@@ -220,15 +220,26 @@ async function runTestSuite() {
   // TEST SUITE 9: Cryptographic Security & Password Hashing
   // ----------------------------------------------------
   console.log('\n📌 Test Suite 9: Cryptography & Zero-Plaintext Security');
-  const userResult = db.createUser({
+  const testUser = db.createUser({
     name: 'Security QA Engineer',
     email: `security.qa.${Date.now()}@beyondip.net`,
     password: 'superSecretPassword99!',
     role: 'Security Architect',
   });
-  const testUser = userResult.user;
   assert(!!testUser.id, 'User created successfully with unique ID');
   assert(testUser.email.includes('@beyondip.net'), 'User email formatted correctly');
+
+  // Sign-up is a request: no sign-in until an admin approves it.
+  assert(testUser.status === 'pending' && testUser.access === 'member', 'Sign-ups start as pending members');
+  let pendingRejected = false;
+  try {
+    db.signIn(testUser.email, 'superSecretPassword99!');
+  } catch (err: any) {
+    pendingRejected = /approve/.test(err.message);
+  }
+  assert(pendingRejected, 'Pending accounts cannot sign in');
+  db.updateUserAccess('qa-admin', testUser.id, { status: 'active' });
+  assert(testUser.status === 'active', 'An admin can approve a request');
   assert(testUser.apiKey === '', 'New users start without an API key');
   const firstKey = db.generateApiKey(testUser.id);
   assert(firstKey.startsWith('bip_') && testUser.apiKey !== firstKey, 'API key is returned once and only a masked form is kept');
@@ -248,7 +259,19 @@ async function runTestSuite() {
     assert(refused?.status === 503, 'Changes are refused with 503 while the database is disconnected');
     assert(!db.getDatacenters().some((d) => d.name === 'Unsaved DC'), 'A refused change never reaches memory');
   }
-  assert(!!userResult.session.token, 'Session token generated successfully');
+
+  // Datacenter rights: members edit only what they were given; admins edit everything.
+  assert(!db.canEditDatacenter(testUser, 'dc-anywhere'), 'Members cannot edit datacenters they were not given');
+  testUser.datacenterIds = ['dc-anywhere'];
+  assert(db.canEditDatacenter(testUser, 'dc-anywhere'), 'Members can edit their assigned datacenters');
+  assert(db.canEditDatacenter({ ...testUser, access: 'admin', datacenterIds: [] }, 'dc-anywhere'), 'Admins can edit every datacenter');
+  let selfChangeRejected = false;
+  try {
+    db.updateUserAccess(testUser.id, testUser.id, { access: 'admin' });
+  } catch {
+    selfChangeRejected = true;
+  }
+  assert(selfChangeRejected && testUser.access === 'member', 'Users cannot raise their own access level');
 
   // Verify BCrypt sign in
   const authResult = db.signIn(testUser.email, 'superSecretPassword99!');
@@ -263,6 +286,13 @@ async function runTestSuite() {
     wrongPassRejected = true;
   }
   assert(wrongPassRejected, 'BCrypt authentication correctly rejects incorrect password');
+
+  // Disabling cuts off existing sessions and API keys at once.
+  db.updateUserAccess('qa-admin', testUser.id, { status: 'disabled' });
+  assert(db.getUserBySession(authResult.session.token) === null, 'Disabled accounts lose their sessions');
+  assert(db.getUserByApiKey(secondKey) === null, 'Disabled accounts lose their API keys');
+  db.deleteUser('qa-admin', testUser.id);
+  assert(!db.getUserById(testUser.id), 'An admin can delete an account');
 
   // ----------------------------------------------------
   // SUMMARY

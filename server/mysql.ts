@@ -4,6 +4,15 @@ import path from 'path';
 import { Datacenter, VLAN, Subnet, IPAddress, ActivityLog, UserProfile } from '../src/types/ipam';
 import { hashPasswordSync, isBcryptHash, API_KEY_PREFIX } from './crypto';
 
+const parseIdList = (raw: unknown): string[] => {
+  try {
+    const list = JSON.parse(String(raw ?? '[]'));
+    return Array.isArray(list) ? list.map(String) : [];
+  } catch {
+    return [];
+  }
+};
+
 export interface MySQLConfig {
   host: string;
   port: number;
@@ -327,6 +336,9 @@ class MySQLEngine {
           api_key_hash VARCHAR(255) NULL,
           api_key_encrypted TEXT NULL,
           api_key_masked VARCHAR(64) NULL,
+          access VARCHAR(16) NOT NULL DEFAULT 'member',
+          status VARCHAR(16) NOT NULL DEFAULT 'active',
+          datacenter_ids TEXT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           INDEX idx_user_email (email)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -353,6 +365,28 @@ class MySQLEngine {
           CONSTRAINT fk_session_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
+
+      // Databases from before access control lack these columns. Existing users keep working:
+      // the seeded admin becomes admin, everyone else a member who can edit every current datacenter.
+      const [accessCol] = await this.pool.query<RowDataPacket[]>(
+        `SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'access'`,
+      );
+      if (accessCol.length === 0) {
+        await this.pool.query(
+          `ALTER TABLE users
+             ADD COLUMN access VARCHAR(16) NOT NULL DEFAULT 'member',
+             ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'active',
+             ADD COLUMN datacenter_ids TEXT NULL`,
+        );
+        const [dcRows] = await this.pool.query<RowDataPacket[]>('SELECT id FROM datacenters');
+        await this.pool.query('UPDATE users SET datacenter_ids = ?', [JSON.stringify(dcRows.map((r) => r.id))]);
+        await this.pool.query(`UPDATE users SET access = 'admin', datacenter_ids = '[]' WHERE id = 'usr-admin-default'`);
+        // If the seeded admin was deleted, the oldest account becomes admin so someone can approve requests.
+        await this.pool.query(
+          `UPDATE users SET access = 'admin' WHERE NOT EXISTS (SELECT 1 FROM (SELECT id FROM users WHERE access = 'admin') a) ORDER BY created_at LIMIT 1`,
+        );
+        console.log('[MySQL] Added access control columns; existing users can edit all current datacenters.');
+      }
 
       // Wipe API keys from before hashing-only storage (nx_live_, kept decryptable). They no longer
       // sign requests; only bip_ keys, stored as a hash with no encrypted copy, are kept.
@@ -592,6 +626,9 @@ class MySQLEngine {
           collisionAlerts: Boolean(r.collision_alerts),
           exhaustionAlerts: Boolean(r.exhaustion_alerts),
           themePreference: r.theme_preference || 'dark',
+          access: r.access === 'admin' ? 'admin' : 'member',
+          status: r.status === 'pending' || r.status === 'disabled' ? r.status : 'active',
+          datacenterIds: parseIdList(r.datacenter_ids),
           apiKey: hasKey ? r.api_key_masked : '',
           createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
         };
@@ -763,8 +800,8 @@ class MySQLEngine {
         `INSERT INTO users (
            id, name, email, password_hash, role, department, organization, location, phone, bio,
            primary_datacenter_id, two_factor_enabled, email_notifications, collision_alerts, exhaustion_alerts,
-           theme_preference, api_key_hash, api_key_encrypted, api_key_masked, created_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           theme_preference, api_key_hash, api_key_encrypted, api_key_masked, access, status, datacenter_ids, created_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            name = VALUES(name), email = VALUES(email), password_hash = VALUES(password_hash),
            role = VALUES(role), department = VALUES(department), organization = VALUES(organization),
@@ -773,7 +810,8 @@ class MySQLEngine {
            email_notifications = VALUES(email_notifications), collision_alerts = VALUES(collision_alerts),
            exhaustion_alerts = VALUES(exhaustion_alerts), theme_preference = VALUES(theme_preference),
            api_key_hash = VALUES(api_key_hash), api_key_encrypted = VALUES(api_key_encrypted),
-           api_key_masked = VALUES(api_key_masked)`,
+           api_key_masked = VALUES(api_key_masked), access = VALUES(access), status = VALUES(status),
+           datacenter_ids = VALUES(datacenter_ids)`,
         [
           user.id,
           user.name,
@@ -794,11 +832,25 @@ class MySQLEngine {
           apiKeyHash,
           null,
           apiKeyHash ? user.apiKey || null : null,
+          user.access,
+          user.status,
+          JSON.stringify(user.datacenterIds),
           new Date(user.createdAt),
         ]
       );
     } catch (err) {
       console.error('[MySQL Error] saveUser:', err);
+      throw err;
+    }
+  }
+
+  public async deleteUser(id: string): Promise<void> {
+    if (!this.pool || !this.isConnected) throw new Error('MySQL is not connected');
+    try {
+      // Sessions go with it (ON DELETE CASCADE).
+      await this.pool.query('DELETE FROM users WHERE id = ?', [id]);
+    } catch (err) {
+      console.error('[MySQL Error] deleteUser:', err);
       throw err;
     }
   }

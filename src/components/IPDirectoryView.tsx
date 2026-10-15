@@ -28,7 +28,7 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
   onOpenEditIPModal,
   onOpenBulkGenerateModal,
 }) => {
-  const { ips, subnets, datacenters, vlans, deleteIP, filters, setFilters, resetFilters } = useIPAM();
+  const { ips, subnets, datacenters, vlans, deleteIP, filters, setFilters, resetFilters, canEditDc, editableSubnets } = useIPAM();
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [limit, setLimit] = useState(PAGE);
@@ -92,12 +92,16 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
           IP addresses <span className={`font-mono text-base font-medium ${muted}`}>{filteredIPs.length}</span>
         </h1>
         <div className="flex flex-wrap gap-2">
-          <button id="btn-bulk-generate-ips" type="button" onClick={onOpenBulkGenerateModal} className={secondaryButton}>
-            <Database className="h-4 w-4" /> Bulk add
-          </button>
-          <button id="btn-add-ip" type="button" onClick={onOpenNewIPModal} className={primaryButton}>
-            <Plus className="h-4 w-4" /> Assign IP
-          </button>
+          {editableSubnets.length > 0 && (
+            <>
+              <button id="btn-bulk-generate-ips" type="button" onClick={onOpenBulkGenerateModal} className={secondaryButton}>
+                <Database className="h-4 w-4" /> Bulk add
+              </button>
+              <button id="btn-add-ip" type="button" onClick={onOpenNewIPModal} className={primaryButton}>
+                <Plus className="h-4 w-4" /> Assign IP
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -171,7 +175,7 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
         <div className={`${card} flex flex-col items-center gap-3 p-12 text-center`}>
           <Hash className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
           <p className={`text-sm ${muted}`}>{ips.length === 0 ? 'No IP addresses yet.' : 'No IP addresses match these filters.'}</p>
-          {ips.length === 0 && (
+          {ips.length === 0 && editableSubnets.length > 0 && (
             <button type="button" onClick={onOpenNewIPModal} className={primaryButton}>
               Assign the first one
             </button>
@@ -226,18 +230,22 @@ export const IPDirectoryView: React.FC<IPDirectoryViewProps> = ({
                     </p>
                   </div>
                   <div className="col-span-2 flex justify-end gap-0.5 md:col-span-1">
-                    <button type="button" onClick={() => onOpenEditIPModal(ip)} className={iconButton} title="Edit" aria-label={`Edit ${ip.ipAddress}`}>
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(ip)}
-                      className={`${iconButton} hover:text-rose-600! dark:hover:text-rose-400!`}
-                      title="Remove"
-                      aria-label={`Remove ${ip.ipAddress}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {canEditDc(subnet.datacenterId) && (
+                      <>
+                        <button type="button" onClick={() => onOpenEditIPModal(ip)} className={iconButton} title="Edit" aria-label={`Edit ${ip.ipAddress}`}>
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(ip)}
+                          className={`${iconButton} hover:text-rose-600! dark:hover:text-rose-400!`}
+                          title="Remove"
+                          aria-label={`Remove ${ip.ipAddress}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </li>
               );

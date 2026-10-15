@@ -225,6 +225,9 @@ class IPAMDatabase {
       name: 'System Administrator',
       email: 'admin@beyondip.internal',
       role: 'Super Administrator',
+      access: 'admin',
+      status: 'active',
+      datacenterIds: [],
       department: 'Infrastructure & Cloud Ops',
       organization: 'BeyondIP Enterprise',
       location: 'Corporate HQ',
@@ -1517,7 +1520,7 @@ class IPAMDatabase {
       return null;
     }
     const user = this.getUserById(session.userId);
-    return user || null;
+    return user?.status === 'active' ? user : null;
   }
 
   public deleteSession(token?: string): void {
@@ -1575,7 +1578,7 @@ class IPAMDatabase {
     bio?: string;
     primaryDatacenterId?: string;
     password?: string;
-  }): { user: UserProfile; session: { token: string; expiresAt: Date } } {
+  }): UserProfile {
     if (!data.name?.trim()) throw new Error('Full Name is required');
     if (!data.email?.trim()) throw new Error('Email address is required');
 
@@ -1591,6 +1594,9 @@ class IPAMDatabase {
       name: data.name.trim(),
       email,
       role: data.role?.trim() || 'Senior Network Engineer',
+      access: 'member',
+      status: 'pending',
+      datacenterIds: [],
       department: data.department?.trim() || 'Infrastructure Engineering',
       organization: data.organization?.trim() || 'BeyondIP Enterprise',
       location: data.location?.trim() || 'Corporate Headquarters',
@@ -1612,15 +1618,11 @@ class IPAMDatabase {
     this.passwordHashes.set(newUser.id, bcryptHash);
 
     this.users.push(newUser);
-    this.logActivity('CREATE', 'User', newUser.id, `New Account Created: ${newUser.name}`, `Registered ${newUser.email} with ${newUser.role} role`);
+    this.logActivity('CREATE', 'User', newUser.id, `Account Requested: ${newUser.name}`, `${newUser.email} is waiting for admin approval`);
     this.persist();
-    
-    // Save to MySQL with salted hash
     this.track(mysqlEngine.saveUser(newUser, bcryptHash, null));
-    
-    // Create new session
-    const session = this.createSession(newUser.id);
-    return { user: newUser, session };
+    // No session: the request can't sign in until an admin approves it.
+    return newUser;
   }
 
   public signIn(email: string, password: string): { user: UserProfile; session: { token: string; expiresAt: Date } } {
@@ -1643,6 +1645,9 @@ class IPAMDatabase {
     if (!isMatch) {
       throw new Error('Invalid email or password.');
     }
+    // Checked after the password so these messages don't reveal which emails exist.
+    if (user.status === 'pending') throw new Error('Your account is waiting for an admin to approve it.');
+    if (user.status === 'disabled') throw new Error('This account has been disabled. Contact an admin.');
 
     this.logActivity('UPDATE', 'User', user.id, `Engineer Authenticated: ${user.name}`, `Logged into IPAM session as ${user.email}`);
     
@@ -1658,6 +1663,67 @@ class IPAMDatabase {
     }
     this.deleteSession(token);
     return true;
+  }
+
+  public canEditDatacenter(user: UserProfile, datacenterId: string | undefined): boolean {
+    return user.access === 'admin' || (!!datacenterId && user.datacenterIds.includes(datacenterId));
+  }
+
+  // Admin panel: approve, (dis)able, change access level and datacenter rights.
+  public updateUserAccess(
+    actorId: string,
+    id: string,
+    data: Partial<Pick<UserProfile, 'access' | 'status' | 'datacenterIds'>>,
+  ): UserProfile {
+    const user = this.users.find(u => u.id === id);
+    if (!user) throw new Error('User not found');
+    if (id === actorId && ((data.access && data.access !== user.access) || (data.status && data.status !== user.status))) {
+      throw new Error("You can't change your own access level or status.");
+    }
+    if (data.access !== undefined && !['admin', 'member'].includes(data.access)) throw new Error('Access must be admin or member.');
+    if (data.status !== undefined && !['pending', 'active', 'disabled'].includes(data.status)) throw new Error('Unknown account status.');
+    if (data.datacenterIds !== undefined) {
+      if (!Array.isArray(data.datacenterIds)) throw new Error('datacenterIds must be a list.');
+      const unknown = data.datacenterIds.find(dcId => !this.getDatacenterById(dcId));
+      if (unknown) throw new Error(`Datacenter ${unknown} does not exist.`);
+    }
+    const losesAdmin = user.access === 'admin' && user.status === 'active' && (data.access === 'member' || (data.status && data.status !== 'active'));
+    if (losesAdmin && this.users.filter(u => u.access === 'admin' && u.status === 'active').length === 1) {
+      throw new Error('There must be at least one active admin.');
+    }
+
+    const wasPending = user.status === 'pending';
+    if (data.access !== undefined) user.access = data.access;
+    if (data.status !== undefined) user.status = data.status;
+    if (data.datacenterIds !== undefined) user.datacenterIds = [...new Set(data.datacenterIds.map(String))];
+    if (user.status !== 'active') this.deleteSessionsFor(user.id);
+
+    const what = wasPending && user.status === 'active' ? 'Account Approved' : 'Access Updated';
+    this.logActivity('UPDATE', 'User', user.id, `${what}: ${user.name}`, `${user.access}, ${user.status}, ${user.datacenterIds.length} datacenter(s)`);
+    this.persist();
+    this.track(mysqlEngine.saveUser(user, this.passwordHashes.get(user.id) ?? '', this.apiKeyHashes.get(user.id) ?? null));
+    return user;
+  }
+
+  public deleteUser(actorId: string, id: string): void {
+    const user = this.users.find(u => u.id === id);
+    if (!user) throw new Error('User not found');
+    if (id === actorId) throw new Error("You can't delete your own account.");
+    if (user.access === 'admin' && user.status === 'active' && this.users.filter(u => u.access === 'admin' && u.status === 'active').length === 1) {
+      throw new Error('There must be at least one active admin.');
+    }
+    this.users = this.users.filter(u => u.id !== id);
+    this.passwordHashes.delete(id);
+    this.apiKeyHashes.delete(id);
+    this.deleteSessionsFor(id);
+    this.logActivity('DELETE', 'User', id, `Account Deleted: ${user.name}`, `Removed ${user.email}`);
+    this.persist();
+    this.track(mysqlEngine.deleteUser(id));
+  }
+
+  // In memory only: MySQL drops a user's sessions with the account, and getUserBySession ignores inactive users.
+  private deleteSessionsFor(userId: string): void {
+    for (const [token, session] of this.sessions) if (session.userId === userId) this.sessions.delete(token);
   }
 
   public generateApiKey(userId: string): string {
@@ -1680,7 +1746,10 @@ class IPAMDatabase {
     if (!key?.startsWith(API_KEY_PREFIX)) return null;
     const keyHash = hashSensitiveData(key);
     for (const [userId, stored] of this.apiKeyHashes) {
-      if (stored === keyHash) return this.getUserById(userId) || null;
+      if (stored === keyHash) {
+        const user = this.getUserById(userId);
+        return user?.status === 'active' ? user : null;
+      }
     }
     return null;
   }

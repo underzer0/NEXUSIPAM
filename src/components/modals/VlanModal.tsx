@@ -11,7 +11,7 @@ interface VlanModalProps {
 }
 
 export const VlanModal: React.FC<VlanModalProps> = ({ isOpen, onClose, vlanToEdit, defaultDatacenterId }) => {
-  const { datacenters, createVlan, updateVlan } = useIPAM();
+  const { editableDatacenters: datacenters, createVlan, updateVlan } = useIPAM();
   const [vlanId, setVlanId] = useState('100');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');

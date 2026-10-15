@@ -140,7 +140,13 @@ export interface UserProfile {
   id: string;
   name: string;
   email: string;
+  // Job title, shown on the profile; it grants nothing. Permissions come from `access` and `datacenterIds`.
   role: string;
+  access: 'admin' | 'member';
+  // Sign-up requests start as 'pending' and cannot sign in until an admin approves them.
+  status: 'pending' | 'active' | 'disabled';
+  // Datacenters a member may change subnets, VLANs and IPs in. Admins can change everything.
+  datacenterIds: string[];
   department: string;
   organization: string;
   location: string;

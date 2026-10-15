@@ -1,7 +1,7 @@
 import React from 'react';
 import { useIPAM } from '../context/IPAMContext';
 import { BeyondIPLogo } from './BeyondIPLogo';
-import { Building2, Calculator, ChevronsLeft, ChevronsRight, Hash, Layers, LayoutDashboard, Moon, Network, Sun, X } from 'lucide-react';
+import { Building2, Calculator, ShieldCheck, ChevronsLeft, ChevronsRight, Hash, Layers, LayoutDashboard, Moon, Network, Sun, X } from 'lucide-react';
 import { muted } from './ui';
 
 interface SidebarProps {
@@ -17,7 +17,7 @@ const initials = (n: string) => {
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, isMobileOpen = false, onMobileClose }) => {
-  const { activeTab, setActiveTab, datacenters, vlans, subnets, ips, currentUser, wsConnected, isDark, toggleTheme } = useIPAM();
+  const { activeTab, setActiveTab, datacenters, vlans, subnets, ips, currentUser, wsConnected, isDark, toggleTheme, isAdmin } = useIPAM();
 
   const navItems = [
     { id: 'dashboard' as const, label: 'Overview', icon: LayoutDashboard, count: null },
@@ -26,6 +26,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, isMob
     { id: 'subnets' as const, label: 'Subnets', icon: Network, count: subnets.length },
     { id: 'ips' as const, label: 'IP addresses', icon: Hash, count: ips.length },
     { id: 'tools' as const, label: 'Tools', icon: Calculator, count: null },
+    ...(isAdmin ? [{ id: 'admin' as const, label: 'Admin', icon: ShieldCheck, count: null }] : []),
   ];
 
   const expanded = !collapsed || isMobileOpen;
