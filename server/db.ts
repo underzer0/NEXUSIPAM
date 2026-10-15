@@ -5,6 +5,8 @@ import { isIPInCIDR, isValidCIDR, isValidIP, parseCIDR, ipToInt, intToIp, getIPV
 import { mysqlEngine } from './mysql';
 import { hashPasswordSync, verifyPasswordSync, generateSecureApiKey, hashSensitiveData, generateSessionToken, API_KEY_PREFIX } from './crypto';
 
+const MIN_PASSWORD = 6;
+
 export interface UserSession {
   token: string;
   userId: string;
@@ -1613,7 +1615,7 @@ class IPAMDatabase {
     };
 
     // SECURE CRYPTOGRAPHY: Password is salted and hashed with BCrypt
-    if (!data.password || data.password.length < 6) throw new Error('Password must be at least 6 characters');
+    if (!data.password || data.password.length < MIN_PASSWORD) throw new Error(`Password must be at least ${MIN_PASSWORD} characters`);
     const bcryptHash = hashPasswordSync(data.password);
     this.passwordHashes.set(newUser.id, bcryptHash);
 
@@ -1721,9 +1723,40 @@ class IPAMDatabase {
     this.track(mysqlEngine.deleteUser(id));
   }
 
-  // In memory only: MySQL drops a user's sessions with the account, and getUserBySession ignores inactive users.
-  private deleteSessionsFor(userId: string): void {
-    for (const [token, session] of this.sessions) if (session.userId === userId) this.sessions.delete(token);
+  private deleteSessionsFor(userId: string, keepToken?: string): void {
+    for (const [token, session] of this.sessions) {
+      if (session.userId === userId && token !== keepToken) this.sessions.delete(token);
+    }
+    this.track(mysqlEngine.deleteUserSessions(userId, keepToken));
+  }
+
+  // Signs the user out everywhere except the session they changed it from.
+  public changePassword(userId: string, currentPassword: string, newPassword: string, keepToken: string): void {
+    const user = this.users.find(u => u.id === userId);
+    if (!user) throw new Error('User not found');
+    if (!verifyPasswordSync(currentPassword ?? '', this.passwordHashes.get(userId) ?? '')) throw new Error('Your current password is wrong.');
+    this.setPassword(user, newPassword, keepToken);
+    this.logActivity('UPDATE', 'User', user.id, `Password Changed: ${user.name}`, `${user.email} changed their password`);
+  }
+
+  // For forgotten passwords: the admin hands over a temporary one, which signs the user out everywhere.
+  public resetPassword(actorId: string, id: string, newPassword: string): void {
+    const user = this.users.find(u => u.id === id);
+    if (!user) throw new Error('User not found');
+    if (id === actorId) throw new Error('Change your own password on your profile.');
+    this.setPassword(user, newPassword);
+    this.logActivity('UPDATE', 'User', user.id, `Password Reset: ${user.name}`, `An admin set a temporary password for ${user.email}`);
+  }
+
+  private setPassword(user: UserProfile, newPassword: string, keepToken?: string): void {
+    if (typeof newPassword !== 'string' || newPassword.length < MIN_PASSWORD) {
+      throw new Error(`Password must be at least ${MIN_PASSWORD} characters`);
+    }
+    const hash = hashPasswordSync(newPassword);
+    this.passwordHashes.set(user.id, hash);
+    this.deleteSessionsFor(user.id, keepToken);
+    this.persist();
+    this.track(mysqlEngine.saveUser(user, hash, this.apiKeyHashes.get(user.id) ?? null));
   }
 
   public generateApiKey(userId: string): string {

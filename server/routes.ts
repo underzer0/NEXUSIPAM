@@ -35,7 +35,7 @@ const publicUser = (u: UserProfile) => ({
 const adminView = (u: UserProfile) => ({ ...publicUser(u), status: u.status, createdAt: u.createdAt });
 
 // Writes that touch no datacenter; anything else that isn't matched below is admin-only.
-const PERSONAL_WRITES = new Set(['/db/retry', '/auth/signin', '/auth/signout', '/auth/signup', '/user/profile', '/user/generate-api-key']);
+const PERSONAL_WRITES = new Set(['/db/retry', '/auth/signin', '/auth/signout', '/auth/signup', '/user/profile', '/user/password', '/user/generate-api-key']);
 
 // The datacenters a write changes (old and new, for moves), or 'admin' when only admins may make it.
 function datacentersTouched(req: Request): string[] | 'admin' {
@@ -638,10 +638,34 @@ export function createApiRouter(broadcast: (type: WSAction, payload: any) => voi
     }
   });
 
+  router.put('/admin/users/:id/password', async (req: Request, res: Response) => {
+    try {
+      const actor = getSessionUser(req)!;
+      await db.persisted(() => db.resetPassword(actor.id, req.params.id, req.body?.password));
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
+    }
+  });
+
   router.delete('/admin/users/:id', async (req: Request, res: Response) => {
     try {
       const actor = getSessionUser(req)!;
       await db.persisted(() => db.deleteUser(actor.id, req.params.id));
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(err.status ?? 400).json({ success: false, error: err.message });
+    }
+  });
+
+  router.put('/user/password', async (req: Request, res: Response) => {
+    try {
+      // Browser session only, like API keys: a leaked key must not be able to take over the account.
+      const token = req.cookies?.[SESSION_COOKIE_NAME];
+      const currentUser = db.getUserBySession(token);
+      if (!currentUser) return res.status(401).json({ success: false, error: 'Sign in to the web app to change your password' });
+      const { currentPassword, newPassword } = req.body ?? {};
+      await db.persisted(() => db.changePassword(currentUser.id, currentPassword, newPassword, token));
       res.json({ success: true });
     } catch (err: any) {
       res.status(err.status ?? 400).json({ success: false, error: err.message });

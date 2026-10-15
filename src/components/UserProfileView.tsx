@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useIPAM } from '../context/IPAMContext';
-import { Check, Copy, KeyRound, LogOut, RefreshCw, Save } from 'lucide-react';
+import { Check, Copy, KeyRound, LockKeyhole, LogOut, RefreshCw, Save } from 'lucide-react';
 import { UserProfile } from '../types/ipam';
 import { card, chip, input, muted, primaryButton, secondaryButton } from './ui';
+import { PasswordInput } from './SignInView';
 
 const ROLE_OPTIONS = ['IT Engineer', 'Junior Network Admin', 'Senior Network Admin', 'Expert Network Architect', 'IT Manager', 'Director'];
 
@@ -92,6 +93,77 @@ const ApiKeyCard: React.FC<{ masked: string }> = ({ masked: initialMasked }) => 
         </pre>
       )}
     </section>
+  );
+};
+
+const PasswordCard: React.FC = () => {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setDone(false);
+    // Same 6-character minimum the server enforces.
+    if (next.length < 6) return setError('Use at least 6 characters for the new password.');
+    if (next !== confirm) return setError('The new passwords don’t match.');
+    setBusy(true);
+    try {
+      const res = await fetch('/api/user/password', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: current, newPassword: next }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      setCurrent('');
+      setNext('');
+      setConfirm('');
+      setDone(true);
+    } catch (err: any) {
+      setError(err.message || 'Could not change the password.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className={`${card} space-y-4 p-6`}>
+      <div className="flex items-center gap-3">
+        <LockKeyhole className="h-5 w-5 text-cyan-500" aria-hidden />
+        <div>
+          <h2 className="font-semibold text-zinc-900 dark:text-white">Password</h2>
+          <p className={`text-sm ${muted}`}>Changing it signs you out on every other device.</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <label className="space-y-1.5">
+          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Current password</span>
+          <PasswordInput required autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">New password</span>
+          <PasswordInput required minLength={6} autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Repeat new password</span>
+          <PasswordInput required autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+        </label>
+      </div>
+      {error && <p role="alert" className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
+      <div className="flex items-center justify-end gap-3">
+        <span role="status" className="mr-auto text-sm text-emerald-600 dark:text-emerald-400">
+          {done && 'Password changed.'}
+        </span>
+        <button type="submit" disabled={busy} className={`${primaryButton} disabled:opacity-50`}>
+          {busy ? 'Changing…' : 'Change password'}
+        </button>
+      </div>
+    </form>
   );
 };
 
@@ -213,6 +285,8 @@ export const UserProfileView: React.FC = () => {
           </button>
         </div>
       </form>
+
+      <PasswordCard />
 
       <ApiKeyCard key={currentUser.id} masked={currentUser.apiKey ?? ''} />
     </div>

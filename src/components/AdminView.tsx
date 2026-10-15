@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Check, ShieldCheck, Trash2, UserCheck, UserX, Users } from 'lucide-react';
+import { Check, KeyRound, ShieldCheck, Trash2, UserCheck, UserX, Users } from 'lucide-react';
 import { useIPAM } from '../context/IPAMContext';
 import { UserProfile } from '../types/ipam';
 import { Segmented, card, chip, chipNeutral, iconButton, muted, primaryButton, secondaryButton } from './ui';
@@ -81,6 +81,21 @@ export const AdminView: React.FC = () => {
     try {
       await api(`/api/admin/users/${a.id}`, { method: 'DELETE' });
       setAccounts((prev) => prev?.filter((x) => x.id !== a.id) ?? null);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const resetPassword = async (a: Account) => {
+    const password = window.prompt(`Temporary password for ${a.name} (at least 6 characters). They should change it on their profile.`);
+    if (password === null) return;
+    setBusyId(a.id);
+    setError(null);
+    try {
+      await api(`/api/admin/users/${a.id}/password`, { method: 'PUT', body: JSON.stringify({ password }) });
+      window.alert(`Password reset. ${a.name} has been signed out everywhere.`);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -191,6 +206,16 @@ export const AdminView: React.FC = () => {
                   />
                   {!isSelf && (
                     <div className="flex">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => resetPassword(a)}
+                        className={iconButton}
+                        title="Reset password"
+                        aria-label={`Reset password for ${a.name}`}
+                      >
+                        <KeyRound className="h-4 w-4" />
+                      </button>
                       <button
                         type="button"
                         disabled={busy}
