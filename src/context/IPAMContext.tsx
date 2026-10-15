@@ -66,6 +66,8 @@ interface IPAMContextType {
   // What the user may change, for pickers in dialogs; stable between renders.
   editableDatacenters: Datacenter[];
   editableSubnets: Subnet[];
+  // Sign-up requests waiting for approval (admins only; 0 for members).
+  pendingRequests: number;
 
   createDatacenter: (data: { name: string; location: string; description: string }) => Promise<Datacenter>;
   updateDatacenter: (id: string, data: { name?: string; location?: string; description?: string }) => Promise<Datacenter>;
@@ -107,6 +109,7 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [stats, setStats] = useState<IPAMStats | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [currentUser, setCurrentUser] = useState<UserProfile>(emptyUser);
+  const [pendingRequests, setPendingRequests] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -154,6 +157,7 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIps(json.data.ips || []);
         setStats(json.data.stats || null);
         setActivityLogs(json.data.activityLogs || []);
+        setPendingRequests(json.data.pendingRequests ?? 0);
 
         if (json.data.currentUser && json.data.currentUser.id) {
           setCurrentUser(json.data.currentUser);
@@ -265,6 +269,10 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setActivityLogs(msg.payload.activityLogs || []);
             setLoading(false);
           }
+          break;
+
+        case 'PENDING_REQUESTS':
+          setPendingRequests(msg.payload?.count ?? 0);
           break;
 
         case 'USER_UPDATED':
@@ -662,6 +670,7 @@ export const IPAMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         canEditDc,
         editableDatacenters,
         editableSubnets,
+        pendingRequests: isAdmin ? pendingRequests : 0,
         createDatacenter,
         updateDatacenter,
         deleteDatacenter,

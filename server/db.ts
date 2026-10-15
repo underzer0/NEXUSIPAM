@@ -1667,6 +1667,10 @@ class IPAMDatabase {
     return true;
   }
 
+  public getPendingRequestCount(): number {
+    return this.users.filter(u => u.status === 'pending').length;
+  }
+
   public canEditDatacenter(user: UserProfile, datacenterId: string | undefined): boolean {
     return user.access === 'admin' || (!!datacenterId && user.datacenterIds.includes(datacenterId));
   }

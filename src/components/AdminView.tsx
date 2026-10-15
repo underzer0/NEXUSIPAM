@@ -49,7 +49,7 @@ const DcPicker: React.FC<{ value: string[]; onChange: (ids: string[]) => void; d
 };
 
 export const AdminView: React.FC = () => {
-  const { currentUser } = useIPAM();
+  const { currentUser, pendingRequests } = useIPAM();
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -59,7 +59,8 @@ export const AdminView: React.FC = () => {
   const load = useCallback(() => {
     api('/api/admin/users').then(setAccounts, (err) => setError(err.message));
   }, []);
-  useEffect(load, [load]);
+  // Reload when the waiting-request count changes, so new requests appear without a refresh.
+  useEffect(load, [load, pendingRequests]);
 
   const update = async (id: string, patch: Partial<Pick<Account, 'access' | 'status' | 'datacenterIds'>>) => {
     setBusyId(id);
